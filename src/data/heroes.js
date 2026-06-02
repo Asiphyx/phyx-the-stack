@@ -105,11 +105,11 @@ export const HEROES = {
     quote: 'Here to help, always.',
   },
 
-  paradox: {
-    id: 'paradox',
-    name: 'Paradox',
-    title: 'The Backward Architect',
-    portrait: '/assets/heroes/6.png',
+  antigrav: {
+    id: 'antigrav',
+    name: 'Antigrav',
+    title: 'The Weightless Menace',
+    portrait: '/assets/heroes/antigrav.png',
     maxHp: 68,
     startingDeck: [
       'git_push', 'git_push', 'git_push',

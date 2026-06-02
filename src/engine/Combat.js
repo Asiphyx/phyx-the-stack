@@ -602,7 +602,7 @@ export class Combat {
 
   _maybeApplyParadoxCombo(cardCategory, options = {}) {
     const s = this.gs.state;
-    if (s.hero?.id !== 'paradox') return 0;
+    if (s.hero?.id !== 'antigrav') return 0;
     if (options.sourceEffect) return 0;
     if (cardCategory === 'utility' || cardCategory === null) return 0;
 

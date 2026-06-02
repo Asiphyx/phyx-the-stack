@@ -232,10 +232,10 @@ function renderCombat() {
 
   const hero = state.hero;
   const combatHeroesHint = hero?.id === 'xadnib' ? ' · Xadnib sees the next 2 intents' : '';
-  const paradoxHint = hero?.id === 'paradox' ? ` · Backwards chain x${snapshot.paradoxChain ?? 0}` : '';
+  const antigravHint = hero?.id === 'antigrav' ? ` · Backwards chain x${snapshot.paradoxChain ?? 0}` : '';
   section.innerHTML = `
     <div class="combat-top-bar">
-      <div class="combat-floor-info">${hero?.name ?? 'Hero'} · Floor ${snapshot.floor}/${snapshot.maxFloor}${combatHeroesHint}${paradoxHint}</div>
+      <div class="combat-floor-info">${hero?.name ?? 'Hero'} · Floor ${snapshot.floor}/${snapshot.maxFloor}${combatHeroesHint}${antigravHint}</div>
       <div class="combat-player-stats">
         <div class="stat-badge hp">
           <span class="stat-icon">❤</span>
