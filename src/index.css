@@ -93,7 +93,11 @@ html, body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: var(--bg-void);
+  background-color: #030306;
+  background-image: 
+    linear-gradient(0deg, rgba(0, 229, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 229, 255, 0.02) 1px, transparent 1px);
+  background-size: 36px 36px;
   color: var(--text-primary);
   font-family: var(--font-body);
   font-size: 16px;
@@ -143,6 +147,79 @@ body::after {
   overflow: hidden;
 }
 
+#game-root::after {
+  content: " ";
+  display: block;
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 4px;
+  background: rgba(0, 229, 255, 0.15);
+  box-shadow: 0 0 15px rgba(0, 229, 255, 0.5), 0 0 30px rgba(0, 229, 255, 0.2);
+  pointer-events: none;
+  z-index: 100000;
+  animation: scanlineRefresh 8s linear infinite;
+}
+
+@keyframes scanlineRefresh {
+  0% { transform: translateY(-10px); opacity: 0; }
+  1% { opacity: 1; }
+  99% { opacity: 1; }
+  100% { transform: translateY(100vh); opacity: 0; }
+}
+
+/* Cyberpunk Text Glitch Class */
+.glitch-text {
+  position: relative;
+  color: var(--text-primary);
+  font-family: var(--font-pixel);
+}
+
+.glitch-text::before,
+.glitch-text::after {
+  content: attr(data-text);
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: var(--bg-void);
+  overflow: hidden;
+}
+
+.glitch-text::before {
+  left: 2px;
+  text-shadow: -2px 0 var(--neon-pink);
+  clip: rect(44px, 450px, 56px, 0);
+  animation: glitch-anim 5s infinite linear alternate-reverse;
+}
+
+.glitch-text::after {
+  left: -2px;
+  text-shadow: -2px 0 var(--neon-cyan), 0 2px var(--neon-cyan);
+  clip: rect(85px, 450px, 140px, 0);
+  animation: glitch-anim2 5s infinite linear alternate-reverse;
+}
+
+@keyframes glitch-anim {
+  0% { clip: rect(15px, 9999px, 66px, 0); transform: skew(0.3deg); }
+  5% { clip: rect(85px, 9999px, 5px, 0); transform: skew(-0.5deg); }
+  10% { clip: rect(34px, 9999px, 115px, 0); transform: skew(0.1deg); }
+  15% { clip: rect(141px, 9999px, 50px, 0); transform: skew(-0.2deg); }
+  20% { clip: rect(67px, 9999px, 98px, 0); transform: skew(0.6deg); }
+  25% { clip: rect(12px, 9999px, 150px, 0); transform: skew(0deg); }
+  30% { clip: rect(85px, 9999px, 3px, 0); transform: skew(-0.1deg); }
+  100% { clip: rect(15px, 9999px, 66px, 0); transform: skew(0deg); }
+}
+
+@keyframes glitch-anim2 {
+  0% { clip: rect(76px, 9999px, 116px, 0); transform: skew(-0.1deg); }
+  5% { clip: rect(121px, 9999px, 43px, 0); transform: skew(0.3deg); }
+  10% { clip: rect(15px, 9999px, 98px, 0); transform: skew(-0.2deg); }
+  15% { clip: rect(89px, 9999px, 12px, 0); transform: skew(0.1deg); }
+  20% { clip: rect(54px, 9999px, 132px, 0); transform: skew(-0.5deg); }
+  25% { clip: rect(110px, 9999px, 80px, 0); transform: skew(0.2deg); }
+  30% { clip: rect(5px, 9999px, 140px, 0); transform: skew(0deg); }
+  100% { clip: rect(76px, 9999px, 116px, 0); transform: skew(0deg); }
+}
+
 #screen-container {
   position: absolute;
   inset: 0;
@@ -175,10 +252,10 @@ body::after {
 }
 
 /* ── Scrollbar ── */
-::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg-deep); }
-::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
+::-webkit-scrollbar-thumb { background: var(--neon-cyan); border-radius: 0px; }
+::-webkit-scrollbar-thumb:hover { background: var(--neon-pink); }
 
 /* ══════════════════════════════════════════════
    TYPOGRAPHY
@@ -1235,21 +1312,22 @@ body::after {
   padding: var(--space-sm) var(--space-lg);
   background: var(--bg-card);
   border: 2px solid var(--text-muted);
-  border-radius: 10px;
+  border-radius: 0px;
   cursor: pointer;
   width: 100%;
-  transition: all 0.25s var(--ease-out-expo);
+  transition: all 0.2s ease;
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
 }
 
 .map-node:hover {
   border-color: var(--neon-cyan);
-  box-shadow: 0 0 20px var(--neon-cyan-glow);
+  box-shadow: -3px 0 0 var(--neon-pink), 3px 0 0 var(--neon-cyan), 0 0 15px var(--neon-cyan-glow);
   transform: translateX(4px);
 }
 
 .map-node.current {
   border-color: var(--neon-pink);
-  box-shadow: 0 0 25px var(--neon-pink-glow);
+  box-shadow: -3px 0 0 var(--neon-cyan), 3px 0 0 var(--neon-pink), 0 0 20px var(--neon-pink-glow);
 }
 
 .map-node.completed {

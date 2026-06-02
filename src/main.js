@@ -56,7 +56,7 @@ function renderTitle() {
   section.innerHTML = `
     <div class="title-logo">
       <div class="title-subtitle">A Phyxian Roguelike Deckbuilder</div>
-      <h1>Phyx the Stack</h1>
+      <h1 class="glitch-text" data-text="Phyx the Stack">Phyx the Stack</h1>
       <p class="title-cta">Click to begin</p>
     </div>
     <button class="btn btn-primary" id="start-btn">New Run</button>
@@ -75,8 +75,9 @@ function renderTitle() {
 
 function renderHeroSelect() {
   const section = el('section', 'hero-select-screen');
-  const heading = el('div', 'hero-select-title');
-  heading.textContent = 'Choose Your Hero';
+  const heading = el('div', 'hero-select-title glitch-text');
+  heading.dataset.text = 'CHOOSE YOUR HERO';
+  heading.textContent = 'CHOOSE YOUR HERO';
   section.appendChild(heading);
 
   const grid = el('div', 'hero-grid');
@@ -339,7 +340,7 @@ function renderDraft() {
 
   if (draft.draftType === 'choice') {
     section.innerHTML = `
-      <div class="draft-title">REFACTORING TERMINAL</div>
+      <div class="draft-title glitch-text" data-text="REFACTORING TERMINAL">REFACTORING TERMINAL</div>
       <div class="text-small" style="color:var(--text-secondary); margin-bottom: 20px;">Initialize a codebase refactoring directive to fix technical debt.</div>
       <div class="terminal-options">
         <button class="terminal-opt-btn btn-deprecate" data-mode="deprecate">
@@ -376,7 +377,7 @@ function renderDraft() {
 
   } else if (draft.draftType === 'deprecate_select') {
     section.innerHTML = `
-      <div class="draft-title">DEPRECATE: SELECT SOURCE LINE</div>
+      <div class="draft-title glitch-text" data-text="DEPRECATE: SELECT SOURCE LINE">DEPRECATE: SELECT SOURCE LINE</div>
       <div class="text-small" style="color:var(--text-secondary); margin-bottom: 20px;">Click a card in your deck to permanently wipe it from the codebase.</div>
       <div class="deck-select-grid"></div>
       <button class="btn" id="cancel-refactor" style="margin-top: 20px;">Cancel</button>
@@ -401,7 +402,7 @@ function renderDraft() {
 
   } else if (draft.draftType === 'refactor_select') {
     section.innerHTML = `
-      <div class="draft-title">REFACTOR: UPGRADE DEPENDENCY</div>
+      <div class="draft-title glitch-text" data-text="REFACTOR: UPGRADE DEPENDENCY">REFACTOR: UPGRADE DEPENDENCY</div>
       <div class="text-small" style="color:var(--text-secondary); margin-bottom: 20px;">Click a card in your deck to optimize its performance stats (damage/block values ++).</div>
       <div class="deck-select-grid"></div>
       <button class="btn" id="cancel-refactor" style="margin-top: 20px;">Cancel</button>
@@ -426,7 +427,7 @@ function renderDraft() {
 
   } else if (draft.draftType === 'compile_select') {
     section.innerHTML = `
-      <div class="draft-title">COMPILE FEATURE: SELECT FEATURE</div>
+      <div class="draft-title glitch-text" data-text="COMPILE FEATURE: SELECT FEATURE">COMPILE FEATURE: SELECT FEATURE</div>
       <div class="text-small" style="color:var(--text-secondary); margin-bottom: 20px;">Select a new library feature to add to your stack.</div>
       <div class="draft-cards"></div>
       <button class="btn" id="cancel-refactor" style="margin-top: 20px;">Cancel</button>
@@ -463,7 +464,7 @@ function renderGameOver() {
   const snap = game.getSnapshot();
   const section = el('section', 'gameover-screen');
   section.innerHTML = `
-    <div class="gameover-title">Stack Overflow</div>
+    <div class="gameover-title glitch-text" data-text="Stack Overflow">Stack Overflow</div>
     <div class="text-subheading">Your process has been killed.</div>
     <div class="run-stats">
       <div class="run-stat"><div class="run-stat-value">${snap.floor}</div><div class="run-stat-label">Floor Reached</div></div>
@@ -481,7 +482,7 @@ function renderVictory() {
   const snap = game.getSnapshot();
   const section = el('section', 'victory-screen');
   section.innerHTML = `
-    <div class="victory-title">Stack Phyxed</div>
+    <div class="victory-title glitch-text" data-text="Stack Phyxed">Stack Phyxed</div>
     <div class="text-subheading">Process exited with code 0. Clean run.</div>
     <div class="run-stats">
       <div class="run-stat"><div class="run-stat-value">${snap.floor}</div><div class="run-stat-label">Floors Cleared</div></div>
