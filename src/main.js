@@ -334,39 +334,125 @@ function renderCard(card, index, canPlay) {
 
 function renderDraft() {
   const snap = game.getSnapshot();
+  const draft = game.draft;
   const section = el('section', 'draft-screen');
-  section.innerHTML = `
-    <div class="draft-title">Choose a Card</div>
-    <div class="text-small" style="color:var(--text-secondary)">or skip to keep your deck lean</div>
-    <div class="draft-cards"></div>
-    <button class="btn" id="skip-draft">Skip</button>
-  `;
 
-  const list = section.querySelector('.draft-cards');
-  if (!activeDraft.length) activeDraft = fallbackDraft();
-  for (const [i, card] of activeDraft.entries()) {
-    const wrap = el('button', 'draft-card-wrapper');
-    wrap.type = 'button';
-    const inner = el('div', 'game-card');
-    inner.dataset.rarity = card.rarity ?? 'common';
-    inner.dataset.type = card.type ?? 'skill';
-    inner.innerHTML = `
-      <div class="card-header"><div class="card-name">${card.name}</div><div class="card-cost">${card.cost ?? 0}</div></div>
-      <div class="card-emoji">${card.emoji ?? '🧪'}</div>
-      <div class="card-description">${card.description ?? ''}</div>
-      <div class="card-flavor">${card.flavor ?? ''}</div>
+  if (draft.draftType === 'choice') {
+    section.innerHTML = `
+      <div class="draft-title">REFACTORING TERMINAL</div>
+      <div class="text-small" style="color:var(--text-secondary); margin-bottom: 20px;">Initialize a codebase refactoring directive to fix technical debt.</div>
+      <div class="terminal-options">
+        <button class="terminal-opt-btn btn-deprecate" data-mode="deprecate">
+          <span class="terminal-opt-code">[01]</span>
+          <span class="terminal-opt-name">DEPRECATE LINE</span>
+          <span class="terminal-opt-desc">Remove a card permanently from your stack.</span>
+        </button>
+        <button class="terminal-opt-btn btn-refactor" data-mode="refactor">
+          <span class="terminal-opt-code">[02]</span>
+          <span class="terminal-opt-name">REFACTOR FUNCTION</span>
+          <span class="terminal-opt-desc">Upgrade a card in your stack to higher performance.</span>
+        </button>
+        <button class="terminal-opt-btn btn-compile" data-mode="compile">
+          <span class="terminal-opt-code">[03]</span>
+          <span class="terminal-opt-name">COMPILE FEATURE</span>
+          <span class="terminal-opt-desc">Draft a new advanced library feature card.</span>
+        </button>
+      </div>
+      <button class="btn" id="skip-draft" style="margin-top: 20px;">Skip Refactoring</button>
     `;
-    wrap.appendChild(inner);
-    wrap.onclick = () => { game.draft.pickCard(i); activeDraft = []; };
-    list.appendChild(wrap);
+
+    setTimeout(() => {
+      section.querySelectorAll('.terminal-opt-btn').forEach(btn => {
+        btn.onclick = () => {
+          draft.chooseMode(btn.dataset.mode);
+          render();
+        };
+      });
+      section.querySelector('#skip-draft').onclick = () => {
+        draft.skip();
+        render();
+      };
+    }, 0);
+
+  } else if (draft.draftType === 'deprecate_select') {
+    section.innerHTML = `
+      <div class="draft-title">DEPRECATE: SELECT SOURCE LINE</div>
+      <div class="text-small" style="color:var(--text-secondary); margin-bottom: 20px;">Click a card in your deck to permanently wipe it from the codebase.</div>
+      <div class="deck-select-grid"></div>
+      <button class="btn" id="cancel-refactor" style="margin-top: 20px;">Cancel</button>
+    `;
+
+    setTimeout(() => {
+      const grid = section.querySelector('.deck-select-grid');
+      for (const card of game.state.deck) {
+        const cardEl = renderCard(card, 0, true);
+        cardEl.onclick = (e) => {
+          e.stopPropagation();
+          draft.deprecateCard(card.instanceId);
+          render();
+        };
+        grid.appendChild(cardEl);
+      }
+      section.querySelector('#cancel-refactor').onclick = () => {
+        draft.generateDraft(game.state.cardPool);
+        render();
+      };
+    }, 0);
+
+  } else if (draft.draftType === 'refactor_select') {
+    section.innerHTML = `
+      <div class="draft-title">REFACTOR: UPGRADE DEPENDENCY</div>
+      <div class="text-small" style="color:var(--text-secondary); margin-bottom: 20px;">Click a card in your deck to optimize its performance stats (damage/block values ++).</div>
+      <div class="deck-select-grid"></div>
+      <button class="btn" id="cancel-refactor" style="margin-top: 20px;">Cancel</button>
+    `;
+
+    setTimeout(() => {
+      const grid = section.querySelector('.deck-select-grid');
+      for (const card of game.state.deck) {
+        const cardEl = renderCard(card, 0, true);
+        cardEl.onclick = (e) => {
+          e.stopPropagation();
+          draft.refactorCard(card.instanceId);
+          render();
+        };
+        grid.appendChild(cardEl);
+      }
+      section.querySelector('#cancel-refactor').onclick = () => {
+        draft.generateDraft(game.state.cardPool);
+        render();
+      };
+    }, 0);
+
+  } else if (draft.draftType === 'compile_select') {
+    section.innerHTML = `
+      <div class="draft-title">COMPILE FEATURE: SELECT FEATURE</div>
+      <div class="text-small" style="color:var(--text-secondary); margin-bottom: 20px;">Select a new library feature to add to your stack.</div>
+      <div class="draft-cards"></div>
+      <button class="btn" id="cancel-refactor" style="margin-top: 20px;">Cancel</button>
+    `;
+
+    setTimeout(() => {
+      const list = section.querySelector('.draft-cards');
+      for (const [i, card] of draft.offeredCards.entries()) {
+        const wrap = el('button', 'draft-card-wrapper');
+        wrap.type = 'button';
+        const cardEl = renderCard(card, i, true);
+        wrap.appendChild(cardEl);
+        wrap.onclick = () => {
+          draft.pickCard(i);
+          render();
+        };
+        list.appendChild(wrap);
+      }
+      section.querySelector('#cancel-refactor').onclick = () => {
+        draft.generateDraft(game.state.cardPool);
+        render();
+      };
+    }, 0);
   }
 
-  section.querySelector('#skip-draft').onclick = () => { game.draft.skip(); activeDraft = []; };
   root.appendChild(section);
-}
-
-function fallbackDraft() {
-  return (game.state.cardPool ?? cardPool).sort(() => Math.random() - 0.5).slice(0, 3);
 }
 
 // ──────────────────────────────────────────────────────────

@@ -1639,3 +1639,91 @@ body::after {
 }
 
 .hidden { display: none !important; }
+
+/* ══════════════════════════════════════════════
+   REFACTORING TERMINAL
+   ══════════════════════════════════════════════ */
+.terminal-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  width: 100%;
+  max-width: 500px;
+  margin-top: 10px;
+}
+
+.terminal-opt-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: var(--space-md);
+  background: rgba(0, 0, 0, 0.4);
+  border: 2px solid var(--text-muted);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+  outline: none;
+}
+
+.terminal-opt-btn.btn-deprecate { border-color: var(--neon-red); }
+.terminal-opt-btn.btn-refactor { border-color: var(--neon-gold); }
+.terminal-opt-btn.btn-compile { border-color: var(--neon-cyan); }
+
+.terminal-opt-btn:hover {
+  transform: translateX(5px);
+}
+
+.terminal-opt-btn.btn-deprecate:hover {
+  background: rgba(255, 51, 68, 0.08);
+  box-shadow: -3px 0 0 var(--neon-pink), 3px 0 0 var(--neon-cyan), 0 0 15px var(--neon-red-glow);
+}
+.terminal-opt-btn.btn-refactor:hover {
+  background: rgba(255, 204, 0, 0.08);
+  box-shadow: -3px 0 0 var(--neon-pink), 3px 0 0 var(--neon-cyan), 0 0 15px var(--neon-gold-glow);
+}
+.terminal-opt-btn.btn-compile:hover {
+  background: rgba(0, 229, 255, 0.08);
+  box-shadow: -3px 0 0 var(--neon-pink), 3px 0 0 var(--neon-cyan), 0 0 15px var(--neon-cyan-glow);
+}
+
+.terminal-opt-code {
+  font-family: var(--font-pixel);
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  margin-bottom: var(--space-xs);
+}
+.terminal-opt-btn.btn-deprecate:hover .terminal-opt-code { color: var(--neon-pink); }
+.terminal-opt-btn.btn-refactor:hover .terminal-opt-code { color: var(--neon-gold); }
+.terminal-opt-btn.btn-compile:hover .terminal-opt-code { color: var(--neon-cyan); }
+
+.terminal-opt-name {
+  font-family: var(--font-pixel);
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin-bottom: var(--space-xs);
+}
+.terminal-opt-btn.btn-deprecate .terminal-opt-name { color: var(--neon-red); }
+.terminal-opt-btn.btn-refactor .terminal-opt-name { color: var(--neon-gold); }
+.terminal-opt-btn.btn-compile .terminal-opt-name { color: var(--neon-cyan); }
+
+.terminal-opt-desc {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+/* Deck Select Grid */
+.deck-select-grid {
+  display: flex;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 1000px;
+  max-height: 55vh;
+  overflow-y: auto;
+  padding: var(--space-md);
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}

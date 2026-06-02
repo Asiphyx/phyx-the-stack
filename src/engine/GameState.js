@@ -156,6 +156,19 @@ export class GameState {
       })
       .filter(Boolean);
 
+    // Add technical debt cards to bloat starting deck (Legacy Code Reversal mechanic)
+    const debtCards = ['spaghetti_code', 'deprecated_api', 'merge_conflict', 'memory_leak'];
+    debtCards.forEach((debtId, i) => {
+      const card = CARDS[debtId];
+      if (card) {
+        s.deck.push({
+          ...card,
+          instanceId: `${card.id}_debt_${i}`,
+          _source: debtId,
+        });
+      }
+    });
+
     // reset combat piles
     s.drawPile = [];
     s.discardPile = [];

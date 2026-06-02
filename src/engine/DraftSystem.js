@@ -1,12 +1,7 @@
 // ============================================================
 // DraftSystem.js — Card draft / reward system after combat
 // ============================================================
-// After each combat victory the player is offered 3 cards to
-// choose from (or they may skip).  The selected card is added
-// to their permanent deck.
-//
-// The card pool passed in should come from game data; this
-// module is pool-agnostic — it just samples and adds.
+// Modified for Phyx the Stack: Legacy Refactoring Terminal
 // ============================================================
 
 import bus from './EventBus.js';
@@ -19,8 +14,14 @@ export class DraftSystem {
     /** @type {import('./GameState.js').GameState} */
     this.gs = gameState;
 
-    /** Cards currently offered to the player (3 choices). */
+    /** Current phase type: 'choice', 'deprecate_select', 'refactor_select', 'compile_select' */
+    this.draftType = 'choice';
+
+    /** Cards currently offered to the player for drafting (Option 3: Compile) */
     this.offeredCards = [];
+    
+    /** Saved full card pool for feature compiling */
+    this.cardPool = [];
   }
 
   // ──────────────────────────────────────────────────────────
@@ -28,41 +29,110 @@ export class DraftSystem {
   // ──────────────────────────────────────────────────────────
 
   /**
-   * Offer a draft of N cards from the given pool.
+   * Enter the refactoring terminal after combat.
    * Called by GameState when entering the 'draft' phase.
    *
    * @param {object[]} cardPool — full array of possible reward cards
-   * @param {number}   [count=3] — how many choices to show
    */
-  generateDraft(cardPool, count = 3) {
-    // Filter out cards the player already owns if they're flagged unique
-    const owned = new Set(this.gs.state.deck.map(c => c.id));
-    const eligible = cardPool.filter(c => !c.unique || !owned.has(c.id));
-
-    // Sample without replacement
-    const shuffled = [...eligible].sort(() => Math.random() - 0.5);
-    this.offeredCards = shuffled.slice(0, count).map(c => ({ ...c }));
+  generateDraft(cardPool) {
+    this.cardPool = cardPool;
+    this.draftType = 'choice';
+    this.offeredCards = [];
 
     bus.emit('draftOffered', {
+      type: this.draftType,
+      cards: [],
+      gold: this.gs.state.gold,
+    });
+  }
+
+  /**
+   * Choose a refactoring mode in the terminal.
+   * @param {string} mode — 'deprecate', 'refactor', 'compile'
+   */
+  chooseMode(mode) {
+    if (mode === 'deprecate') {
+      this.draftType = 'deprecate_select';
+    } else if (mode === 'refactor') {
+      this.draftType = 'refactor_select';
+    } else if (mode === 'compile') {
+      this.draftType = 'compile_select';
+      // Pick 3 random cards to show
+      const owned = new Set(this.gs.state.deck.map(c => c.id));
+      const eligible = this.cardPool.filter(c => !c.unique || !owned.has(c.id));
+      const shuffled = [...eligible].sort(() => Math.random() - 0.5);
+      this.offeredCards = shuffled.slice(0, 3).map(c => ({ ...c }));
+    }
+
+    bus.emit('draftOffered', {
+      type: this.draftType,
       cards: this.offeredCards.map(c => ({ ...c })),
       gold: this.gs.state.gold,
     });
   }
 
   // ──────────────────────────────────────────────────────────
-  //  Player picks a card (or skips)
+  //  Refactoring Actions
   // ──────────────────────────────────────────────────────────
 
   /**
-   * Player selects one of the offered cards.
-   * @param {number} index — index in offeredCards (0-based)
-   * @returns {boolean} true if the pick was valid
+   * Deprecate: Delete a card by instance ID.
+   */
+  deprecateCard(instanceId) {
+    const s = this.gs.state;
+    const idx = s.deck.findIndex(c => c.instanceId === instanceId);
+    if (idx === -1) return false;
+
+    const card = s.deck.splice(idx, 1)[0];
+    bus.emit('toast', { text: `DEPRECATED: ${card.name}!`, type: 'danger' });
+    this._advanceAfterDraft();
+    return true;
+  }
+
+  /**
+   * Refactor: Upgrade a card's parameters.
+   */
+  refactorCard(instanceId) {
+    const s = this.gs.state;
+    const card = s.deck.find(c => c.instanceId === instanceId);
+    if (!card) return false;
+
+    card.upgraded = (card.upgraded ?? 0) + 1;
+    card.name = `${card.name.replace(/\++/g, '')}++`;
+
+    // Upgrade numeric values in effects
+    for (const effect of card.effects ?? []) {
+      if (effect.value !== undefined) {
+        if (effect.type === 'damage' || effect.type === 'damageAll') {
+          effect.value = Math.round(effect.value * 1.5) + 3;
+        } else if (effect.type === 'block') {
+          effect.value = Math.round(effect.value * 1.5) + 3;
+        } else if (effect.type === 'heal' || effect.type === 'draw' || effect.type === 'energy') {
+          effect.value += 1;
+        }
+      }
+    }
+
+    // Rewrite description text
+    if (card.description) {
+      card.description = card.description.replace(/\d+/g, (val) => {
+        const num = parseInt(val, 10);
+        return Math.round(num * 1.5) + (num > 2 ? 3 : 1);
+      });
+    }
+
+    bus.emit('toast', { text: `REFACTORED: ${card.name}!`, type: 'passive' });
+    this._advanceAfterDraft();
+    return true;
+  }
+
+  /**
+   * Compile Feature: Add a card to the deck.
    */
   pickCard(index) {
     const card = this.offeredCards[index];
     if (!card) return false;
 
-    // Give the card a unique instance id so the deck can hold duplicates
     const instance = {
       ...card,
       instanceId: `${card.id}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -70,14 +140,13 @@ export class DraftSystem {
 
     this.gs.state.deck.push(instance);
     this.offeredCards = [];
-
-    bus.emit('combatUpdate', { deckSize: this.gs.state.deck.length });
+    bus.emit('toast', { text: `COMPILED: ${card.name}!`, type: 'info' });
     this._advanceAfterDraft();
     return true;
   }
 
   /**
-   * Player skips the draft — takes no card.
+   * Skip refactoring.
    */
   skip() {
     this.offeredCards = [];
@@ -88,15 +157,11 @@ export class DraftSystem {
   //  Post-draft progression
   // ──────────────────────────────────────────────────────────
 
-  /** Move to the next floor (via map) or declare victory. */
   _advanceAfterDraft() {
     const s = this.gs.state;
-
-    // If we just beat the final floor → victory!
     if (s.floor >= s.maxFloor) {
       this.gs.setPhase('victory');
     } else {
-      // Advance floor counter and go back to the map
       s.floor += 1;
       this.gs.setPhase('map');
     }

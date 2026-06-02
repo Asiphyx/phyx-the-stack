@@ -57,6 +57,75 @@ export const CARDS = {
   },
 
   // ─────────────────────────────────────────────
+  // TECHNICAL DEBT CARDS (Legacy Code)
+  // ─────────────────────────────────────────────
+
+  spaghetti_code: {
+    id: 'spaghetti_code',
+    name: 'Spaghetti Code',
+    description: 'Deal 3 damage. Draw 1 card.',
+    flavor: 'It works, but nobody knows why.',
+    cost: 1,
+    rarity: 'debt',
+    type: 'attack',
+    effects: [
+      { type: 'damage', value: 3, target: 'enemy' },
+      { type: 'draw', value: 1 },
+    ],
+    heroOnly: null,
+    emoji: '🍝',
+    tags: ['offensive'],
+  },
+
+  deprecated_api: {
+    id: 'deprecated_api',
+    name: 'Deprecated API',
+    description: 'Gain 4 block. Take 2 damage.',
+    flavor: 'Will be removed in v2.0.',
+    cost: 1,
+    rarity: 'debt',
+    type: 'skill',
+    effects: [
+      { type: 'block', value: 4, target: 'self' },
+      { type: 'damageSelf', value: 2 },
+    ],
+    heroOnly: null,
+    emoji: '⚠️',
+    tags: ['defensive'],
+  },
+
+  merge_conflict: {
+    id: 'merge_conflict',
+    name: 'Merge Conflict',
+    description: 'Deal 5 damage. Discard 1 card.',
+    flavor: '<<<<<<< HEAD',
+    cost: 1,
+    rarity: 'debt',
+    type: 'attack',
+    effects: [
+      { type: 'damage', value: 5, target: 'enemy' },
+      { type: 'discard', value: 1 },
+    ],
+    heroOnly: null,
+    emoji: '💥',
+    tags: ['offensive'],
+  },
+
+  memory_leak: {
+    id: 'memory_leak',
+    name: 'Memory Leak',
+    description: 'Unplayable. When drawn, lose 1 Energy.',
+    flavor: 'Where did the RAM go?',
+    cost: 1,
+    rarity: 'debt',
+    type: 'skill',
+    effects: [],
+    heroOnly: null,
+    emoji: '💧',
+    tags: ['curse'],
+  },
+
+  // ─────────────────────────────────────────────
   // COMMON CARDS
   // ─────────────────────────────────────────────
 

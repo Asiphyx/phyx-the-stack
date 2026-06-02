@@ -190,7 +190,12 @@ export class Combat {
       }
 
       if (s.drawPile.length > 0) {
-        s.hand.push(s.drawPile.pop());
+        const card = s.drawPile.pop();
+        s.hand.push(card);
+        if (card.id === 'memory_leak') {
+          s.energy = Math.max(0, s.energy - 1);
+          bus.emit('toast', { text: 'Memory Leak: -1 Energy!', type: 'danger' });
+        }
       }
     }
 
@@ -217,6 +222,11 @@ export class Combat {
     const s = this.gs.state;
     const card = s.hand[handIndex];
     if (!card) return false;
+
+    if (card.tags?.includes('curse') || card.id === 'memory_leak') {
+      bus.emit('toast', { text: `${card.name} is unplayable!`, type: 'danger' });
+      return false;
+    }
 
     const effectiveCost = this.getCardCost(card);
     if (effectiveCost > s.energy) return false;
@@ -498,6 +508,29 @@ export class Combat {
         }
         case 'unit_test': {
           this._addBlock(toDisplayInt(effect.value ?? 8));
+          break;
+        }
+        case 'damageSelf': {
+          const val = toDisplayInt(effect.value ?? 0);
+          s.hp = Math.max(0, s.hp - val);
+          bus.emit('damageDealt', { target: 'player', amount: val });
+          break;
+        }
+        case 'discard': {
+          const count = toDisplayInt(effect.value ?? 1);
+          for (let i = 0; i < count; i++) {
+            if (s.hand.length > 0) {
+              const idx = Math.floor(Math.random() * s.hand.length);
+              const cardDiscarded = s.hand.splice(idx, 1)[0];
+              s.discardPile.push(cardDiscarded);
+              bus.emit('toast', { text: `Discarded ${cardDiscarded.name}`, type: 'info' });
+            }
+          }
+          break;
+        }
+        case 'loseEnergy': {
+          const val = toDisplayInt(effect.value ?? 0);
+          s.energy = Math.max(0, s.energy - val);
           break;
         }
         default: {
