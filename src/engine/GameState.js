@@ -1,0 +1,307 @@
+// ============================================================
+// GameState.js — Core state machine & central orchestrator
+// ============================================================
+// Single source of truth for the entire game.
+//
+// Phase flow:
+//   TITLE → HERO_SELECT → MAP → COMBAT → DRAFT → MAP → … → VICTORY
+//                                                    ↘ GAME_OVER
+//
+// The subsystems (Combat, DraftSystem, FloorManager) receive a
+// reference to this GameState so they can read/write the shared
+// state object and call setPhase() to drive transitions.
+// ============================================================
+
+import bus from './EventBus.js';
+import { Combat } from './Combat.js';
+import { DraftSystem } from './DraftSystem.js';
+import { FloorManager, NODE_TYPE } from './FloorManager.js';
+import { CARDS } from '../data/cards.js';
+
+// ── Valid phases ─────────────────────────────────────────────
+export const PHASES = Object.freeze([
+  'title',
+  'heroSelect',
+  'map',
+  'combat',
+  'draft',
+  'gameOver',
+  'victory',
+]);
+
+// ── Default state factory ───────────────────────────────────
+
+function createDefaultState() {
+  return {
+    // Phase
+    phase: 'title',
+
+    // Hero
+    hero: null,
+
+    // Player vitals
+    hp: 0,
+    maxHp: 0,
+    block: 0,
+
+    // Energy
+    energy: 3,
+    maxEnergy: 3,
+
+    // Card piles
+    deck: [],         // master list — persists across combats
+    drawPile: [],     // shuffled at combat start
+    discardPile: [],
+    hand: [],
+    exhaustPile: [],  // removed for THIS combat only
+
+    // Progression
+    floor: 1,
+    maxFloor: 15,
+
+    // Enemies (populated during combat)
+    enemies: [],
+
+    // Economy
+    gold: 0,
+
+    // Run configuration
+    cardPool: [],
+    enemyCatalogue: null,
+
+    // Analytics for run-level passives
+    cardPlayCounts: {},
+  };
+}
+
+// ── GameState class ─────────────────────────────────────────
+
+export class GameState {
+  constructor() {
+    /** The mutable game state object. */
+    this.state = createDefaultState();
+
+    /** Sub-systems — they hold a back-reference to `this`. */
+    this.combat = new Combat(this);
+    this.draft = new DraftSystem(this);
+    this.floors = new FloorManager(this);
+  }
+
+  // ──────────────────────────────────────────────────────────
+  //  Phase management
+  // ──────────────────────────────────────────────────────────
+
+  /**
+   * Transition to a new phase.
+   * Emits 'stateChange' so the UI can react.
+   * @param {string} newPhase — must be one of PHASES
+   */
+  setPhase(newPhase) {
+    if (!PHASES.includes(newPhase)) {
+      console.error(`[GameState] Invalid phase: "${newPhase}"`);
+      return;
+    }
+    const prev = this.state.phase;
+    this.state.phase = newPhase;
+    bus.emit('stateChange', { from: prev, to: newPhase, state: this.getSnapshot() });
+  }
+
+  /**
+   * @returns {string} current phase
+   */
+  getPhase() {
+    return this.state.phase;
+  }
+
+  // ──────────────────────────────────────────────────────────
+  //  Game lifecycle
+  // ──────────────────────────────────────────────────────────
+
+  /**
+   * Select a hero and initialise their starting stats + deck.
+   * @param {object} heroDef — { id, name, maxHp, startingDeck: [] }
+   */
+  selectHero(heroDef) {
+    const s = this.state;
+    s.hero = heroDef;
+    s.hp = heroDef.maxHp;
+    s.maxHp = heroDef.maxHp;
+    s.gold = 0;
+    s.floor = 1;
+    s.block = 0;
+    s.cardPlayCounts = {};
+    s.cardPool = [];
+    s.enemyCatalogue = null;
+
+    // Deep-copy the starter deck so each card has its own identity.
+    // Hero definitions use card IDs, so map to full card defs here.
+    s.deck = (heroDef.startingDeck ?? [])
+      .map((cardId, i) => {
+        const card = CARDS[cardId];
+        if (!card) {
+          console.warn(`[GameState] Unknown starting card id "${cardId}" in ${heroDef.id}`);
+          return null;
+        }
+        return {
+          ...card,
+          instanceId: `${card.id}_start_${i}`,
+          _source: cardId,
+        };
+      })
+      .filter(Boolean);
+
+    // reset combat piles
+    s.drawPile = [];
+    s.discardPile = [];
+    s.hand = [];
+    s.exhaustPile = [];
+    s.energy = s.maxEnergy;
+
+    this.setPhase('heroSelect'); // confirm selection
+  }
+
+  /**
+   * Start a new run after hero selection.
+   * Generates the map and transitions to the map phase.
+   * Also stores run resources so combat + draft can pull from stable pools.
+   * @param {number} [totalFloors=15]
+   * @param {object[]} [cardPool=[]]
+   * @param {{ normal: object[], elite: object[], boss: object[] }} [enemyCatalogue=null]
+   */
+  startRun(totalFloors = 15, cardPool = [], enemyCatalogue = null) {
+    const s = this.state;
+    s.cardPool = [...cardPool];
+    s.enemyCatalogue = enemyCatalogue;
+    s.cardPlayCounts = {};
+    s.floor = 1;
+    s.gold = 0;
+    s.drawPile = [];
+    s.discardPile = [];
+    s.hand = [];
+    s.exhaustPile = [];
+    this.floors.generateMap(totalFloors);
+    this.setPhase('map');
+  }
+
+  /**
+   * Record card play count across the current run.
+   * Used for Codex-style repeat-bonus mechanics.
+   * @param {string} cardId
+   */
+  recordCardPlay(cardId) {
+    const s = this.state;
+    s.cardPlayCounts[cardId] = (s.cardPlayCounts[cardId] ?? 0) + 1;
+  }
+
+  /**
+   * Get raw card def by ID.
+   * @param {string} cardId
+   * @returns {object|null}
+   */
+  getCardDefinition(cardId) {
+    return CARDS[cardId] ?? null;
+  }
+
+  /**
+   * Advance to next floor without side effects (used for rest / shop / draft transitions).
+   */
+  advanceFloor() {
+    this.state.floor += 1;
+    this.setPhase('map');
+  }
+
+  /**
+   * Enter the current floor's encounter.
+   * Reads the map node and either starts combat, offers rest, etc.
+   * @param {object} catalogue — enemy catalogue { normal, elite, boss }
+   * @param {object} [cardPool] — for draft + shop fallback
+   */
+  enterFloor(catalogue, cardPool) {
+    const node = this.floors.getCurrentNode();
+    if (!node) {
+      console.error('[GameState] No map node for floor', this.state.floor);
+      return;
+    }
+
+    switch (node.type) {
+      case NODE_TYPE.COMBAT:
+      case NODE_TYPE.ELITE:
+      case NODE_TYPE.BOSS: {
+        const effectiveCatalogue = catalogue ?? this.state.enemyCatalogue;
+        const activeCardPool = cardPool ?? this.state.cardPool;
+        if (!effectiveCatalogue) {
+          console.error('[GameState] Missing enemy catalogue for this run');
+          return;
+        }
+        this.state.cardPool = [...activeCardPool];
+        const enemies = this.floors.generateEncounter(effectiveCatalogue);
+        this.combat.startCombat(enemies);
+        break;
+      }
+      case NODE_TYPE.REST:
+      case NODE_TYPE.SHOP: {
+        this.setPhase('map');
+        break;
+      }
+      default:
+        console.warn(`[GameState] Unhandled node type: "${node.type}"`);
+    }
+  }
+
+  /**
+   * Start the draft after combat ends.
+   * @param {object[]} cardPool — full reward card pool
+   */
+  startDraft(cardPool) {
+    this.draft.generateDraft(cardPool ?? this.state.cardPool);
+  }
+
+  /**
+   * Reset everything back to the title screen.
+   */
+  reset() {
+    this.state = createDefaultState();
+    this.combat = new Combat(this);
+    this.draft = new DraftSystem(this);
+    this.floors = new FloorManager(this);
+    this.setPhase('title');
+  }
+
+  // ──────────────────────────────────────────────────────────
+  //  Snapshot for UI
+  // ──────────────────────────────────────────────────────────
+
+  /**
+   * Return a shallow copy of the state for safe UI reads.
+   * @returns {object}
+   */
+  getSnapshot() {
+    const s = this.state;
+    return {
+      phase: s.phase,
+      hero: s.hero,
+      hp: s.hp,
+      maxHp: s.maxHp,
+      block: s.block,
+      energy: s.energy,
+      maxEnergy: s.maxEnergy,
+      deckSize: s.deck.length,
+      drawPileCount: s.drawPile.length,
+      discardPileCount: s.discardPile.length,
+      handSize: s.hand.length,
+      exhaustPileCount: s.exhaustPile.length,
+      floor: s.floor,
+      maxFloor: s.maxFloor,
+      enemies: s.enemies.map(e => ({
+        id: e.id,
+        name: e.name,
+        hp: e.hp,
+        maxHp: e.maxHp,
+        block: e.block,
+        intent: e.pattern?.[e.patternIndex] ?? null,
+      })),
+      gold: s.gold,
+      cardPlayCounts: { ...s.cardPlayCounts },
+    };
+  }
+}
