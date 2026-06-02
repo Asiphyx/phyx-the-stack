@@ -951,6 +951,7 @@ export class Combat {
       floor: s.floor,
       gold: s.gold,
       hero: s.hero,
+      paradoxChain: this.combatState.paradoxChain,
     };
   }
 }
