@@ -65,6 +65,10 @@ function createDefaultState() {
     // Economy
     gold: 0,
 
+    // Ultimate ability
+    ultCharge: 0,
+    ultMaxCharge: 5,
+
     // Run configuration
     cardPool: [],
     enemyCatalogue: null,
@@ -129,6 +133,8 @@ export class GameState {
     s.gold = 0;
     s.floor = 1;
     s.block = 0;
+    s.ultCharge = 0;
+    s.ultMaxCharge = heroDef.ultimate?.chargeCost ?? 5;
     s.cardPlayCounts = {};
     s.cardPool = [];
     s.enemyCatalogue = null;
@@ -268,6 +274,100 @@ export class GameState {
   }
 
   // ──────────────────────────────────────────────────────────
+  //  Ultimate ability
+  // ──────────────────────────────────────────────────────────
+
+  /**
+   * Use the hero's ultimate ability (if fully charged and in combat).
+   * @returns {boolean} true if ult was used
+   */
+  useUltimate() {
+    const s = this.state;
+    if (s.phase !== 'combat') return false;
+    if (s.ultCharge < s.ultMaxCharge) return false;
+    if (!s.hero?.ultimate) return false;
+
+    s.ultCharge = 0;
+    const ult = s.hero.ultimate;
+
+    for (const effect of ult.effects) {
+      switch (effect.type) {
+        case 'damageAll': {
+          const val = effect.value ?? 0;
+          s.enemies.forEach(e => {
+            const absorbed = Math.min(e.block, val);
+            e.block -= absorbed;
+            const remaining = val - absorbed;
+            if (remaining > 0) e.hp = Math.max(0, e.hp - remaining);
+            bus.emit('damageDealt', { target: 'enemy', targetId: e.id, amount: val, blocked: absorbed, hpAfter: e.hp });
+          });
+          break;
+        }
+        case 'damageAllEqualBlock': {
+          const val = s.block;
+          s.enemies.forEach(e => {
+            const absorbed = Math.min(e.block, val);
+            e.block -= absorbed;
+            const remaining = val - absorbed;
+            if (remaining > 0) e.hp = Math.max(0, e.hp - remaining);
+            bus.emit('damageDealt', { target: 'enemy', targetId: e.id, amount: val, blocked: absorbed, hpAfter: e.hp });
+          });
+          break;
+        }
+        case 'block': {
+          s.block += effect.value ?? 0;
+          break;
+        }
+        case 'draw': {
+          this.combat.drawCards(effect.value ?? 0);
+          break;
+        }
+        case 'energy': {
+          s.energy = Math.max(0, s.energy + (effect.value ?? 0));
+          break;
+        }
+        case 'zeroCostTurn': {
+          this.combat.combatState.costReduction = 99;
+          break;
+        }
+        case 'add_random_rares_to_hand': {
+          for (let i = 0; i < (effect.value ?? 1); i++) {
+            const pool = s.cardPool.filter(c => c.rarity === 'rare');
+            if (pool.length > 0) {
+              const pick = pool[Math.floor(Math.random() * pool.length)];
+              s.hand.push({ ...pick, instanceId: `ult_${pick.id}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}` });
+            }
+          }
+          break;
+        }
+        case 'removeRandomStarters': {
+          for (let i = 0; i < (effect.value ?? 1); i++) {
+            const starters = s.deck.filter(c => c.rarity === 'starter');
+            if (starters.length > 0) {
+              const pick = starters[Math.floor(Math.random() * starters.length)];
+              const idx = s.deck.indexOf(pick);
+              if (idx >= 0) s.deck.splice(idx, 1);
+            }
+          }
+          break;
+        }
+      }
+    }
+
+    // Purge dead enemies
+    s.enemies = s.enemies.filter(e => e.hp > 0);
+
+    bus.emit('toast', { text: `${ult.emoji} ${ult.name}!`, type: 'passive' });
+    bus.emit('combatUpdate', this.combat._snapshot());
+
+    if (s.enemies.length === 0) {
+      this.combat._combatWon();
+    }
+
+    return true;
+  }
+
+  // ──────────────────────────────────────────────────────────
   //  Snapshot for UI
   // ──────────────────────────────────────────────────────────
 
@@ -285,6 +385,8 @@ export class GameState {
       block: s.block,
       energy: s.energy,
       maxEnergy: s.maxEnergy,
+      ultCharge: s.ultCharge,
+      ultMaxCharge: s.ultMaxCharge,
       deckSize: s.deck.length,
       drawPileCount: s.drawPile.length,
       discardPileCount: s.discardPile.length,
@@ -295,6 +397,7 @@ export class GameState {
       enemies: s.enemies.map(e => ({
         id: e.id,
         name: e.name,
+        emoji: e.emoji,
         hp: e.hp,
         maxHp: e.maxHp,
         block: e.block,
@@ -305,3 +408,4 @@ export class GameState {
     };
   }
 }
+

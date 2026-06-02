@@ -262,6 +262,9 @@ export class Combat {
       doublePlayed: shouldPlayTwice,
     });
 
+    // Charge ultimate
+    s.ultCharge = Math.min(s.ultMaxCharge, (s.ultCharge ?? 0) + 1);
+
     return true;
   }
 

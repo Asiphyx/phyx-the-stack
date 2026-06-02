@@ -1,6 +1,6 @@
 /**
  * Phyx the Stack — Hero Definitions
- * Each hero has a unique passive, signature card, and starting deck.
+ * Each hero has a unique passive, signature card, ultimate ability, and starting deck.
  */
 
 export const HEROES = {
@@ -18,6 +18,13 @@ export const HEROES = {
     passive: {
       name: 'Royal Command',
       description: 'First card each turn costs 0 energy.',
+    },
+    ultimate: {
+      name: 'Sovereign Strike',
+      description: 'Deal 20 damage to ALL enemies.',
+      emoji: '👑',
+      chargeCost: 5,
+      effects: [{ type: 'damageAll', value: 20 }],
     },
     signatureCardId: 'royal_decree',
     color: '#ff3399',
@@ -40,6 +47,13 @@ export const HEROES = {
       name: 'Null is Origin',
       description: 'When deck is empty, gain 8 block before reshuffling.',
     },
+    ultimate: {
+      name: 'Event Horizon',
+      description: 'Gain 25 block. Remove 2 random starter cards from deck.',
+      emoji: '🕳️',
+      chargeCost: 6,
+      effects: [{ type: 'block', value: 25 }, { type: 'removeRandomStarters', value: 2 }],
+    },
     signatureCardId: 'void_collapse',
     color: '#9933ff',
     quote: 'Null is origin.',
@@ -58,6 +72,13 @@ export const HEROES = {
     passive: {
       name: 'Clean Build',
       description: 'Cards played 3+ times in a run gain +2 damage or +2 block.',
+    },
+    ultimate: {
+      name: 'Zero-Cost Sprint',
+      description: 'All cards cost 0 energy this turn. Draw 3.',
+      emoji: '⚡',
+      chargeCost: 7,
+      effects: [{ type: 'zeroCostTurn' }, { type: 'draw', value: 3 }],
     },
     signatureCardId: 'clean_architecture',
     color: '#00ccff',
@@ -78,6 +99,13 @@ export const HEROES = {
     passive: {
       name: 'Pattern Read',
       description: 'See enemy intents 2 turns ahead instead of 1.',
+    },
+    ultimate: {
+      name: 'Constellation Burst',
+      description: 'Draw 5 cards. Gain 2 energy.',
+      emoji: '✨',
+      chargeCost: 5,
+      effects: [{ type: 'draw', value: 5 }, { type: 'energy', value: 2 }],
     },
     signatureCardId: 'star_chart',
     color: '#ffcc00',
@@ -100,6 +128,13 @@ export const HEROES = {
       name: 'Here to Help',
       description: 'Start each combat with a random card from the draft pool in hand.',
     },
+    ultimate: {
+      name: 'Jackpot',
+      description: 'Add 3 random rare cards to your hand permanently.',
+      emoji: '🎰',
+      chargeCost: 6,
+      effects: [{ type: 'add_random_rares_to_hand', value: 3 }],
+    },
     signatureCardId: 'party_trick',
     color: '#ff66cc',
     quote: 'Here to help, always.',
@@ -120,6 +155,13 @@ export const HEROES = {
     passive: {
       name: 'Backward Thinking',
       description: 'Alternating attack/defense plays gets stronger with every chain link.',
+    },
+    ultimate: {
+      name: 'Gravity Well',
+      description: 'Deal damage equal to your current block to ALL enemies.',
+      emoji: '🌀',
+      chargeCost: 6,
+      effects: [{ type: 'damageAllEqualBlock' }],
     },
     signatureCardId: 'regex',
     color: '#33ff99',

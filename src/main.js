@@ -5,7 +5,7 @@ import { ENEMIES, ENCOUNTERS } from './data/enemies.js';
 import { CARDS } from './data/cards.js';
 import bus from './engine/EventBus.js';
 
-const cardPool = Object.values(CARDS);
+const cardPool = Object.values(CARDS).filter(c => c.rarity !== 'starter');
 const game = new GameState();
 
 const root = document.querySelector('#screen-container');
@@ -24,7 +24,7 @@ bus.on('draftOffered', ({ cards }) => {
 });
 bus.on('damageDealt', onDamageEvent);
 bus.on('toast', ({ text, type = 'info' }) => emitToast(text, type));
-bus.on('enemyAction', () => {
+bus.on('enemyAction', ({ enemy, action }) => {
   root.classList.add('screen-shake');
   setTimeout(() => root.classList.remove('screen-shake'), 300);
 });
@@ -36,29 +36,14 @@ function render() {
   root.innerHTML = '';
 
   switch (snapshot.phase) {
-    case 'title':
-      renderTitle();
-      return;
-    case 'heroSelect':
-      renderHeroSelect();
-      return;
-    case 'map':
-      renderMap();
-      return;
-    case 'combat':
-      renderCombat();
-      return;
-    case 'draft':
-      renderDraft();
-      return;
-    case 'gameOver':
-      renderGameOver();
-      return;
-    case 'victory':
-      renderVictory();
-      return;
-    default:
-      renderTitle();
+    case 'title': renderTitle(); return;
+    case 'heroSelect': renderHeroSelect(); return;
+    case 'map': renderMap(); return;
+    case 'combat': renderCombat(); return;
+    case 'draft': renderDraft(); return;
+    case 'gameOver': renderGameOver(); return;
+    case 'victory': renderVictory(); return;
+    default: renderTitle();
   }
 }
 
@@ -67,44 +52,37 @@ function render() {
 // ──────────────────────────────────────────────────────────
 
 function renderTitle() {
-  const title = document.createElement('section');
-  title.className = 'title-screen';
-  title.innerHTML = `
+  const section = el('section', 'title-screen');
+  section.innerHTML = `
     <div class="title-logo">
-      <div class="title-subtitle">Phyxian / Phyx the Stack</div>
+      <div class="title-subtitle">A Phyxian Roguelike Deckbuilder</div>
       <h1>Phyx the Stack</h1>
-      <p class="title-cta">A dev roguelike: fix bugs, clear the board, craft better drafts</p>
+      <p class="title-cta">Click to begin</p>
     </div>
-    <button class="btn btn-primary" id="start-btn">Start New Run</button>
+    <button class="btn btn-primary" id="start-btn">New Run</button>
+    <div class="title-version">v0.1.0 · CaitOS</div>
   `;
-  root.appendChild(title);
-
-  title.querySelector('#start-btn').addEventListener('click', () => {
+  root.appendChild(section);
+  section.querySelector('#start-btn').onclick = () => {
     game.state.phase = 'heroSelect';
     game.setPhase('heroSelect');
-  });
+  };
 }
 
 // ──────────────────────────────────────────────────────────
-// Hero select
+// Hero Select
 // ──────────────────────────────────────────────────────────
 
 function renderHeroSelect() {
-  const section = document.createElement('section');
-  section.className = 'hero-select-screen';
-
-  const heading = document.createElement('div');
-  heading.className = 'hero-select-title';
-  heading.textContent = 'Choose your hero';
+  const section = el('section', 'hero-select-screen');
+  const heading = el('div', 'hero-select-title');
+  heading.textContent = 'Choose Your Hero';
   section.appendChild(heading);
 
-  const grid = document.createElement('div');
-  grid.className = 'hero-grid';
-
+  const grid = el('div', 'hero-grid');
   for (const hero of Object.values(HEROES)) {
-    const card = document.createElement('button');
+    const card = el('button', 'hero-card');
     card.type = 'button';
-    card.className = 'hero-card';
     card.style.setProperty('--hero-color', hero.color);
     card.style.setProperty('--hero-glow', `${hero.color}55`);
     card.innerHTML = `
@@ -112,371 +90,345 @@ function renderHeroSelect() {
       <div class="hero-name">${hero.name}</div>
       <div class="hero-title-text">${hero.title}</div>
       <div class="hero-passive"><strong>${hero.passive.name}</strong><br/>${hero.passive.description}</div>
+      <div class="hero-passive" style="color:var(--neon-gold)"><strong>${hero.ultimate.emoji} ${hero.ultimate.name}</strong><br/>${hero.ultimate.description}</div>
       <div class="hero-hp">${hero.maxHp} HP</div>
-      <div class="text-small">${hero.signatureCardId ? `Signature: ${CARDS[hero.signatureCardId]?.name ?? 'None'}` : ''}</div>
     `;
-    card.addEventListener('click', () => {
+    card.onclick = () => {
       game.selectHero(hero);
       game.startRun(15, cardPool, enemyCatalogue);
-      render();
-    });
+    };
     grid.appendChild(card);
   }
-
   section.appendChild(grid);
   root.appendChild(section);
 }
 
 // ──────────────────────────────────────────────────────────
-// Map / floor flow
+// Map
 // ──────────────────────────────────────────────────────────
 
 function renderMap() {
-  const snapshot = game.getSnapshot();
-  const currentNode = game.floors.getCurrentNode();
+  const snap = game.getSnapshot();
   const state = game.state;
+  const currentNode = game.floors.getCurrentNode();
 
-  const section = document.createElement('section');
-  section.className = 'map-screen';
+  const section = el('section', 'map-screen');
   section.innerHTML = `
-    <div class="map-title">Run Floor ${snapshot.floor} of ${snapshot.maxFloor} · Gold: ${snapshot.gold}</div>
+    <div class="map-title">Floor ${snap.floor} of ${snap.maxFloor} · ${snap.gold} Gold</div>
     <div class="run-stats">
-      <div class="run-stat"><div class="run-stat-value">${snapshot.hp}/${snapshot.maxHp}</div><div class="run-stat-label">HP</div></div>
+      <div class="run-stat"><div class="run-stat-value">${snap.hp}/${snap.maxHp}</div><div class="run-stat-label">HP</div></div>
       <div class="run-stat"><div class="run-stat-value">${state.deck.length}</div><div class="run-stat-label">Deck</div></div>
-      <div class="run-stat"><div class="run-stat-value">${state.cardPlayCounts ? Object.keys(state.cardPlayCounts).length : 0}</div><div class="run-stat-label">Cards Tracked</div></div>
-      <div class="run-stat"><div class="run-stat-value">${snapshot.floor - 1}</div><div class="run-stat-label">Floors Cleared</div></div>
+      <div class="run-stat"><div class="run-stat-value">${snap.floor - 1}</div><div class="run-stat-label">Cleared</div></div>
+      <div class="run-stat"><div class="run-stat-value">${snap.gold}</div><div class="run-stat-label">Gold</div></div>
     </div>
     <div class="map-nodes"></div>
   `;
 
   const nodes = section.querySelector('.map-nodes');
-  const map = game.floors.map ?? [];
-  for (const node of map) {
-    const nodeType = labelForNodeType(node.type);
-    const isCurrent = node.floor === snapshot.floor;
-    const isCompleted = node.floor < snapshot.floor;
-    const nodeBtn = document.createElement('button');
-    nodeBtn.type = 'button';
-    nodeBtn.className = `map-node ${isCurrent ? 'current' : ''} ${isCompleted ? 'completed' : ''}`;
-    nodeBtn.innerHTML = `
-      <div class="map-node-icon">${nodeType.icon}</div>
+  for (const node of game.floors.map ?? []) {
+    const isCurrent = node.floor === snap.floor;
+    const isCompleted = node.floor < snap.floor;
+    const info = nodeLabel(node.type);
+    const btn = el('button', `map-node ${isCurrent ? 'current' : ''} ${isCompleted ? 'completed' : ''}`);
+    btn.type = 'button';
+    btn.innerHTML = `
+      <div class="map-node-icon">${info.icon}</div>
       <div class="map-node-label">Floor ${node.floor}</div>
-      <div class="map-node-type">${nodeType.label}</div>
+      <div class="map-node-type">${info.label}</div>
     `;
-    if (!isCurrent && !isCompleted) {
-      nodeBtn.disabled = true;
-    }
-    if (isCurrent && !isCompleted) {
-      nodeBtn.addEventListener('click', () => handleMapNode(node));
-    }
-    nodes.appendChild(nodeBtn);
+    btn.disabled = !isCurrent || isCompleted;
+    if (isCurrent && !isCompleted) btn.onclick = () => handleMapNode(node);
+    nodes.appendChild(btn);
   }
 
   if (currentNode) {
-    const actions = document.createElement('div');
-    actions.style.marginTop = 'var(--space-lg)';
-    if (currentNode.type === 'combat' || currentNode.type === 'elite' || currentNode.type === 'boss') {
-      actions.appendChild(buttonEl('Enter Encounter', 'btn btn-primary', () => game.enterFloor(enemyCatalogue, cardPool)));
+    const actions = el('div');
+    actions.style.cssText = 'margin-top:var(--space-lg);display:flex;gap:var(--space-md);flex-wrap:wrap;justify-content:center';
+    if (['combat', 'elite', 'boss'].includes(currentNode.type)) {
+      actions.appendChild(btn('Enter Encounter', 'btn btn-primary', () => game.enterFloor(enemyCatalogue, cardPool)));
     } else if (currentNode.type === 'rest') {
-      actions.appendChild(buttonEl('Take a Rest (+30% HP)', 'btn', () => {
-        game.floors.rest();
-      }));
-      actions.appendChild(buttonEl('Push Forward', 'btn btn-primary', () => {
-        game.advanceFloor();
-      }));
+      actions.appendChild(btn('Rest (+30% HP)', 'btn', () => game.floors.rest()));
+      actions.appendChild(btn('Push Forward', 'btn btn-primary', () => game.advanceFloor()));
     } else if (currentNode.type === 'shop') {
-      actions.appendChild(buttonEl('Grab random common card +', 'btn', () => buyShopCard('common')));
-      actions.appendChild(buttonEl('Skip shop', 'btn btn-primary', () => {
-        game.advanceFloor();
-      }));
+      actions.appendChild(btn('Buy Random Card', 'btn', () => buyShopCard()));
+      actions.appendChild(btn('Skip Shop', 'btn btn-primary', () => game.advanceFloor()));
     }
     section.appendChild(actions);
   }
-
   root.appendChild(section);
 }
 
 function handleMapNode(node) {
-  if (node.type === 'combat' || node.type === 'elite' || node.type === 'boss') {
-    game.enterFloor(enemyCatalogue, cardPool);
-  } else if (node.type === 'rest') {
-    game.floors.rest();
-  } else if (node.type === 'shop') {
-    game.advanceFloor();
-  }
+  if (['combat', 'elite', 'boss'].includes(node.type)) game.enterFloor(enemyCatalogue, cardPool);
+  else if (node.type === 'rest') game.floors.rest();
+  else game.advanceFloor();
 }
 
-function buyShopCard(rarity = 'common') {
-  const state = game.state;
-  const candidates = (state.cardPool ?? []).filter(c => c.rarity === rarity);
-  if (candidates.length === 0) {
-    emitToast('Shop is out of stock for that tier.', 'danger');
-    game.advanceFloor();
-    return;
-  }
-  const card = candidates[Math.floor(Math.random() * candidates.length)];
-  state.deck.push({ ...card, instanceId: `${card.id}_shop_${Date.now()}_${Math.random().toString(36).slice(2, 5)}` });
-  emitToast(`Shop added ${card.name}`, 'info');
+function buyShopCard() {
+  const s = game.state;
+  const pool = (s.cardPool ?? []).filter(c => c.rarity === 'common' || c.rarity === 'uncommon');
+  if (!pool.length) { emitToast('Shop empty!', 'danger'); game.advanceFloor(); return; }
+  const card = pool[Math.floor(Math.random() * pool.length)];
+  s.deck.push({ ...card, instanceId: `shop_${card.id}_${Date.now()}` });
+  emitToast(`Bought ${card.emoji} ${card.name}`, 'info');
   game.advanceFloor();
 }
 
 // ──────────────────────────────────────────────────────────
-// Combat
+// COMBAT — The big one
 // ──────────────────────────────────────────────────────────
 
 function renderCombat() {
-  const snapshot = game.getSnapshot();
+  const snap = game.getSnapshot();
   const state = game.state;
-  const section = document.createElement('section');
-  section.className = 'combat-screen';
-
   const hero = state.hero;
-  const combatHeroesHint = hero?.id === 'xadnib' ? ' · Xadnib sees the next 2 intents' : '';
-  const antigravHint = hero?.id === 'antigrav' ? ` · Backwards chain x${snapshot.paradoxChain ?? 0}` : '';
-  section.innerHTML = `
-    <div class="combat-top-bar">
-      <div class="combat-floor-info">${hero?.name ?? 'Hero'} · Floor ${snapshot.floor}/${snapshot.maxFloor}${combatHeroesHint}${antigravHint}</div>
-      <div class="combat-player-stats">
-        <div class="stat-badge hp">
-          <span class="stat-icon">❤</span>
-          <span>${snapshot.hp}</span>/<span>${snapshot.maxHp}</span>
-        </div>
-        <div class="stat-badge block">
-          <span class="stat-icon">▦</span>
-          <span>${snapshot.block}</span>
-        </div>
-        <div class="stat-badge energy">
-          <span class="stat-icon">⚡</span>
-          <span>${snapshot.energy}</span>/<span>${snapshot.maxEnergy}</span>
-        </div>
-      </div>
-      <div class="player-hp-bar-container">
-        <div class="player-hp-bar">
-          <div class="player-hp-fill ${hpClass(snapshot.hp, snapshot.maxHp)}" style="width: ${Math.max(1, (snapshot.hp / snapshot.maxHp) * 100)}%"></div>
-        </div>
-      </div>
-    </div>
+  const ultReady = snap.ultCharge >= snap.ultMaxCharge;
 
-    <div class="combat-enemy-area"></div>
-    <div class="combat-action-bar">
-      <div class="combat-pile-info">Draw: ${snapshot.drawPileCount} · Discard: ${snapshot.discardPileCount} · Exhaust: ${snapshot.exhaustPileCount} · Gold: ${snapshot.gold}</div>
-      <button class="btn btn-end-turn" id="end-turn-btn">End Turn</button>
+  const section = el('section', 'combat-screen');
+
+  // ─── HERO PANEL (left side) ───
+  const heroPanel = el('div', 'hero-panel');
+  heroPanel.style.setProperty('--hero-color', hero?.color ?? '#9933ff');
+  heroPanel.innerHTML = `
+    <img class="hero-panel-portrait" src="${hero?.portrait ?? ''}" alt="${hero?.name ?? ''}" />
+    <div class="hero-panel-name">${hero?.name ?? 'Hero'}</div>
+    <div class="hero-panel-title">${hero?.title ?? ''}</div>
+    <div class="hero-panel-stats">
+      <div class="hero-stat hp-stat">
+        <span class="hero-stat-icon">❤️</span>
+        <div class="hero-stat-bar">
+          <div class="hero-stat-fill ${hpClass(snap.hp, snap.maxHp)}" style="width:${pct(snap.hp, snap.maxHp)}%"></div>
+        </div>
+        <span class="hero-stat-text">${snap.hp}/${snap.maxHp}</span>
+      </div>
+      ${snap.block > 0 ? `<div class="hero-stat block-stat"><span class="hero-stat-icon">🛡️</span><span class="hero-stat-text" style="color:var(--neon-cyan)">${snap.block} Block</span></div>` : ''}
+      <div class="hero-stat energy-stat">
+        <span class="hero-stat-icon">⚡</span>
+        <span class="hero-stat-text" style="color:var(--neon-gold)">${snap.energy}/${snap.maxEnergy} Energy</span>
+      </div>
     </div>
-    <div class="combat-hand-area"></div>
+    <div class="ult-container">
+      <div class="ult-bar">
+        <div class="ult-fill ${ultReady ? 'ult-ready' : ''}" style="width:${pct(snap.ultCharge, snap.ultMaxCharge)}%"></div>
+      </div>
+      <button class="ult-btn ${ultReady ? 'ult-btn-ready' : ''}" ${ultReady ? '' : 'disabled'}>
+        ${hero?.ultimate?.emoji ?? '💥'} ${hero?.ultimate?.name ?? 'Ultimate'}
+      </button>
+      <div class="ult-desc">${hero?.ultimate?.description ?? ''}</div>
+      <div class="ult-charge-text">${snap.ultCharge}/${snap.ultMaxCharge}</div>
+    </div>
+    <div class="hero-panel-passive">
+      <div class="passive-label">Passive</div>
+      <div class="passive-name">${hero?.passive?.name ?? ''}</div>
+      <div class="passive-desc">${hero?.passive?.description ?? ''}</div>
+    </div>
   `;
+  section.appendChild(heroPanel);
 
-  const enemiesArea = section.querySelector('.combat-enemy-area');
+  // Ult button handler
+  setTimeout(() => {
+    const ultBtn = heroPanel.querySelector('.ult-btn');
+    if (ultBtn && ultReady) {
+      ultBtn.onclick = () => {
+        game.useUltimate();
+        root.classList.add('screen-shake-big');
+        setTimeout(() => root.classList.remove('screen-shake-big'), 500);
+      };
+    }
+  }, 0);
+
+  // ─── MAIN COMBAT AREA ───
+  const mainArea = el('div', 'combat-main');
+
+  // Floor info bar
+  const topBar = el('div', 'combat-top-bar');
+  topBar.innerHTML = `
+    <div class="combat-floor-info">Floor ${snap.floor}/${snap.maxFloor}</div>
+    <div class="combat-pile-info">
+      <span>📥 ${snap.drawPileCount}</span>
+      <span>📤 ${snap.discardPileCount}</span>
+      <span>🗑️ ${snap.exhaustPileCount}</span>
+      <span>💰 ${snap.gold}</span>
+    </div>
+  `;
+  mainArea.appendChild(topBar);
+
+  // ─── ENEMY AREA ───
+  const enemyArea = el('div', 'combat-enemy-area');
   for (const [i, enemy] of state.enemies.entries()) {
-    const intent = enemy.pattern?.[enemy.patternIndex] ?? { type: 'none', description: 'Waiting' };
+    const intent = enemy.pattern?.[enemy.patternIndex] ?? { type: 'none', description: '...' };
     const nextIntent = enemy.pattern?.[(enemy.patternIndex + 1) % Math.max(1, enemy.pattern.length)];
-    const secondText = hero?.id === 'xadnib' && nextIntent
-      ? ` / then ${intentLabel(nextIntent)}`
-      : '';
+    const isSelected = selectedTarget === i;
 
-    const enemyCard = document.createElement('div');
-    enemyCard.className = `enemy-slot ${selectedTarget === i ? 'targeted' : ''}`;
-    enemyCard.innerHTML = `
-      <div class="enemy-body" data-enemy="${i}">
+    const slot = el('div', `enemy-slot ${isSelected ? '' : ''}`);
+    slot.innerHTML = `
+      <div class="enemy-intent ${intent.type}">
+        ${intentIcon(intent.type)} ${intentLabel(intent)}
+        ${hero?.id === 'xadnib' && nextIntent ? `<span class="intent-next">→ ${intentLabel(nextIntent)}</span>` : ''}
+      </div>
+      <div class="enemy-body ${isSelected ? 'targeted' : ''}" data-enemy="${i}">
+        ${enemy.block > 0 ? `<div class="enemy-block-badge">${enemy.block}</div>` : ''}
         <div class="enemy-emoji">${enemy.emoji ?? '👾'}</div>
         <div class="enemy-name">${enemy.name}</div>
-        <div class="enemy-hp-text">${enemy.hp}/${enemy.maxHp}</div>
-        <div class="enemy-hp-bar"><div class="enemy-hp-fill" style="width:${Math.max(1, (enemy.hp / enemy.maxHp) * 100)}%"></div></div>
-      </div>
-      <div class="enemy-intent attack">
-        <span>▶</span><span>${intentLabel(intent)}${secondText}</span>
+        <div class="enemy-hp-bar"><div class="enemy-hp-fill" style="width:${pct(enemy.hp, enemy.maxHp)}%"></div></div>
+        <div class="enemy-hp-text">${enemy.hp} / ${enemy.maxHp}</div>
       </div>
     `;
-    enemyCard.querySelector('.enemy-body').addEventListener('click', () => {
-      selectedTarget = i;
-      render();
-    });
-    const body = enemyCard.querySelector('.enemy-body');
-    body.setAttribute('data-enemy-id', enemy.id);
-    body.style.position = 'relative';
-    const hpEl = body.querySelector('.enemy-hp-text');
-    if (enemy.block > 0) {
-      const badge = document.createElement('div');
-      badge.className = 'enemy-block-badge';
-      badge.textContent = enemy.block;
-      body.appendChild(badge);
-    }
-    enemiesArea.appendChild(enemyCard);
+    slot.querySelector('.enemy-body').onclick = () => { selectedTarget = i; render(); };
+    enemyArea.appendChild(slot);
   }
+  mainArea.appendChild(enemyArea);
 
-  const handArea = section.querySelector('.combat-hand-area');
+  // ─── ACTION BAR ───
+  const actionBar = el('div', 'combat-action-bar');
+  actionBar.innerHTML = `<button class="btn btn-end-turn" id="end-turn-btn">End Turn</button>`;
+  mainArea.appendChild(actionBar);
+
+  // ─── HAND ───
+  const handArea = el('div', 'combat-hand-area');
   for (const [i, card] of state.hand.entries()) {
     const cost = game.combat.getCardCost(card);
-    const canPlay = card && cost <= state.energy && state.hp > 0;
-    const cardEl = renderCard(card, i, canPlay);
-    cardEl.classList.toggle('unplayable', !canPlay);
-    handArea.appendChild(cardEl);
+    const canPlay = cost <= state.energy && state.hp > 0;
+    handArea.appendChild(renderCard(card, i, canPlay));
   }
+  mainArea.appendChild(handArea);
 
-  section.querySelector('#end-turn-btn').addEventListener('click', () => {
+  section.appendChild(mainArea);
+  root.appendChild(section);
+
+  // Wire end turn
+  section.querySelector('#end-turn-btn').onclick = () => {
     if (state.hp <= 0) return;
     game.combat.endPlayerTurn();
-  });
-
-  root.appendChild(section);
+  };
 }
 
 function renderCard(card, index, canPlay) {
-  const el = document.createElement('button');
-  el.className = 'game-card';
-  el.type = 'button';
-  el.dataset.rarity = card.rarity ?? 'common';
-  el.dataset.type = card.type ?? 'skill';
-  el.disabled = !canPlay;
-  el.innerHTML = `
+  const cost = game.combat.getCardCost(card);
+  const cardEl = el('button', `game-card ${canPlay ? '' : 'unplayable'}`);
+  cardEl.type = 'button';
+  cardEl.dataset.rarity = card.rarity ?? 'common';
+  cardEl.dataset.type = card.type ?? 'skill';
+  cardEl.disabled = !canPlay;
+  cardEl.innerHTML = `
     <div class="card-header">
-      <div class="card-name">${card.name ?? 'Unnamed Card'}</div>
-      <div class="card-cost">${game.combat.getCardCost(card)}</div>
+      <div class="card-name">${card.name ?? '?'}</div>
+      <div class="card-cost">${cost}</div>
     </div>
     <div class="card-emoji">${card.emoji ?? '🧪'}</div>
     <div class="card-description">${card.description ?? ''}</div>
     <div class="card-flavor">${card.flavor ?? ''}</div>
     <div class="card-type-badge">${card.type ?? 'skill'}</div>
   `;
-  el.addEventListener('click', () => {
-    const target = selectedTarget ?? 0;
-    game.combat.playCard(index, target);
-  });
-  return el;
+  cardEl.onclick = () => {
+    if (!canPlay) return;
+    cardEl.classList.add('playing');
+    setTimeout(() => game.combat.playCard(index, selectedTarget ?? 0), 150);
+  };
+  return cardEl;
 }
 
 // ──────────────────────────────────────────────────────────
-// Draft phase
+// Draft
 // ──────────────────────────────────────────────────────────
 
 function renderDraft() {
-  const state = game.getSnapshot();
-  const section = document.createElement('section');
-  section.className = 'draft-screen';
-
+  const snap = game.getSnapshot();
+  const section = el('section', 'draft-screen');
   section.innerHTML = `
-    <div class="draft-title">Draft: choose one card</div>
-    <div class="draft-title text-small">Current gold: ${state.gold}</div>
+    <div class="draft-title">Choose a Card</div>
+    <div class="text-small" style="color:var(--text-secondary)">or skip to keep your deck lean</div>
     <div class="draft-cards"></div>
-    <div style="display:flex;gap:12px;justify-content:center">
-      <button class="btn" id="skip-draft">Skip</button>
-    </div>
+    <button class="btn" id="skip-draft">Skip</button>
   `;
 
   const list = section.querySelector('.draft-cards');
-  if (activeDraft.length === 0) {
-    activeDraft = activeDraftFallback();
-  }
+  if (!activeDraft.length) activeDraft = fallbackDraft();
   for (const [i, card] of activeDraft.entries()) {
-    const wrap = document.createElement('button');
+    const wrap = el('button', 'draft-card-wrapper');
     wrap.type = 'button';
-    wrap.className = 'draft-card-wrapper';
-    const cardEl = document.createElement('div');
-    cardEl.className = 'game-card';
-    cardEl.dataset.rarity = card.rarity ?? 'common';
-    cardEl.dataset.type = card.type ?? 'skill';
-    cardEl.innerHTML = `
-      <div class="card-header"><div class="card-name">${card.name ?? ''}</div><div class="card-cost">${card.cost ?? 0}</div></div>
+    const inner = el('div', 'game-card');
+    inner.dataset.rarity = card.rarity ?? 'common';
+    inner.dataset.type = card.type ?? 'skill';
+    inner.innerHTML = `
+      <div class="card-header"><div class="card-name">${card.name}</div><div class="card-cost">${card.cost ?? 0}</div></div>
       <div class="card-emoji">${card.emoji ?? '🧪'}</div>
       <div class="card-description">${card.description ?? ''}</div>
       <div class="card-flavor">${card.flavor ?? ''}</div>
     `;
-    wrap.appendChild(cardEl);
-    wrap.addEventListener('click', () => {
-      game.draft.pickCard(i);
-      activeDraft = [];
-    });
+    wrap.appendChild(inner);
+    wrap.onclick = () => { game.draft.pickCard(i); activeDraft = []; };
     list.appendChild(wrap);
   }
 
-  section.querySelector('#skip-draft').addEventListener('click', () => {
-    game.draft.skip();
-    activeDraft = [];
-  });
-
+  section.querySelector('#skip-draft').onclick = () => { game.draft.skip(); activeDraft = []; };
   root.appendChild(section);
 }
 
-function activeDraftFallback() {
-  const state = game.state;
-  return (state.cardPool ?? cardPool)
-    .filter(c => !state.deck.some(d => c.id === d.id && d.unique))
-    .slice(0, 3);
+function fallbackDraft() {
+  return (game.state.cardPool ?? cardPool).sort(() => Math.random() - 0.5).slice(0, 3);
 }
 
 // ──────────────────────────────────────────────────────────
-// End states
+// End States
 // ──────────────────────────────────────────────────────────
 
 function renderGameOver() {
-  const section = document.createElement('section');
-  section.className = 'gameover-screen';
+  const snap = game.getSnapshot();
+  const section = el('section', 'gameover-screen');
   section.innerHTML = `
-    <div class="gameover-title">Run failed</div>
+    <div class="gameover-title">Stack Overflow</div>
+    <div class="text-subheading">Your process has been killed.</div>
     <div class="run-stats">
-      <div class="run-stat"><div class="run-stat-value">${game.getSnapshot().floor}</div><div class="run-stat-label">Floor reached</div></div>
-      <div class="run-stat"><div class="run-stat-value">${game.getSnapshot().gold}</div><div class="run-stat-label">Gold</div></div>
-      <div class="run-stat"><div class="run-stat-value">${game.state.deck.length}</div><div class="run-stat-label">Cards in deck</div></div>
-      <div class="run-stat"><div class="run-stat-value">${game.state.maxFloor}</div><div class="run-stat-label">Target floor</div></div>
+      <div class="run-stat"><div class="run-stat-value">${snap.floor}</div><div class="run-stat-label">Floor Reached</div></div>
+      <div class="run-stat"><div class="run-stat-value">${snap.gold}</div><div class="run-stat-label">Gold</div></div>
+      <div class="run-stat"><div class="run-stat-value">${game.state.deck.length}</div><div class="run-stat-label">Deck Size</div></div>
+      <div class="run-stat"><div class="run-stat-value">${Object.keys(snap.cardPlayCounts).length}</div><div class="run-stat-label">Unique Cards</div></div>
     </div>
-    <button class="btn btn-primary" id="reset-btn">Return to Title</button>
+    <button class="btn btn-primary" id="reset-btn">Try Again</button>
   `;
-  section.querySelector('#reset-btn').addEventListener('click', () => {
-    game.reset();
-  });
+  section.querySelector('#reset-btn').onclick = () => game.reset();
   root.appendChild(section);
 }
 
 function renderVictory() {
-  const section = document.createElement('section');
-  section.className = 'victory-screen';
-  const state = game.getSnapshot();
+  const snap = game.getSnapshot();
+  const section = el('section', 'victory-screen');
   section.innerHTML = `
-    <div class="victory-title">A victory loop in the stack</div>
+    <div class="victory-title">Stack Phyxed</div>
+    <div class="text-subheading">Process exited with code 0. Clean run.</div>
     <div class="run-stats">
-      <div class="run-stat"><div class="run-stat-value">${state.floor}</div><div class="run-stat-label">Cleared Floors</div></div>
-      <div class="run-stat"><div class="run-stat-value">${state.gold}</div><div class="run-stat-label">Gold</div></div>
-      <div class="run-stat"><div class="run-stat-value">${game.state.maxFloor}</div><div class="run-stat-label">Target</div></div>
+      <div class="run-stat"><div class="run-stat-value">${snap.floor}</div><div class="run-stat-label">Floors Cleared</div></div>
+      <div class="run-stat"><div class="run-stat-value">${snap.gold}</div><div class="run-stat-label">Gold</div></div>
       <div class="run-stat"><div class="run-stat-value">${game.state.deck.length}</div><div class="run-stat-label">Final Deck</div></div>
+      <div class="run-stat"><div class="run-stat-value">${snap.hero?.name ?? '?'}</div><div class="run-stat-label">Hero</div></div>
     </div>
     <button class="btn btn-primary" id="reset-btn">Main Menu</button>
   `;
-  section.querySelector('#reset-btn').addEventListener('click', () => {
-    game.reset();
-  });
+  section.querySelector('#reset-btn').onclick = () => game.reset();
   root.appendChild(section);
 }
 
 // ──────────────────────────────────────────────────────────
-// Combat/visual effects
+// Damage & Toast FX
 // ──────────────────────────────────────────────────────────
 
 function onDamageEvent(event) {
   const isPlayer = event.target === 'player';
-  const sign = isPlayer ? '-' : '-';
   const value = Math.round(event.amount ?? 0);
-  const label = `${sign}${value}`;
-  let x = window.innerWidth / 2;
-  let y = window.innerHeight / 2;
+  if (value <= 0) return;
+  let x = window.innerWidth / 2, y = window.innerHeight / 2;
 
   if (isPlayer) {
-    const hpEl = root.querySelector('.combat-player-stats');
-    if (hpEl) {
-      const rect = hpEl.getBoundingClientRect();
-      x = rect.left + rect.width / 2;
-      y = rect.top;
-    }
+    const hp = root.querySelector('.hero-panel-portrait');
+    if (hp) { const r = hp.getBoundingClientRect(); x = r.left + r.width / 2; y = r.top + r.height / 2; }
   } else {
-    const enemyEl = root.querySelector(`[data-enemy-id="${event.targetId}"]`);
-    if (enemyEl) {
-      const rect = enemyEl.getBoundingClientRect();
-      x = rect.left + rect.width / 2;
-      y = rect.top;
-    }
+    const en = root.querySelector(`[data-enemy-id="${event.targetId}"], [data-enemy="${event.targetId}"]`);
+    if (en) { const r = en.getBoundingClientRect(); x = r.left + r.width / 2; y = r.top; }
   }
 
-  const num = document.createElement('div');
-  num.className = `damage-number ${isPlayer ? 'block' : 'damage'}`;
-  num.textContent = label;
+  const num = el('div', `damage-number ${isPlayer ? 'damage' : 'damage'} ${value >= 15 ? 'big' : ''}`);
+  num.textContent = `-${value}`;
   num.style.left = `${x}px`;
   num.style.top = `${y}px`;
   damageLayer.appendChild(num);
@@ -484,74 +436,76 @@ function onDamageEvent(event) {
 }
 
 function emitToast(text, type = 'info') {
-  const toast = document.createElement('div');
-  toast.className = `toast ${type}`;
-  toast.textContent = text;
-  toastLayer.appendChild(toast);
-  setTimeout(() => toast.remove(), 2500);
+  const t = el('div', `toast ${type}`);
+  t.textContent = text;
+  toastLayer.appendChild(t);
+  setTimeout(() => t.remove(), 2500);
 }
 
 // ──────────────────────────────────────────────────────────
 // Helpers
 // ──────────────────────────────────────────────────────────
 
-function intentLabel(intent) {
-  if (!intent) return 'Waiting';
-  if (intent.description) return intent.description;
-  switch (intent.type) {
-    case 'attack':
-      return `Attack ${intent.value}`;
-    case 'attackAll':
-      return `Affects all for ${intent.value}`;
-    case 'block':
-      return `Block +${intent.value}`;
-    case 'buff':
-      return `Buff +${intent.value ?? 0}`;
-    case 'debuff':
-      return `Debuff ${intent.value ? `-${intent.value}` : ''}`;
-    case 'summon':
-      return 'Summon';
-    default:
-      return intent.type;
-  }
+function el(tag, className = '') {
+  const e = document.createElement(tag);
+  if (className) e.className = className;
+  return e;
 }
 
+function btn(label, className, onClick) {
+  const b = el('button', className);
+  b.type = 'button';
+  b.textContent = label;
+  b.onclick = onClick;
+  return b;
+}
+
+function pct(cur, max) { return Math.max(1, Math.min(100, (cur / Math.max(1, max)) * 100)); }
+
 function hpClass(cur, max) {
-  const ratio = (cur / Math.max(1, max));
-  if (ratio <= 0.35) return 'critical';
-  if (ratio <= 0.7) return 'hurt';
+  const r = cur / Math.max(1, max);
+  if (r <= 0.35) return 'critical';
+  if (r <= 0.7) return 'hurt';
   return 'healthy';
 }
 
-function labelForNodeType(type) {
-  if (type === 'combat') return { label: 'Combat', icon: '⚔' };
-  if (type === 'elite') return { label: 'Elite', icon: '🩸' };
-  if (type === 'boss') return { label: 'Boss', icon: '👑' };
-  if (type === 'rest') return { label: 'Rest', icon: '🛌' };
-  return { label: 'Shop', icon: '🛒' };
+function intentIcon(type) {
+  switch (type) {
+    case 'attack': return '⚔️';
+    case 'block': return '🛡️';
+    case 'buff': return '💪';
+    case 'debuff': return '💀';
+    case 'summon': return '📦';
+    case 'heal': return '💚';
+    default: return '❓';
+  }
 }
 
-function buttonEl(label, className, onClick) {
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = className;
-  button.textContent = label;
-  button.addEventListener('click', onClick);
-  return button;
+function intentLabel(intent) {
+  if (!intent) return '...';
+  if (intent.description) return intent.description;
+  switch (intent.type) {
+    case 'attack': return `Attack ${intent.value}`;
+    case 'block': return `Block +${intent.value}`;
+    case 'buff': return `Buff +${intent.value ?? 0}`;
+    case 'debuff': return `Debuff${intent.value ? ` -${intent.value}` : ''}`;
+    case 'summon': return 'Summon';
+    default: return intent.type;
+  }
+}
+
+function nodeLabel(type) {
+  const map = { combat: { label: 'Combat', icon: '⚔️' }, elite: { label: 'Elite', icon: '🩸' }, boss: { label: 'BOSS', icon: '👑' }, rest: { label: 'Rest', icon: '🛌' }, shop: { label: 'Shop', icon: '🛒' } };
+  return map[type] ?? { label: 'Unknown', icon: '?' };
 }
 
 function buildEnemyCatalogue() {
-  const normalIds = new Set([
-    ...ENCOUNTERS.easy.flat(),
-    ...ENCOUNTERS.medium.flat(),
-    ...ENCOUNTERS.hard.flat(),
-  ]);
-  const eliteIds = new Set(['tech_debt', 'race_condition']);
+  const normalIds = new Set([...ENCOUNTERS.easy.flat(), ...ENCOUNTERS.medium.flat(), ...ENCOUNTERS.hard.flat()]);
+  const eliteIds = ['tech_debt', 'race_condition'];
   const bossIds = ['production_outage', 'legacy_codebase', 'the_product_manager'];
-
-  const normal = [...normalIds].map(id => ENEMIES[id]).filter(Boolean);
-  const elite = [...eliteIds].map(id => ENEMIES[id]).filter(Boolean);
-  const boss = bossIds.map(id => ENEMIES[id]).filter(Boolean);
-
-  return { normal, elite, boss };
+  return {
+    normal: [...normalIds].map(id => ENEMIES[id]).filter(Boolean),
+    elite: eliteIds.map(id => ENEMIES[id]).filter(Boolean),
+    boss: bossIds.map(id => ENEMIES[id]).filter(Boolean),
+  };
 }
