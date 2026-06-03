@@ -163,9 +163,14 @@ export class FloorManager {
   _instantiateEnemy(template, hpMultiplier, index) {
     const baseHp = template.baseHp ?? template.maxHp ?? 0;
     const scaledHp = Math.max(1, Math.round(baseHp * hpMultiplier));
+    const templateId = template.id ?? template.name.toLowerCase().replace(/\s+/g, '_');
     return {
-      id: `${template.name.toLowerCase().replace(/\s+/g, '_')}_${index}`,
+      id: `${templateId}_${index}`,
       name: template.name,
+      emoji: template.emoji,
+      sprite: template.sprite,
+      tier: template.tier,
+      flavor: template.flavor,
       hp: scaledHp,
       maxHp: scaledHp,
       block: 0,

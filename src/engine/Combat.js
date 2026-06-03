@@ -109,6 +109,10 @@ export class Combat {
     s.enemies = enemies.map((e, i) => ({
       id: e.id ?? `enemy_${i}`,
       name: e.name,
+      emoji: e.emoji,
+      sprite: e.sprite,
+      tier: e.tier,
+      flavor: e.flavor,
       hp: e.hp ?? e.maxHp,
       maxHp: e.maxHp,
       block: 0,
@@ -822,6 +826,10 @@ export class Combat {
               s.enemies.push({
                 id: `${template.id ?? summonName}_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
                 name: template.name ?? summonName,
+                emoji: template.emoji,
+                sprite: template.sprite,
+                tier: template.tier,
+                flavor: template.flavor,
                 hp: Math.max(1, template.maxHp ?? template.baseHp ?? 1),
                 maxHp: Math.max(1, template.maxHp ?? template.baseHp ?? 1),
                 block: 0,

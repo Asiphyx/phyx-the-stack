@@ -285,8 +285,9 @@ function renderCombat() {
     const intent = enemy.pattern?.[enemy.patternIndex] ?? { type: 'none', description: '...' };
     const nextIntent = enemy.pattern?.[(enemy.patternIndex + 1) % Math.max(1, enemy.pattern.length)];
     const isSelected = selectedTarget === i;
+    const enemySprite = enemy.sprite ?? '';
 
-    const slot = el('div', `enemy-slot type-${enemy.type || 'normal'} enemy-${enemy.id}`);
+    const slot = el('div', `enemy-slot type-${enemy.tier || enemy.type || 'normal'} enemy-${enemy.id}`);
     slot.innerHTML = `
       <div class="enemy-intent ${intent.type}">
         ${intentIcon(intent.type)} ${intentLabel(intent)}
@@ -294,7 +295,8 @@ function renderCombat() {
       </div>
       <div class="enemy-body ${isSelected ? 'targeted' : ''}" data-enemy="${i}">
         ${enemy.block > 0 ? `<div class="enemy-block-badge">${enemy.block}</div>` : ''}
-        <div class="enemy-emoji">${enemy.emoji ?? '👾'}</div>
+        ${enemySprite ? `<img class="enemy-sprite" src="${enemySprite}" alt="${enemy.name}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />` : ''}
+        <div class="enemy-emoji ${enemySprite ? 'enemy-emoji-fallback' : ''}">${enemy.emoji ?? '👾'}</div>
         <div class="enemy-name">${enemy.name}</div>
         <div class="enemy-hp-bar"><div class="enemy-hp-fill" style="width:${pct(enemy.hp, enemy.maxHp)}%"></div></div>
         <div class="enemy-hp-text">${enemy.hp} / ${enemy.maxHp}</div>

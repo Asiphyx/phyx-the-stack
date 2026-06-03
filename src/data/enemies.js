@@ -12,6 +12,7 @@ export const ENEMIES = {
     id: 'null_pointer',
     name: 'Null Pointer',
     emoji: '🐛',
+    sprite: '/assets/enemies/null_pointer.png',
     maxHp: 28,
     pattern: [
       { type: 'attack', value: 6, description: 'Dereference — Deal 6 damage.' },
@@ -25,6 +26,7 @@ export const ENEMIES = {
     id: 'todo_comment',
     name: 'TODO Comment',
     emoji: '📝',
+    sprite: '/assets/enemies/todo_comment.png',
     maxHp: 20,
     pattern: [
       { type: 'attack', value: 4, description: 'Nag — Deal 4 damage.' },
@@ -38,6 +40,7 @@ export const ENEMIES = {
     id: 'type_error',
     name: 'Type Error',
     emoji: '🔀',
+    sprite: '/assets/enemies/type_error.png',
     maxHp: 25,
     pattern: [
       { type: 'attack', value: 5, description: 'Coerce — Deal 5 damage.' },
@@ -52,6 +55,7 @@ export const ENEMIES = {
     id: 'spaghetti_code',
     name: 'Spaghetti Code',
     emoji: '🍝',
+    sprite: '/assets/enemies/spaghetti_code.png',
     maxHp: 18,
     pattern: [
       { type: 'attack', value: 3, description: 'Tangle — Deal 3 damage.' },
@@ -69,6 +73,7 @@ export const ENEMIES = {
     id: 'memory_leak',
     name: 'Memory Leak',
     emoji: '🕳️',
+    sprite: '/assets/enemies/memory_leak.png',
     maxHp: 35,
     pattern: [
       { type: 'attack', value: 7, description: 'Drip — Deal 7 damage.' },
@@ -83,6 +88,7 @@ export const ENEMIES = {
     id: 'merge_conflict',
     name: 'Merge Conflict',
     emoji: '🔀',
+    sprite: '/assets/enemies/merge_conflict.png',
     maxHp: 40,
     pattern: [
       { type: 'attack', value: 8, description: 'Diverge — Deal 8 damage.' },
@@ -97,6 +103,7 @@ export const ENEMIES = {
     id: 'heisenbug',
     name: 'Heisenbug',
     emoji: '👻',
+    sprite: '/assets/enemies/heisenbug.png',
     maxHp: 30,
     pattern: [
       { type: 'attack', value: 10, description: 'Manifest — Deal 10 damage.' },
@@ -111,6 +118,7 @@ export const ENEMIES = {
     id: 'dependency_hell',
     name: 'Dependency Hell',
     emoji: '📦',
+    sprite: '/assets/enemies/dependency_hell.png',
     maxHp: 32,
     pattern: [
       { type: 'summon', description: 'npm install — Summon a Null Pointer.' },
@@ -129,6 +137,7 @@ export const ENEMIES = {
     id: 'tech_debt',
     name: 'Tech Debt',
     emoji: '💳',
+    sprite: '/assets/enemies/tech_debt.png',
     maxHp: 55,
     pattern: [
       { type: 'attack', value: 10, description: 'Interest — Deal 10 damage.' },
@@ -144,6 +153,7 @@ export const ENEMIES = {
     id: 'race_condition',
     name: 'Race Condition',
     emoji: '⚡',
+    sprite: '/assets/enemies/race_condition.png',
     maxHp: 45,
     pattern: [
       { type: 'attack', value: 12, description: 'Thread A — Deal 12 damage.' },
@@ -162,6 +172,7 @@ export const ENEMIES = {
     id: 'production_outage',
     name: 'Production Outage',
     emoji: '🔥',
+    sprite: '/assets/enemies/production_outage.png',
     maxHp: 80,
     pattern: [
       { type: 'attack', value: 12, description: 'Alert Storm — Deal 12 damage.' },
@@ -177,6 +188,7 @@ export const ENEMIES = {
     id: 'legacy_codebase',
     name: 'Legacy Codebase',
     emoji: '💀',
+    sprite: '/assets/enemies/legacy_codebase.png',
     maxHp: 120,
     pattern: [
       { type: 'attack', value: 8, description: 'Rot — Deal 8 damage.' },
@@ -193,6 +205,7 @@ export const ENEMIES = {
     id: 'the_product_manager',
     name: 'The Product Manager',
     emoji: '👔',
+    sprite: '/assets/enemies/the_product_manager.png',
     maxHp: 100,
     pattern: [
       { type: 'debuff', description: 'Scope Creep — Randomize your hand.' },
