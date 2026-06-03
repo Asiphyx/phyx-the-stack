@@ -187,81 +187,103 @@ function renderCombat() {
 
   const section = el('section', 'combat-screen');
 
-  // ─── HERO PANEL (left side) ───
-  const heroPanel = el('div', 'hero-panel');
-  heroPanel.style.setProperty('--hero-color', hero?.color ?? '#9933ff');
-  heroPanel.innerHTML = `
-    <img class="hero-panel-portrait" src="${hero?.portrait ?? ''}" alt="${hero?.name ?? ''}" />
-    <div class="hero-panel-name">${hero?.name ?? 'Hero'}</div>
-    <div class="hero-panel-title">${hero?.title ?? ''}</div>
-    <div class="hero-panel-stats">
-      <div class="hero-stat hp-stat">
-        <span class="hero-stat-icon">❤️</span>
-        <div class="hero-stat-bar">
-          <div class="hero-stat-fill ${hpClass(snap.hp, snap.maxHp)}" style="width:${pct(snap.hp, snap.maxHp)}%"></div>
-        </div>
-        <span class="hero-stat-text">${snap.hp}/${snap.maxHp}</span>
-      </div>
-      ${snap.block > 0 ? `<div class="hero-stat block-stat"><span class="hero-stat-icon">🛡️</span><span class="hero-stat-text" style="color:var(--neon-cyan)">${snap.block} Block</span></div>` : ''}
-      <div class="hero-stat energy-stat">
-        <span class="hero-stat-icon">⚡</span>
-        <span class="hero-stat-text" style="color:var(--neon-gold)">${snap.energy}/${snap.maxEnergy} Energy</span>
-      </div>
-    </div>
-    <div class="ult-container">
-      <div class="ult-bar">
-        <div class="ult-fill ${ultReady ? 'ult-ready' : ''}" style="width:${pct(snap.ultCharge, snap.ultMaxCharge)}%"></div>
-      </div>
-      <button class="ult-btn ${ultReady ? 'ult-btn-ready' : ''}" ${ultReady ? '' : 'disabled'}>
-        ${hero?.ultimate?.emoji ?? '💥'} ${hero?.ultimate?.name ?? 'Ultimate'}
-      </button>
-      <div class="ult-desc">${hero?.ultimate?.description ?? ''}</div>
-      <div class="ult-charge-text">${snap.ultCharge}/${snap.ultMaxCharge}</div>
-    </div>
-    <div class="hero-panel-passive">
-      <div class="passive-label">Passive</div>
-      <div class="passive-name">${hero?.passive?.name ?? ''}</div>
-      <div class="passive-desc">${hero?.passive?.description ?? ''}</div>
-    </div>
-  `;
-  section.appendChild(heroPanel);
-
-  // Ult button handler
-  setTimeout(() => {
-    const ultBtn = heroPanel.querySelector('.ult-btn');
-    if (ultBtn && ultReady) {
-      ultBtn.onclick = () => {
-        game.useUltimate();
-        root.classList.add('screen-shake-big');
-        setTimeout(() => root.classList.remove('screen-shake-big'), 500);
-      };
-    }
-  }, 0);
-
-  // ─── MAIN COMBAT AREA ───
-  const mainArea = el('div', 'combat-main');
-
-  // Floor info bar
+  // ─── 1. TOP STATS BAR ───
   const topBar = el('div', 'combat-top-bar');
+  topBar.style.setProperty('--hero-color', hero?.color ?? '#9933ff');
   topBar.innerHTML = `
-    <div class="combat-floor-info">Floor ${snap.floor}/${snap.maxFloor}</div>
-    <div class="combat-pile-info">
-      <span>📥 ${snap.drawPileCount}</span>
-      <span>📤 ${snap.discardPileCount}</span>
-      <span>🗑️ ${snap.exhaustPileCount}</span>
-      <span>💰 ${snap.gold}</span>
+    <div class="combat-top-hero-identity">
+      <span class="combat-top-hero-name glitch-text" data-text="${hero?.name ?? 'HERO'}">${hero?.name ?? 'HERO'}</span>
+      <span class="combat-top-hero-title">${hero?.title ?? ''}</span>
+    </div>
+    
+    <div class="combat-top-stats-group">
+      <!-- HP Stat -->
+      <div class="top-stat-item hp-stat">
+        <span class="top-stat-icon">❤️</span>
+        <div class="top-stat-bar-outer">
+          <div class="top-stat-bar-fill ${hpClass(snap.hp, snap.maxHp)}" style="width:${pct(snap.hp, snap.maxHp)}%"></div>
+        </div>
+        <span class="top-stat-val">${snap.hp}/${snap.maxHp}</span>
+      </div>
+      
+      <!-- Block Stat -->
+      <div class="top-stat-item block-stat ${snap.block > 0 ? 'has-block' : 'no-block'}">
+        <span class="top-stat-icon">🛡️</span>
+        <span class="top-stat-val">${snap.block} Block</span>
+      </div>
+      
+      <!-- Energy Stat -->
+      <div class="top-stat-item energy-stat">
+        <span class="top-stat-icon">⚡</span>
+        <span class="top-stat-val">${snap.energy}/${snap.maxEnergy} Energy</span>
+      </div>
+    </div>
+    
+    <div class="combat-top-run-info">
+      <span class="top-run-val">💰 ${snap.gold} Gold</span>
+      <span class="top-run-divider">|</span>
+      <span class="top-run-val">Floor ${snap.floor}/${snap.maxFloor}</span>
     </div>
   `;
-  mainArea.appendChild(topBar);
+  section.appendChild(topBar);
 
-  // ─── ENEMY AREA ───
+  // ─── 2. MIDDLE BATTLEFIELD ───
+  const battlefield = el('div', 'combat-battlefield');
+  
+  // High-fidelity low-opacity terminal background diagnostic logs
+  const matrixBg = el('div', 'battlefield-matrix-bg');
+  const terminalLogs = [
+    `SYS_CORE_INIT // RESOLVED`,
+    `STACK_POINTER // PTR: 0x7FFA8F`,
+    `MEMORY_LIMIT // CAP: 2048MB`,
+    `REF_COUNT_GC // ACTIVE`,
+    `VITE_COMPILER_V8 // RUNNING`,
+    `HEAP_POOL_ALLOC // 142KB`,
+    `DAEMON_THREAD // ACTIVE`,
+    `DEBUG_LEVEL_LOG // VERBOSE`,
+    `ERR_TRACE // EXITED_CODE_0`,
+    `CACHE_SECTOR // SYNCED`,
+    `PORT_LISTENER_8080 // OK`,
+    `STACK_FRAME_COUNT // CLN`
+  ];
+  matrixBg.innerHTML = terminalLogs.map(log => `<div>&gt; ${log}</div>`).join('');
+  battlefield.appendChild(matrixBg);
+
+  // Neon territorial divider between hero and enemy columns
+  const divider = el('div', 'battlefield-divider');
+  battlefield.appendChild(divider);
+  
+  // Left Side: Hero Sprite Platform
+  const heroSpriteContainer = el('div', 'hero-sprite-container');
+  heroSpriteContainer.style.setProperty('--hero-color', hero?.color ?? '#9933ff');
+  heroSpriteContainer.innerHTML = `
+    <div class="hero-sprite-platform">
+      <div class="hero-sprite-glow"></div>
+      <div class="hero-sprite-matrix">
+        <div class="holo-sprite-avatar">
+          <img class="holo-avatar-image" src="${hero?.portrait ?? ''}" alt="${hero?.name ?? ''}" />
+          <div class="holo-glitch-overlay"></div>
+        </div>
+      </div>
+      <div class="hero-sprite-tag" style="background-color: rgba(0,0,0,0.6); border-color: ${hero?.color}">
+        <span class="hero-tag-indicator" style="background-color: ${hero?.color ?? 'var(--neon-purple)'}"></span>
+        ${hero?.name?.toUpperCase() ?? 'SYS'} : READY
+      </div>
+      <div class="hero-sprite-stats">
+        ${snap.block > 0 ? `<div class="hero-battle-block">🛡️ ${snap.block}</div>` : ''}
+      </div>
+    </div>
+  `;
+  battlefield.appendChild(heroSpriteContainer);
+
+  // Right Side: Enemy Area
   const enemyArea = el('div', 'combat-enemy-area');
   for (const [i, enemy] of state.enemies.entries()) {
     const intent = enemy.pattern?.[enemy.patternIndex] ?? { type: 'none', description: '...' };
     const nextIntent = enemy.pattern?.[(enemy.patternIndex + 1) % Math.max(1, enemy.pattern.length)];
     const isSelected = selectedTarget === i;
 
-    const slot = el('div', `enemy-slot ${isSelected ? '' : ''}`);
+    const slot = el('div', `enemy-slot type-${enemy.type || 'normal'} enemy-${enemy.id}`);
     slot.innerHTML = `
       <div class="enemy-intent ${intent.type}">
         ${intentIcon(intent.type)} ${intentLabel(intent)}
@@ -278,30 +300,98 @@ function renderCombat() {
     slot.querySelector('.enemy-body').onclick = () => { selectedTarget = i; render(); };
     enemyArea.appendChild(slot);
   }
-  mainArea.appendChild(enemyArea);
+  battlefield.appendChild(enemyArea);
+  section.appendChild(battlefield);
 
-  // ─── ACTION BAR ───
-  const actionBar = el('div', 'combat-action-bar');
-  actionBar.innerHTML = `<button class="btn btn-end-turn" id="end-turn-btn">End Turn</button>`;
-  mainArea.appendChild(actionBar);
+  // ─── 3. BOTTOM PANEL (DASHBOARD CONSOLE) ───
+  const bottomDashboard = el('div', 'combat-bottom-dashboard');
+  
+  // Bottom Left: Hero Portrait Console
+  const heroPortraitConsole = el('div', 'hero-portrait-console');
+  heroPortraitConsole.style.setProperty('--hero-color', hero?.color ?? '#9933ff');
+  heroPortraitConsole.innerHTML = `
+    <div class="console-portrait-frame">
+      <img class="console-portrait-image" src="${hero?.portrait ?? ''}" alt="${hero?.name ?? ''}" />
+      <div class="console-portrait-glitch"></div>
+    </div>
+    <div class="console-hero-details">
+      <div class="console-hero-header">
+        <div class="console-hero-name">${hero?.name ?? 'Hero'}</div>
+        <div class="console-hero-passive-label">PASSIVE: ${hero?.passive?.name ?? ''}</div>
+      </div>
+      
+      <!-- Ultimate Control inside Portrait Console -->
+      <div class="console-ult-control">
+        <button class="ult-btn ${ultReady ? 'ult-btn-ready' : ''}" ${ultReady ? '' : 'disabled'}>
+          ${hero?.ultimate?.emoji ?? '💥'} ${hero?.ultimate?.name ?? 'Ultimate'}
+        </button>
+        <div class="console-ult-bar-outer">
+          <div class="console-ult-bar-fill ${ultReady ? 'ult-ready' : ''}" style="width:${pct(snap.ultCharge, snap.ultMaxCharge)}%"></div>
+        </div>
+        <div class="console-ult-desc" title="${hero?.ultimate?.description ?? ''}">${hero?.ultimate?.description ?? ''}</div>
+      </div>
+    </div>
+  `;
+  bottomDashboard.appendChild(heroPortraitConsole);
 
-  // ─── HAND ───
+  // Bottom Center: Hand Area
   const handArea = el('div', 'combat-hand-area');
   for (const [i, card] of state.hand.entries()) {
     const cost = game.combat.getCardCost(card);
     const canPlay = cost <= state.energy && state.hp > 0;
     handArea.appendChild(renderCard(card, i, canPlay));
   }
-  mainArea.appendChild(handArea);
+  bottomDashboard.appendChild(handArea);
 
-  section.appendChild(mainArea);
+  // Bottom Right: Deck & Control Console
+  const deckControlConsole = el('div', 'deck-control-console');
+  deckControlConsole.innerHTML = `
+    <div class="deck-piles-grid">
+      <div class="deck-pile-badge draw-pile" title="Draw Pile (STACK)">
+        <span class="pile-icon">📥</span>
+        <span class="pile-count">${snap.drawPileCount}</span>
+        <span class="pile-label">STACK</span>
+      </div>
+      <div class="deck-pile-badge discard-pile" title="Discard Pile (HEAP)">
+        <span class="pile-icon">📤</span>
+        <span class="pile-count">${snap.discardPileCount}</span>
+        <span class="pile-label">HEAP</span>
+      </div>
+      <div class="deck-pile-badge exhaust-pile" title="Exhaust Pile (VOID)">
+        <span class="pile-icon">🗑️</span>
+        <span class="pile-count">${snap.exhaustPileCount}</span>
+        <span class="pile-label">VOID</span>
+      </div>
+    </div>
+    <button class="btn btn-end-turn" id="end-turn-btn" ${state.hp <= 0 ? 'disabled' : ''}>
+      END TURN
+      <span class="btn-subtext">// COMPILE STACK</span>
+    </button>
+  `;
+  bottomDashboard.appendChild(deckControlConsole);
+  section.appendChild(bottomDashboard);
+
   root.appendChild(section);
 
-  // Wire end turn
-  section.querySelector('#end-turn-btn').onclick = () => {
-    if (state.hp <= 0) return;
-    game.combat.endPlayerTurn();
-  };
+  // Wire event handlers asynchronously to ensure DOM availability
+  setTimeout(() => {
+    const ultBtn = section.querySelector('.ult-btn');
+    if (ultBtn && ultReady) {
+      ultBtn.onclick = () => {
+        game.useUltimate();
+        root.classList.add('screen-shake-big');
+        setTimeout(() => root.classList.remove('screen-shake-big'), 500);
+      };
+    }
+
+    const endTurnBtn = section.querySelector('#end-turn-btn');
+    if (endTurnBtn) {
+      endTurnBtn.onclick = () => {
+        if (state.hp <= 0) return;
+        game.combat.endPlayerTurn();
+      };
+    }
+  }, 0);
 }
 
 function renderCard(card, index, canPlay) {
@@ -323,7 +413,8 @@ function renderCard(card, index, canPlay) {
       <div class="card-name">${card.name ?? '?'}</div>
     </div>
     <div class="card-illustration">
-      <div class="card-emoji">${card.emoji ?? '🧪'}</div>
+      <img class="card-art" src="/assets/cards/cardicon_${card.id}.png" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" alt="" />
+      <div class="card-emoji" style="display:none">${card.emoji ?? '🧪'}</div>
     </div>
     <div class="card-description">${card.description ?? ''}</div>
     <div class="card-footer">// ${typeLabel.toUpperCase()}</div>
@@ -514,7 +605,7 @@ function onDamageEvent(event) {
   let x = window.innerWidth / 2, y = window.innerHeight / 2;
 
   if (isPlayer) {
-    const hp = root.querySelector('.hero-panel-portrait');
+    const hp = root.querySelector('.console-portrait-image') || root.querySelector('.holo-sprite-avatar');
     if (hp) { const r = hp.getBoundingClientRect(); x = r.left + r.width / 2; y = r.top + r.height / 2; }
   } else {
     const en = root.querySelector(`[data-enemy-id="${event.targetId}"], [data-enemy="${event.targetId}"]`);
