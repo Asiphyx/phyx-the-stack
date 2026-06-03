@@ -52,8 +52,8 @@
   --rarity-rare: #ffcc00;
 
   /* Cards */
-  --card-width: 140px;
-  --card-height: 196px;
+  --card-width: 154px;
+  --card-height: 216px;
   --card-radius: 0px;
   --card-border: 2px;
 
@@ -872,19 +872,20 @@ body::after {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: var(--space-md);
-  background: var(--bg-card);
+  padding: var(--space-md) var(--space-lg);
+  background: rgba(10, 6, 20, 0.95);
   border: 2px solid rgba(255, 255, 255, 0.15);
   border-radius: 0px;
-  min-width: 100px;
+  min-width: 170px;
   cursor: pointer;
   transition: all 0.2s ease;
   clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
 }
 
 .enemy-body:hover {
-  border-color: var(--neon-red);
-  box-shadow: -3px 0 0 var(--neon-pink), 3px 0 0 var(--neon-cyan), 0 0 15px var(--neon-red-glow);
+  border-color: var(--neon-cyan);
+  box-shadow: -3px 0 0 var(--neon-pink), 3px 0 0 var(--neon-cyan), 0 0 20px var(--neon-cyan-glow);
 }
 
 .enemy-body.targeted {
@@ -894,29 +895,34 @@ body::after {
 }
 
 @keyframes targetPulse {
-  0%, 100% { box-shadow: 0 0 20px var(--neon-red-glow); }
-  50% { box-shadow: 0 0 40px var(--neon-red-glow); }
+  0%, 100% { box-shadow: -4px 0 0 var(--neon-pink), 4px 0 0 var(--neon-cyan), 0 0 15px var(--neon-red-glow); }
+  50% { box-shadow: -4px 0 0 var(--neon-pink), 4px 0 0 var(--neon-cyan), 0 0 35px var(--neon-red-glow); }
 }
 
 .enemy-emoji {
-  font-size: 2.5rem;
+  font-size: 4.8rem;
   line-height: 1;
+  filter: drop-shadow(0 0 10px rgba(0, 229, 255, 0.25));
+  margin-bottom: var(--space-xs);
 }
 
 .enemy-name {
-  font-family: var(--font-display);
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--text-primary);
+  font-family: var(--font-pixel);
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--neon-cyan);
+  text-transform: uppercase;
+  letter-spacing: 1px;
   margin-top: var(--space-xs);
 }
 
 .enemy-hp-bar {
   width: 100%;
-  height: 8px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
-  margin-top: var(--space-xs);
+  height: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0px;
+  margin-top: var(--space-sm);
   overflow: hidden;
   position: relative;
 }
@@ -924,15 +930,17 @@ body::after {
 .enemy-hp-fill {
   height: 100%;
   background: linear-gradient(90deg, var(--neon-red), #ff6644);
-  border-radius: 4px;
+  border-radius: 0px;
   transition: width 0.4s var(--ease-out-expo);
+  box-shadow: 0 0 8px var(--neon-red-glow);
 }
 
 .enemy-hp-text {
   font-family: var(--font-display);
-  font-size: 0.7rem;
+  font-size: 0.75rem;
+  font-weight: 700;
   color: var(--text-secondary);
-  margin-top: 2px;
+  margin-top: 4px;
 }
 
 .enemy-block-badge {
@@ -1196,16 +1204,24 @@ body::after {
 }
 
 .btn-end-turn {
-  background: rgba(255, 204, 0, 0.1);
-  border-color: var(--neon-gold);
-  color: var(--neon-gold);
-  font-size: 0.75rem;
-  padding: 12px 32px;
+  background: rgba(255, 102, 0, 0.12);
+  border: 3px solid #ff6600;
+  color: #ffaa00;
+  font-family: var(--font-pixel);
+  font-size: 0.95rem;
+  letter-spacing: 2px;
+  padding: 14px 48px;
+  box-shadow: 0 0 20px rgba(255, 102, 0, 0.35);
+  text-shadow: 0 0 10px rgba(255, 170, 0, 0.7);
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
+  outline: none;
 }
 
 .btn-end-turn:hover {
-  background: rgba(255, 204, 0, 0.25);
-  box-shadow: -3px 0 0 var(--neon-pink), 3px 0 0 var(--neon-cyan), 0 0 20px var(--neon-gold-glow);
+  background: rgba(255, 102, 0, 0.3);
+  border-color: #ffaa00;
+  box-shadow: -4px 0 0 var(--neon-pink), 4px 0 0 var(--neon-cyan), 0 0 25px rgba(255, 102, 0, 0.6);
+  transform: translateY(-2px);
 }
 
 /* ══════════════════════════════════════════════
