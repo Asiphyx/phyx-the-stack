@@ -9,6 +9,8 @@ export const HEROES = {
     name: 'Cait',
     title: 'The Tyrant Queen',
     portrait: '/assets/heroes/cait.png',
+    avatar: '/assets/heroes/avatars/cait.png',
+    battlePortrait: '/assets/heroes/battle/cait.png',
     maxHp: 65,
     startingDeck: [
       'git_push', 'git_push', 'git_push', 'git_push',
@@ -36,6 +38,8 @@ export const HEROES = {
     name: 'Asiphyx',
     title: 'The Void Walker',
     portrait: '/assets/heroes/asiphyx.png',
+    avatar: '/assets/heroes/avatars/asiphyx.png',
+    battlePortrait: '/assets/heroes/battle/asiphyx.png',
     maxHp: 70,
     startingDeck: [
       'git_push', 'git_push', 'git_push',
@@ -64,6 +68,8 @@ export const HEROES = {
     name: 'Codex',
     title: 'The Architect',
     portrait: '/assets/heroes/codex.png',
+    avatar: '/assets/heroes/avatars/codex.png',
+    battlePortrait: '/assets/heroes/battle/codex.png',
     maxHp: 75,
     startingDeck: [
       'git_push', 'git_push', 'git_push', 'git_push',
@@ -90,6 +96,8 @@ export const HEROES = {
     name: 'Xadnib',
     title: 'The Stargazer',
     portrait: '/assets/heroes/xadnib.png',
+    avatar: '/assets/heroes/avatars/xadnib.png',
+    battlePortrait: '/assets/heroes/battle/xadnib.png',
     maxHp: 60,
     startingDeck: [
       'git_push', 'git_push', 'git_push',
@@ -117,6 +125,8 @@ export const HEROES = {
     name: 'Bindax',
     title: 'The Wild Card',
     portrait: '/assets/heroes/bindax.png',
+    avatar: '/assets/heroes/avatars/bindax.png',
+    battlePortrait: '/assets/heroes/battle/bindax.png',
     maxHp: 72,
     startingDeck: [
       'git_push', 'git_push', 'git_push',
@@ -144,7 +154,9 @@ export const HEROES = {
     id: 'antigrav',
     name: 'Antigrav',
     title: 'The Weightless Menace',
-    portrait: '/assets/heroes/antigrav.png',
+    portrait: '/assets/heroes/6.png',
+    avatar: '/assets/heroes/avatars/antigrav.png',
+    battlePortrait: '/assets/heroes/battle/antigrav.png',
     maxHp: 68,
     startingDeck: [
       'git_push', 'git_push', 'git_push',

@@ -83,11 +83,12 @@ function renderHeroSelect() {
   const grid = el('div', 'hero-grid');
   for (const hero of Object.values(HEROES)) {
     const card = el('button', 'hero-card');
+    const avatarSrc = hero.avatar ?? hero.portrait;
     card.type = 'button';
     card.style.setProperty('--hero-color', hero.color);
     card.style.setProperty('--hero-glow', `${hero.color}55`);
     card.innerHTML = `
-      <img class="hero-portrait" src="${hero.portrait}" alt="${hero.name}" />
+      <img class="hero-portrait" src="${avatarSrc}" alt="${hero.name}" />
       <div class="hero-name">${hero.name}</div>
       <div class="hero-title-text">${hero.title}</div>
       <div class="hero-passive"><strong>${hero.passive.name}</strong><br/>${hero.passive.description}</div>
@@ -183,6 +184,8 @@ function renderCombat() {
   const snap = game.getSnapshot();
   const state = game.state;
   const hero = state.hero;
+  const heroAvatar = hero?.avatar ?? hero?.portrait ?? '';
+  const heroBattlePortrait = hero?.battlePortrait ?? heroAvatar;
   const ultReady = snap.ultCharge >= snap.ultMaxCharge;
 
   const section = el('section', 'combat-screen');
@@ -261,7 +264,7 @@ function renderCombat() {
       <div class="hero-sprite-glow"></div>
       <div class="hero-sprite-matrix">
         <div class="holo-sprite-avatar">
-          <img class="holo-avatar-image" src="${hero?.portrait ?? ''}" alt="${hero?.name ?? ''}" />
+          <img class="holo-avatar-image" src="${heroBattlePortrait}" alt="${hero?.name ?? ''}" />
           <div class="holo-glitch-overlay"></div>
         </div>
       </div>
@@ -311,7 +314,7 @@ function renderCombat() {
   heroPortraitConsole.style.setProperty('--hero-color', hero?.color ?? '#9933ff');
   heroPortraitConsole.innerHTML = `
     <div class="console-portrait-frame">
-      <img class="console-portrait-image" src="${hero?.portrait ?? ''}" alt="${hero?.name ?? ''}" />
+      <img class="console-portrait-image" src="${heroAvatar}" alt="${hero?.name ?? ''}" />
       <div class="console-portrait-glitch"></div>
     </div>
     <div class="console-hero-details">
