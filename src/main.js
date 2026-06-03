@@ -311,15 +311,22 @@ function renderCard(card, index, canPlay) {
   cardEl.dataset.rarity = card.rarity ?? 'common';
   cardEl.dataset.type = card.type ?? 'skill';
   cardEl.disabled = !canPlay;
+
+  let typeLabel = card.type ?? 'skill';
+  if (card.rarity === 'debt' || card.tags?.includes('curse')) {
+    typeLabel = 'bug';
+  }
+
   cardEl.innerHTML = `
     <div class="card-header">
-      <div class="card-name">${card.name ?? '?'}</div>
       <div class="card-cost">${cost}</div>
+      <div class="card-name">${card.name ?? '?'}</div>
     </div>
-    <div class="card-emoji">${card.emoji ?? '🧪'}</div>
+    <div class="card-illustration">
+      <div class="card-emoji">${card.emoji ?? '🧪'}</div>
+    </div>
     <div class="card-description">${card.description ?? ''}</div>
-    <div class="card-flavor">${card.flavor ?? ''}</div>
-    <div class="card-type-badge">${card.type ?? 'skill'}</div>
+    <div class="card-footer">// ${typeLabel.toUpperCase()}</div>
   `;
   cardEl.onclick = () => {
     if (!canPlay) return;
