@@ -183,7 +183,7 @@ function buyShopCard() {
 function renderCombat() {
   const snap = game.getSnapshot();
   const state = game.state;
-  const hero = state.hero;
+  const hero = hydrateHeroDisplay(state.hero);
   const heroAvatar = hero?.avatar ?? hero?.portrait ?? '';
   const heroBattlePortrait = hero?.battlePortrait ?? heroAvatar;
   const ultReady = snap.ultCharge >= snap.ultMaxCharge;
@@ -281,7 +281,8 @@ function renderCombat() {
 
   // Right Side: Enemy Area
   const enemyArea = el('div', 'combat-enemy-area');
-  for (const [i, enemy] of state.enemies.entries()) {
+  for (const [i, rawEnemy] of state.enemies.entries()) {
+    const enemy = hydrateEnemyDisplay(rawEnemy);
     const intent = enemy.pattern?.[enemy.patternIndex] ?? { type: 'none', description: '...' };
     const nextIntent = enemy.pattern?.[(enemy.patternIndex + 1) % Math.max(1, enemy.pattern.length)];
     const isSelected = selectedTarget === i;
@@ -698,4 +699,41 @@ function buildEnemyCatalogue() {
     elite: eliteIds.map(id => ENEMIES[id]).filter(Boolean),
     boss: bossIds.map(id => ENEMIES[id]).filter(Boolean),
   };
+}
+
+function hydrateHeroDisplay(hero) {
+  if (!hero?.id) return hero;
+  const canonical = HEROES[hero.id];
+  return canonical ? { ...hero, ...canonical } : hero;
+}
+
+function hydrateEnemyDisplay(enemy) {
+  if (!enemy) return enemy;
+  const canonical = resolveEnemyTemplate(enemy);
+  if (!canonical) return enemy;
+  return {
+    ...canonical,
+    ...enemy,
+    emoji: enemy.emoji ?? canonical.emoji,
+    sprite: enemy.sprite ?? canonical.sprite,
+    tier: enemy.tier ?? canonical.tier,
+    flavor: enemy.flavor ?? canonical.flavor,
+  };
+}
+
+function resolveEnemyTemplate(enemy) {
+  const rawId = String(enemy.id ?? '').trim();
+  const candidates = [
+    rawId,
+    rawId.replace(/_\d+_\d+$/, ''),
+    rawId.replace(/_\d+$/, ''),
+    String(enemy.name ?? '').trim().toLowerCase().replace(/\s+/g, '_'),
+  ].filter(Boolean);
+
+  for (const id of candidates) {
+    if (ENEMIES[id]) return ENEMIES[id];
+  }
+
+  const normalizedName = String(enemy.name ?? '').trim().toLowerCase();
+  return Object.values(ENEMIES).find(template => template.name?.toLowerCase() === normalizedName);
 }
