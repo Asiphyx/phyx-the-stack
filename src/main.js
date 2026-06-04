@@ -1,10 +1,14 @@
 import './index.css';
+import { inject } from '@vercel/analytics';
 import { GameState } from './engine/GameState.js';
 import { HEROES } from './data/heroes.js';
 import { getHeroTheme } from './data/heroThemes.js';
 import { ENEMIES, ENCOUNTERS } from './data/enemies.js';
 import { CARDS } from './data/cards.js';
 import bus from './engine/EventBus.js';
+
+// Initialize Vercel Web Analytics
+inject();
 
 const cardPool = Object.values(CARDS).filter(c => c.rarity !== 'starter');
 const game = new GameState();
@@ -520,7 +524,7 @@ function renderCard(card, index, canPlay) {
   return cardEl;
 }
 
-// ──────────────────────────────────────────────────────────
+// ───────────────────────────────��──────────────────────────
 // Draft
 // ──────────────────────────────────────────────────────────
 
