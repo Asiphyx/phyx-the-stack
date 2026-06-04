@@ -46,6 +46,20 @@ export class DraftSystem {
     });
   }
 
+  exportState() {
+    return {
+      draftType: this.draftType,
+      offeredCards: this.offeredCards.map(c => ({ ...c })),
+      cardPool: this.cardPool.map(c => ({ ...c })),
+    };
+  }
+
+  importState(rawState = {}) {
+    this.draftType = rawState.draftType ?? 'choice';
+    this.offeredCards = (rawState.offeredCards ?? []).map(c => ({ ...c }));
+    this.cardPool = (rawState.cardPool ?? []).map(c => ({ ...c }));
+  }
+
   /**
    * Choose a refactoring mode in the terminal.
    * @param {string} mode — 'deprecate', 'refactor', 'compile'

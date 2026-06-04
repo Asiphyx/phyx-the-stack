@@ -94,6 +94,25 @@ export class Combat {
     };
   }
 
+  exportState() {
+    return {
+      ...this.combatState,
+      endTurnExhaustIds: [...this.combatState.endTurnExhaustIds],
+      combatPlayCounts: Object.fromEntries(this.combatState.combatPlayCounts),
+      lastAttackCard: this.combatState.lastAttackCard ? { ...this.combatState.lastAttackCard } : null,
+    };
+  }
+
+  importState(rawState = {}) {
+    this.combatState = {
+      ...this._newCombatState(),
+      ...rawState,
+      endTurnExhaustIds: new Set(rawState.endTurnExhaustIds ?? []),
+      combatPlayCounts: new Map(Object.entries(rawState.combatPlayCounts ?? {})),
+      lastAttackCard: rawState.lastAttackCard ? { ...rawState.lastAttackCard } : null,
+    };
+  }
+
   // ────────────────────────────────────────────────────────
   //  Start / setup
   // ────────────────────────────────────────────────────────

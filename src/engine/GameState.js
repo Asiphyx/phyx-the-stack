@@ -17,6 +17,9 @@ import { Combat } from './Combat.js';
 import { DraftSystem } from './DraftSystem.js';
 import { FloorManager, NODE_TYPE } from './FloorManager.js';
 import { CARDS } from '../data/cards.js';
+import { buildCaitCompanion } from '../data/caitModules.js';
+
+const SAVE_VERSION = 1;
 
 // ── Valid phases ─────────────────────────────────────────────
 export const PHASES = Object.freeze([
@@ -38,6 +41,7 @@ function createDefaultState() {
 
     // Hero
     hero: null,
+    cait: null,
 
     // Player vitals
     hp: 0,
@@ -76,6 +80,10 @@ function createDefaultState() {
     // Analytics for run-level passives
     cardPlayCounts: {},
   };
+}
+
+function cloneData(value) {
+  return JSON.parse(JSON.stringify(value));
 }
 
 // ── GameState class ─────────────────────────────────────────
@@ -128,6 +136,7 @@ export class GameState {
   selectHero(heroDef) {
     const s = this.state;
     s.hero = heroDef;
+    s.cait = buildCaitCompanion(heroDef.id);
     s.hp = heroDef.maxHp;
     s.maxHp = heroDef.maxHp;
     s.gold = 0;
@@ -287,6 +296,48 @@ export class GameState {
   }
 
   // ──────────────────────────────────────────────────────────
+  //  Save states
+  // ──────────────────────────────────────────────────────────
+
+  createSaveState(label = '') {
+    return {
+      version: SAVE_VERSION,
+      label,
+      savedAt: new Date().toISOString(),
+      state: cloneData(this.state),
+      floorMap: cloneData(this.floors.map ?? []),
+      combatState: this.combat.exportState(),
+      draftState: this.draft.exportState(),
+    };
+  }
+
+  restoreSaveState(saveState) {
+    if (!saveState || saveState.version !== SAVE_VERSION || !saveState.state) {
+      return false;
+    }
+
+    const restored = {
+      ...createDefaultState(),
+      ...cloneData(saveState.state),
+    };
+
+    if (!PHASES.includes(restored.phase)) {
+      restored.phase = 'title';
+    }
+
+    this.state = restored;
+    this.combat = new Combat(this);
+    this.draft = new DraftSystem(this);
+    this.floors = new FloorManager(this);
+    this.floors.map = cloneData(saveState.floorMap ?? []);
+    this.combat.importState(saveState.combatState ?? {});
+    this.draft.importState(saveState.draftState ?? {});
+
+    bus.emit('stateChange', { from: 'saveState', to: this.state.phase, state: this.getSnapshot() });
+    return true;
+  }
+
+  // ──────────────────────────────────────────────────────────
   //  Ultimate ability
   // ──────────────────────────────────────────────────────────
 
@@ -393,6 +444,7 @@ export class GameState {
     return {
       phase: s.phase,
       hero: s.hero,
+      cait: s.cait,
       hp: s.hp,
       maxHp: s.maxHp,
       block: s.block,
@@ -421,4 +473,3 @@ export class GameState {
     };
   }
 }
-

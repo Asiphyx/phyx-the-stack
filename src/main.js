@@ -2,12 +2,16 @@ import './index.css';
 import { GameState } from './engine/GameState.js';
 import { HEROES } from './data/heroes.js';
 import { getHeroTheme } from './data/heroThemes.js';
+import { CAIT_IDOL, buildCaitCompanion, getCaitLoadout } from './data/caitModules.js';
 import { ENEMIES, ENCOUNTERS } from './data/enemies.js';
 import { CARDS } from './data/cards.js';
 import bus from './engine/EventBus.js';
 
 const cardPool = Object.values(CARDS).filter(c => c.rarity !== 'starter');
 const game = new GameState();
+const SAVE_STORAGE_KEY = 'phyx-the-stack:saves:v1';
+const SAVE_SLOT_COUNT = 3;
+const INTRO_TRACK_SRC = '/assets/audio/cait-intro.mp3';
 
 const root = document.querySelector('#screen-container');
 const damageLayer = document.querySelector('#damage-numbers-layer');
@@ -16,6 +20,15 @@ const toastLayer = document.querySelector('#toast-layer');
 const enemyCatalogue = buildEnemyCatalogue();
 let activeDraft = [];
 let selectedTarget = 0;
+let introAudio = null;
+let introMusicEnabled = false;
+let introAudioContext = null;
+let introAnalyser = null;
+let introFrequencyData = null;
+let introVisualizerFrame = null;
+let introBeatLevel = 0;
+let systemMenuOpen = false;
+let titleWindowOffset = { x: 0, y: 0 };
 
 bus.on('stateChange', () => render());
 bus.on('combatUpdate', () => render());
@@ -55,19 +68,530 @@ function render() {
 function renderTitle() {
   const section = el('section', 'title-screen');
   section.innerHTML = `
-    <div class="title-logo">
-      <div class="title-subtitle">A Phyxian Roguelike Deckbuilder</div>
-      <h1 class="glitch-text" data-text="Phyx the Stack">Phyx the Stack</h1>
-      <p class="title-cta">Click to begin</p>
+    <div class="title-cait-lab-backdrop" aria-hidden="true"></div>
+    <canvas class="title-spectrum title-spectrum-back" id="title-spectrum" width="960" height="360" aria-hidden="true"></canvas>
+    <canvas class="title-spectrum title-spectrum-front" id="title-spectrum-front" width="960" height="360" aria-hidden="true"></canvas>
+    <div class="title-fold-anchor">
+      <div class="title-terminal-top">
+        <span class="title-window-grip">CaitOS://PhyxLauncher.exe</span>
+        <span>QUEEN_SESSION_READY</span>
+        <button class="title-window-center" type="button" aria-label="Center launcher window">CENTER</button>
+      </div>
+      <div class="title-logo">
+        <h1 class="glitch-text" data-text="Phyx the Stack">Phyx the Stack</h1>
+        <div class="title-signal-spine" aria-hidden="true"><span></span></div>
+      </div>
+      <div class="title-actions">
+        <button class="btn btn-primary" id="start-btn">New Run</button>
+        <button class="btn title-music-btn" id="music-btn">${introMusicEnabled ? 'Mute Intro' : 'Play Intro'}</button>
+      </div>
+      <button class="btn title-save-menu-btn" id="title-save-menu-btn">Save States</button>
     </div>
-    <button class="btn btn-primary" id="start-btn">New Run</button>
-    <div class="title-version">v0.1.0 · CaitOS</div>
+    <div class="title-version">v0.1.0 · Cait Labs</div>
   `;
   root.appendChild(section);
+  applyTitleWindowOffset(section.querySelector('.title-fold-anchor'));
+  wireTitleWindowDrag(section);
+  startTitleVisualizer(section);
   section.querySelector('#start-btn').onclick = () => {
+    startIntroMusic();
     game.state.phase = 'heroSelect';
     game.setPhase('heroSelect');
   };
+  section.querySelector('#music-btn').onclick = () => toggleIntroMusic(section);
+  section.querySelector('#title-save-menu-btn').onclick = () => openSystemMenu(false);
+  section.querySelector('.title-window-center').onclick = () => {
+    titleWindowOffset = { x: 0, y: 0 };
+    applyTitleWindowOffset(section.querySelector('.title-fold-anchor'));
+  };
+  appendSystemMenuOverlay(section, false);
+}
+
+function applyTitleWindowOffset(windowEl) {
+  if (!windowEl) return;
+  windowEl.style.setProperty('--title-window-x', `${Math.round(titleWindowOffset.x)}px`);
+  windowEl.style.setProperty('--title-window-y', `${Math.round(titleWindowOffset.y)}px`);
+}
+
+function wireTitleWindowDrag(section) {
+  const windowEl = section.querySelector('.title-fold-anchor');
+  const dragBar = section.querySelector('.title-terminal-top');
+  if (!windowEl || !dragBar) return;
+
+  let drag = null;
+  dragBar.addEventListener('pointerdown', (event) => {
+    if (event.target.closest('button')) return;
+    drag = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: titleWindowOffset.x,
+      originY: titleWindowOffset.y,
+    };
+    dragBar.setPointerCapture(event.pointerId);
+    windowEl.classList.add('dragging');
+  });
+
+  dragBar.addEventListener('pointermove', (event) => {
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const rect = windowEl.getBoundingClientRect();
+    const maxX = Math.max(80, window.innerWidth / 2 - Math.min(140, rect.width * 0.22));
+    const maxY = Math.max(80, window.innerHeight / 2 - Math.min(120, rect.height * 0.36));
+    titleWindowOffset = {
+      x: clampNumber(drag.originX + event.clientX - drag.startX, -maxX, maxX),
+      y: clampNumber(drag.originY + event.clientY - drag.startY, -maxY, maxY),
+    };
+    applyTitleWindowOffset(windowEl);
+  });
+
+  const endDrag = (event) => {
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    drag = null;
+    windowEl.classList.remove('dragging');
+  };
+  dragBar.addEventListener('pointerup', endDrag);
+  dragBar.addEventListener('pointercancel', endDrag);
+}
+
+function ensureIntroAudio() {
+  if (introAudio) return introAudio;
+  introAudio = new Audio(INTRO_TRACK_SRC);
+  introAudio.loop = true;
+  introAudio.volume = 0.68;
+  introAudio.preload = 'auto';
+  return introAudio;
+}
+
+function ensureIntroAnalyser() {
+  const audio = ensureIntroAudio();
+  if (introAnalyser) return introAnalyser;
+
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContext) return null;
+
+  introAudioContext = new AudioContext();
+  const source = introAudioContext.createMediaElementSource(audio);
+  introAnalyser = introAudioContext.createAnalyser();
+  introAnalyser.fftSize = 256;
+  introAnalyser.smoothingTimeConstant = 0.68;
+  introFrequencyData = new Uint8Array(introAnalyser.frequencyBinCount);
+  source.connect(introAnalyser);
+  introAnalyser.connect(introAudioContext.destination);
+  return introAnalyser;
+}
+
+function startIntroMusic() {
+  const audio = ensureIntroAudio();
+  const analyser = ensureIntroAnalyser();
+  if (introAudioContext?.state === 'suspended') {
+    introAudioContext.resume();
+  }
+  if (analyser) startTitleVisualizer(document);
+  introMusicEnabled = true;
+  const playAttempt = audio.play();
+  if (playAttempt?.catch) {
+    playAttempt.catch(() => {
+      introMusicEnabled = false;
+      emitToast('Browser blocked intro audio. Press Play Intro.', 'warning');
+    });
+  }
+}
+
+function toggleIntroMusic(scope = document) {
+  const audio = ensureIntroAudio();
+  if (introMusicEnabled && !audio.paused) {
+    audio.pause();
+    introMusicEnabled = false;
+  } else {
+    startIntroMusic();
+  }
+  syncIntroMusicButtons(scope);
+}
+
+function syncIntroMusicButtons(scope = document) {
+  scope.querySelectorAll('#music-btn').forEach(button => {
+    button.textContent = introMusicEnabled ? 'Mute Intro' : 'Play Intro';
+  });
+}
+
+function startTitleVisualizer(scope = document) {
+  const canvases = [
+    scope.querySelector?.('#title-spectrum') ?? document.querySelector('#title-spectrum'),
+    scope.querySelector?.('#title-spectrum-front') ?? document.querySelector('#title-spectrum-front'),
+  ].filter(Boolean);
+  if (!canvases.length) return;
+  const contexts = canvases.map(canvas => canvas.getContext('2d'));
+  if (contexts.some(ctx => !ctx)) return;
+  if (introVisualizerFrame) cancelAnimationFrame(introVisualizerFrame);
+
+  const draw = (time = 0) => {
+    canvases.forEach((canvas, index) => {
+      const ctx = contexts[index];
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      const width = Math.max(1, Math.floor(rect.width * dpr));
+      const height = Math.max(1, Math.floor(rect.height * dpr));
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+      }
+
+      ctx.clearRect(0, 0, width, height);
+      ctx.save();
+      ctx.scale(dpr, dpr);
+      drawTitleSpectrum(ctx, rect.width, rect.height, time, index === 0 ? 'back' : 'front');
+      ctx.restore();
+    });
+
+    introVisualizerFrame = requestAnimationFrame(draw);
+  };
+  draw();
+}
+
+function drawTitleSpectrum(ctx, width, height, time, layer = 'back') {
+  const cx = width / 2;
+  const cy = height * 0.405;
+  const loopX = width * 0.315;
+  const loopY = height * 0.16;
+  const pulse = 0.5 + Math.sin(time * 0.0012) * 0.5;
+  const bands = 96;
+
+  if (introAnalyser && introFrequencyData && introMusicEnabled) {
+    introAnalyser.getByteFrequencyData(introFrequencyData);
+  }
+  updateTitleBeat();
+
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 2 + introBeatLevel * 2;
+
+  if (layer === 'back') {
+    const halo = ctx.createRadialGradient(cx, cy, 8, cx, cy, Math.max(loopX, loopY) * 1.45);
+    halo.addColorStop(0, `rgba(255, 51, 153, ${0.055 + pulse * 0.025 + introBeatLevel * 0.045})`);
+    halo.addColorStop(0.42, `rgba(255, 111, 31, ${0.035 + introBeatLevel * 0.04})`);
+    halo.addColorStop(1, 'rgba(0, 229, 255, 0)');
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, loopX * 1.72, loopY * 1.72, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  drawTitleLemniscateField(ctx, cx, cy, loopX, loopY, time, bands, layer);
+  if (layer === 'front') drawTitleReverseNodes(ctx, cx, cy, loopX, loopY, time);
+  if (layer === 'front') {
+    drawTitleFoldCore(ctx, cx, cy, loopX, loopY, time);
+  }
+}
+
+function lemniscatePoint(cx, cy, loopX, loopY, t, rotation) {
+  const x = loopX * Math.sin(t);
+  const y = loopY * Math.sin(t) * Math.cos(t);
+  const cos = Math.cos(rotation);
+  const sin = Math.sin(rotation);
+  return {
+    x: cx + x * cos - y * sin,
+    y: cy + x * sin + y * cos,
+  };
+}
+
+function drawTitleLemniscateField(ctx, cx, cy, loopX, loopY, time, bands, layer = 'back') {
+  const rotation = 0;
+  const ribbonCount = 3;
+
+  for (let r = 0; r < ribbonCount; r += 1) {
+    drawLemniscateRibbonSegment(ctx, {
+      cx,
+      cy,
+      loopX: loopX + r * 18,
+      loopY: loopY + r * 8,
+      rotation,
+      layer,
+      lineWidth: r === 0
+        ? (layer === 'front' ? 5 + introBeatLevel * 6 : 4 + introBeatLevel * 4)
+        : (layer === 'front' ? 1.4 : 1),
+      strokeStyle: r === 0
+        ? `rgba(255, 51, 153, ${layer === 'front' ? 0.13 + introBeatLevel * 0.1 : 0.055 + introBeatLevel * 0.06})`
+        : r % 2 === 0
+          ? `rgba(255, 111, 31, ${layer === 'front' ? 0.1 + introBeatLevel * 0.08 : 0.035 + introBeatLevel * 0.04})`
+          : `rgba(255, 51, 153, ${layer === 'front' ? 0.1 + introBeatLevel * 0.08 : 0.035 + introBeatLevel * 0.04})`,
+      offset: r * 0.015,
+    });
+  }
+
+  for (let i = 0; i < bands; i += 1) {
+    const t = (i / bands) * Math.PI * 2 + time * 0.00072;
+    const foldDepth = Math.sin(t) * Math.cos(t);
+    const isFront = foldDepth > 0.035 || Math.abs(Math.sin(t)) < 0.14;
+    if ((layer === 'back' && isFront) || (layer === 'front' && !isFront)) continue;
+    const sampleIndex = introFrequencyData ? Math.floor((i / bands) * introFrequencyData.length) : 0;
+    const raw = introMusicEnabled && introFrequencyData ? introFrequencyData[sampleIndex] / 255 : 0;
+    const idle = 0.1 + Math.sin(time * 0.0016 + i * 0.35) * 0.035;
+    const signal = Math.min(1, introMusicEnabled ? raw * 1.25 + introBeatLevel * 0.35 + idle : idle);
+    const center = lemniscatePoint(cx, cy, loopX, loopY, t, rotation);
+    const ahead = lemniscatePoint(cx, cy, loopX, loopY, t + 0.012, rotation);
+    const tangentX = ahead.x - center.x;
+    const tangentY = ahead.y - center.y;
+    const length = Math.hypot(tangentX, tangentY) || 1;
+    const normalX = -tangentY / length;
+    const normalY = tangentX / length;
+    const innerGap = 10 + signal * 8;
+    const barLength = 20 + Math.pow(signal, 1.18) * 80;
+    const hue = i % 3;
+
+    ctx.lineWidth = layer === 'front' ? 4 + signal * 6.2 : 2 + signal * 3;
+    ctx.globalAlpha = layer === 'front' ? 0.76 : 0.24;
+    ctx.strokeStyle = hue === 0
+      ? `rgba(255, 51, 153, ${0.16 + signal * 0.36})`
+      : hue === 1
+        ? `rgba(255, 111, 31, ${0.14 + signal * 0.34})`
+        : `rgba(0, 229, 255, ${0.08 + signal * 0.22})`;
+
+    ctx.beginPath();
+    ctx.moveTo(center.x - normalX * (innerGap + barLength * 0.78), center.y - normalY * (innerGap + barLength * 0.78));
+    ctx.lineTo(center.x - normalX * innerGap, center.y - normalY * innerGap);
+    ctx.moveTo(center.x + normalX * innerGap, center.y + normalY * innerGap);
+    ctx.lineTo(center.x + normalX * (innerGap + barLength), center.y + normalY * (innerGap + barLength));
+    ctx.stroke();
+
+    if (signal > 0.52) {
+      ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(0.42, (signal - 0.45) * 0.56)})`;
+      ctx.beginPath();
+      ctx.arc(center.x + normalX * (innerGap + barLength), center.y + normalY * (innerGap + barLength), 1.4 + signal * 2.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawLemniscateRibbonSegment(ctx, { cx, cy, loopX, loopY, rotation, layer, lineWidth, strokeStyle, offset }) {
+  ctx.lineWidth = lineWidth;
+  ctx.strokeStyle = strokeStyle;
+  ctx.globalAlpha = layer === 'front' ? 1 : 0.5;
+  let drawing = false;
+  for (let i = 0; i <= 360; i += 1) {
+    const t = (i / 360) * Math.PI * 2 + offset;
+    const foldDepth = Math.sin(t) * Math.cos(t);
+    const isFront = foldDepth > 0.035 || Math.abs(Math.sin(t)) < 0.14;
+    const shouldDraw = layer === 'front' ? isFront : !isFront;
+    const point = lemniscatePoint(cx, cy, loopX, loopY, t, rotation);
+    if (!shouldDraw) {
+      if (drawing) {
+        ctx.stroke();
+        drawing = false;
+      }
+      continue;
+    }
+    if (!drawing) {
+      ctx.beginPath();
+      ctx.moveTo(point.x, point.y);
+      drawing = true;
+    } else {
+      ctx.lineTo(point.x, point.y);
+    }
+  }
+  if (drawing) ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+
+function drawTitleFoldLatches(ctx, cx, cy, loopX, loopY, time) {
+  const pulse = 0.5 + Math.sin(time * 0.003) * 0.5;
+  const latchPoints = [-0.09, 0.09, Math.PI - 0.09, Math.PI + 0.09];
+
+  latchPoints.forEach((t, index) => {
+    const point = lemniscatePoint(cx, cy, loopX, loopY, t, 0);
+    const side = index < 2 ? 1 : -1;
+    const alpha = 0.18 + introBeatLevel * 0.3 + pulse * 0.08;
+
+    ctx.strokeStyle = index % 2 === 0
+      ? `rgba(0, 229, 255, ${alpha})`
+      : `rgba(255, 51, 153, ${alpha})`;
+    ctx.lineWidth = 1.6 + introBeatLevel * 2.8;
+    ctx.beginPath();
+    ctx.moveTo(point.x - side * 70, point.y - 8);
+    ctx.lineTo(point.x - side * 18, point.y - 2);
+    ctx.lineTo(point.x + side * 18, point.y + 2);
+    ctx.lineTo(point.x + side * 70, point.y + 8);
+    ctx.stroke();
+
+    ctx.fillStyle = `rgba(255, 255, 255, ${0.12 + introBeatLevel * 0.28})`;
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, 2.8 + introBeatLevel * 3.2, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+function drawTitleReverseNodes(ctx, cx, cy, loopX, loopY, time) {
+  const nodes = 18;
+  const reverseDrift = -time * 0.00105;
+
+  for (let i = 0; i < nodes; i += 1) {
+    const t = (i / nodes) * Math.PI * 2 + reverseDrift;
+    const point = lemniscatePoint(cx, cy, loopX + 22, loopY + 11, t, 0);
+    const sampleIndex = introFrequencyData ? Math.floor((i / nodes) * introFrequencyData.length) : 0;
+    const raw = introMusicEnabled && introFrequencyData ? introFrequencyData[sampleIndex] / 255 : 0.14;
+    const signal = Math.min(1, raw * 0.7 + introBeatLevel * 0.55 + 0.08);
+    const radius = 2.6 + signal * 4.8;
+    const hue = i % 3;
+
+    const glow = ctx.createRadialGradient(point.x, point.y, 0, point.x, point.y, radius * 6);
+    if (hue === 0) {
+      glow.addColorStop(0, `rgba(255, 225, 255, ${0.44 + signal * 0.34})`);
+      glow.addColorStop(0.38, `rgba(255, 51, 153, ${0.18 + signal * 0.24})`);
+    } else if (hue === 1) {
+      glow.addColorStop(0, `rgba(226, 210, 255, ${0.38 + signal * 0.3})`);
+      glow.addColorStop(0.38, `rgba(255, 111, 31, ${0.14 + signal * 0.2})`);
+    } else {
+      glow.addColorStop(0, `rgba(210, 255, 255, ${0.38 + signal * 0.3})`);
+      glow.addColorStop(0.38, `rgba(0, 229, 255, ${0.16 + signal * 0.22})`);
+    }
+    glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, radius * 6, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.72)';
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, radius * 0.42, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawTitleFoldCore(ctx, cx, cy, loopX, loopY, time) {
+  const corePulse = 0.5 + Math.sin(time * 0.002) * 0.5;
+  const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.min(loopX, loopY) * 0.48);
+  core.addColorStop(0, `rgba(255, 255, 255, ${0.08 + introBeatLevel * 0.16})`);
+  core.addColorStop(0.28, `rgba(255, 111, 31, ${0.075 + corePulse * 0.035})`);
+  core.addColorStop(0.62, `rgba(255, 51, 153, ${0.06 + introBeatLevel * 0.08})`);
+  core.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = core;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, loopX * 0.18 + introBeatLevel * 16, loopY * 0.36 + introBeatLevel * 12, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = `rgba(255, 255, 255, ${0.12 + introBeatLevel * 0.2})`;
+  ctx.lineWidth = 1.4 + introBeatLevel * 2;
+  ctx.beginPath();
+  ctx.moveTo(cx - loopX * 0.08, cy);
+  ctx.lineTo(cx + loopX * 0.08, cy);
+  ctx.stroke();
+}
+
+function drawTitleBeatRipples(ctx, cx, cy, ringX, ringY, time) {
+  for (let i = 0; i < 4; i += 1) {
+    const phase = ((time * 0.00022) + i * 0.24) % 1;
+    const intensity = Math.max(0, 1 - phase);
+    const beatPush = introBeatLevel * 0.22;
+    const alpha = (0.035 + introBeatLevel * 0.12) * intensity;
+    ctx.strokeStyle = i % 2 === 0
+      ? `rgba(255, 51, 153, ${alpha})`
+      : `rgba(0, 229, 255, ${alpha})`;
+    ctx.lineWidth = 1 + introBeatLevel * 1.4;
+    ctx.beginPath();
+    ctx.ellipse(
+      cx,
+      cy,
+      ringX * (0.68 + phase * 0.62 + beatPush),
+      ringY * (0.68 + phase * 0.62 + beatPush * 0.7),
+      0,
+      0,
+      Math.PI * 2,
+    );
+    ctx.stroke();
+  }
+}
+
+function drawTitleOrbitNodes(ctx, cx, cy, ringX, ringY, time) {
+  const nodes = 14;
+  const nodePositions = [];
+  for (let i = 0; i < nodes; i += 1) {
+    const drift = time * 0.00012 * (i % 2 === 0 ? 1 : -1);
+    const angle = (i / nodes) * Math.PI * 2 + drift;
+    const sampleIndex = introFrequencyData ? Math.floor((i / nodes) * introFrequencyData.length) : 0;
+    const raw = introMusicEnabled && introFrequencyData ? introFrequencyData[sampleIndex] / 255 : 0.18;
+    const signal = raw * 0.55 + introBeatLevel * 0.45;
+    const x = cx + Math.cos(angle) * (ringX + 18 + signal * 36);
+    const y = cy + Math.sin(angle) * (ringY + 10 + signal * 22);
+    nodePositions.push({ x, y, signal });
+
+    const radius = 2.4 + signal * 5.8;
+    const glow = ctx.createRadialGradient(x, y, 0, x, y, radius * 5);
+    glow.addColorStop(0, i % 3 === 0 ? 'rgba(255, 51, 153, 0.85)' : 'rgba(0, 229, 255, 0.75)');
+    glow.addColorStop(0.45, 'rgba(153, 51, 255, 0.22)');
+    glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(x, y, radius * 5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = i % 3 === 0 ? 'rgba(255, 190, 235, 0.86)' : 'rgba(180, 250, 255, 0.82)';
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.lineWidth = 1;
+  for (let i = 0; i < nodePositions.length; i += 1) {
+    const current = nodePositions[i];
+    const next = nodePositions[(i + 3) % nodePositions.length];
+    const alpha = 0.035 + (current.signal + next.signal) * 0.045;
+    ctx.strokeStyle = `rgba(0, 229, 255, ${alpha})`;
+    ctx.beginPath();
+    ctx.moveTo(current.x, current.y);
+    ctx.lineTo(next.x, next.y);
+    ctx.stroke();
+  }
+}
+
+function drawTitleCornerMeters(ctx, width, height, time) {
+  const marginX = width * 0.065;
+  const marginY = height * 0.1;
+  const meterWidth = width * 0.13;
+  const meterHeight = height * 0.09;
+  const corners = [
+    [marginX, marginY, 1, 1],
+    [width - marginX, marginY, -1, 1],
+    [marginX, height - marginY, 1, -1],
+    [width - marginX, height - marginY, -1, -1],
+  ];
+
+  for (const [x, y, sx, sy] of corners) {
+    ctx.strokeStyle = `rgba(0, 229, 255, ${0.13 + introBeatLevel * 0.2})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, y + sy * meterHeight);
+    ctx.lineTo(x, y);
+    ctx.lineTo(x + sx * meterWidth, y);
+    ctx.stroke();
+
+    for (let i = 0; i < 7; i += 1) {
+      const wave = 0.5 + Math.sin(time * 0.004 + i * 0.9 + sx) * 0.5;
+      const lit = introBeatLevel * 0.8 + wave * 0.2;
+      ctx.strokeStyle = i % 2
+        ? `rgba(255, 51, 153, ${0.08 + lit * 0.2})`
+        : `rgba(0, 229, 255, ${0.08 + lit * 0.22})`;
+      const tickX = x + sx * (14 + i * 13);
+      ctx.beginPath();
+      ctx.moveTo(tickX, y + sy * 8);
+      ctx.lineTo(tickX + sx * (8 + lit * 16), y + sy * 8);
+      ctx.stroke();
+    }
+  }
+}
+
+function updateTitleBeat(scope = document) {
+  let lowAverage = 0;
+  if (introMusicEnabled && introFrequencyData) {
+    const sampleCount = Math.min(18, introFrequencyData.length);
+    for (let i = 0; i < sampleCount; i += 1) lowAverage += introFrequencyData[i] / 255;
+    lowAverage /= sampleCount;
+  } else {
+    lowAverage = 0.12 + Math.sin(performance.now() * 0.0014) * 0.04;
+  }
+  const target = Math.max(0, Math.min(1, (lowAverage - 0.14) * 1.55));
+  introBeatLevel = introBeatLevel * 0.82 + target * 0.18;
+  const titleScreen = scope.querySelector?.('.title-screen') ?? document.querySelector('.title-screen');
+  if (titleScreen) titleScreen.style.setProperty('--title-beat', introBeatLevel.toFixed(3));
 }
 
 // ──────────────────────────────────────────────────────────
@@ -76,33 +600,137 @@ function renderTitle() {
 
 function renderHeroSelect() {
   const section = el('section', 'hero-select-screen');
+  const heroes = Object.values(HEROES).filter(hero => hero.id !== 'cait');
+  const initialHero = heroes.find(hero => hero.id === 'asiphyx') ?? heroes[0];
+  let selectedHero = initialHero;
+  const setHeroSelectTheme = (hero) => {
+    const theme = getHeroTheme(hero.id);
+    section.dataset.selectedHero = hero.id;
+    section.style.setProperty('--selected-hero-color', theme.accent ?? hero.color);
+    section.style.setProperty('--selected-hero-accent-2', theme.accent2 ?? '#00e5ff');
+    section.style.setProperty('--selected-hero-danger', theme.danger ?? '#ff3344');
+    section.style.setProperty('--selected-hero-glow', `${theme.accent ?? hero.color}55`);
+  };
+  setHeroSelectTheme(initialHero);
+
   const heading = el('div', 'hero-select-title glitch-text');
-  heading.dataset.text = 'CHOOSE YOUR HERO';
-  heading.textContent = 'CHOOSE YOUR HERO';
+  heading.dataset.text = 'CHOOSE YOUR BOND';
+  heading.textContent = 'CHOOSE YOUR BOND';
   section.appendChild(heading);
 
-  const grid = el('div', 'hero-grid');
-  for (const hero of Object.values(HEROES)) {
-    const card = el('button', 'hero-card');
-    const avatarSrc = hero.avatar ?? hero.portrait;
-    card.type = 'button';
-    card.style.setProperty('--hero-color', hero.color);
-    card.style.setProperty('--hero-glow', `${hero.color}55`);
-    card.innerHTML = `
-      <img class="hero-portrait" src="${avatarSrc}" alt="${hero.name}" />
-      <div class="hero-name">${hero.name}</div>
-      <div class="hero-title-text">${hero.title}</div>
-      <div class="hero-passive"><strong>${hero.passive.name}</strong><br/>${hero.passive.description}</div>
-      <div class="hero-passive" style="color:var(--neon-gold)"><strong>${hero.ultimate.emoji} ${hero.ultimate.name}</strong><br/>${hero.ultimate.description}</div>
-      <div class="hero-hp">${hero.maxHp} HP</div>
+  const showcase = el('div', 'hero-select-showcase');
+  const renderShowcase = (hero) => {
+    const theme = getHeroTheme(hero.id);
+    const cait = buildCaitCompanion(hero.id);
+    const portraitSrc = hero.portrait ?? hero.avatar;
+    showcase.innerHTML = `
+      <div class="hero-feature-copy">
+        <span class="hero-select-kicker">Forced Duo Protocol</span>
+        <h2 class="hero-feature-name">${escapeHtml(hero.name)}</h2>
+        <p class="hero-feature-title">${escapeHtml(hero.title)} + ${escapeHtml(CAIT_IDOL.title)}</p>
+        <p class="hero-feature-quote">"${escapeHtml(hero.quote)}"</p>
+        <div class="hero-feature-stats">
+          <span>${hero.maxHp} HP</span>
+          <span>Cait ${cait.maxHp} HP</span>
+          <span>${escapeHtml(cait.bondName)}</span>
+        </div>
+        <div class="duo-balance-panel">
+          <span>QUEEN VALUE RATIO</span>
+          <strong>${Math.round(cait.reliability * 100)}% RELIABLE // ${escapeHtml(cait.risk)} RISK</strong>
+          <div class="duo-meter"><i style="width:${Math.round(cait.reliability * 100)}%"></i></div>
+          <p>${escapeHtml(cait.role)}</p>
+        </div>
+      </div>
+      <div class="duo-feature-stage">
+        <div class="duo-portrait-shell hero-duo-shell">
+          <span>${escapeHtml(hero.name)}</span>
+          <img class="duo-feature-art hero-feature-art" src="${portraitSrc}" alt="${escapeHtml(hero.name)} profile art" />
+        </div>
+        <div class="duo-link-core">
+          <span>+</span>
+          <strong>${escapeHtml(cait.bondName)}</strong>
+        </div>
+        <div class="duo-portrait-shell cait-duo-shell">
+          <span>CAIT // PEON QUEEN</span>
+          <img class="duo-feature-art cait-feature-art" src="${CAIT_IDOL.portrait}" alt="Cait Peon Queen profile art" />
+        </div>
+      </div>
+      <div class="hero-feature-kit">
+        <div>
+          <span>HERO PASSIVE</span>
+          <strong>${escapeHtml(hero.passive.name)}</strong>
+          <p>${escapeHtml(hero.passive.description)}</p>
+        </div>
+        <div>
+          <span>CAIT BOND</span>
+          <strong>${escapeHtml(cait.bondName)}</strong>
+          <p>${escapeHtml(cait.bondLine)}</p>
+        </div>
+        <div class="cait-module-stack">
+          <span>STARTING CAIT MODULES</span>
+          ${cait.modules.map(module => `
+            <article class="cait-module-chip">
+              <b>${escapeHtml(module.slot)} // ${escapeHtml(module.name)}</b>
+              <small>${escapeHtml(module.text)}</small>
+            </article>
+          `).join('')}
+        </div>
+        <button class="btn btn-primary hero-feature-start" data-start-hero="${hero.id}">Start Duo Run</button>
+      </div>
     `;
-    card.onclick = () => {
+    showcase.querySelector('[data-start-hero]').onclick = () => {
       game.selectHero(hero);
       game.startRun(15, cardPool, enemyCatalogue);
     };
+  };
+  renderShowcase(initialHero);
+  section.appendChild(showcase);
+
+  const grid = el('div', 'hero-grid');
+  for (const hero of heroes) {
+    const card = el('button', 'hero-card');
+    const avatarSrc = hero.portrait ?? hero.avatar;
+    card.type = 'button';
+    card.dataset.heroId = hero.id;
+    card.style.setProperty('--hero-color', hero.color);
+    card.style.setProperty('--hero-glow', `${hero.color}55`);
+    if (hero.id === initialHero.id) card.classList.add('selected');
+    card.innerHTML = `
+      <img class="hero-portrait" src="${avatarSrc}" alt="${hero.name}" />
+      <div class="hero-card-copy">
+        <div class="hero-name">${hero.name}</div>
+        <div class="hero-title-text">${hero.title}</div>
+        <div class="hero-passive"><strong>${getCaitLoadout(hero.id).bondName}</strong><br/>${getCaitLoadout(hero.id).role}</div>
+        <div class="hero-hp">${hero.maxHp} HP · Cait ${CAIT_IDOL.maxHp} HP</div>
+      </div>
+    `;
+    const previewHero = () => {
+      selectedHero = hero;
+      setHeroSelectTheme(hero);
+      renderShowcase(hero);
+      grid.querySelectorAll('.hero-card').forEach(candidate => {
+        candidate.classList.toggle('selected', candidate === card);
+      });
+    };
+    card.onmouseenter = previewHero;
+    card.onfocus = previewHero;
+    card.onclick = () => {
+      selectedHero = hero;
+      previewHero();
+    };
     grid.appendChild(card);
   }
+  const startStrip = el('div', 'duo-select-start-strip');
+  startStrip.innerHTML = `
+    <span>CAIT IS ALWAYS IN THE RUN</span>
+    <button class="btn btn-primary" id="duo-start-selected">Deploy Selected Duo</button>
+  `;
+  startStrip.querySelector('#duo-start-selected').onclick = () => {
+    game.selectHero(selectedHero);
+    game.startRun(15, cardPool, enemyCatalogue);
+  };
   section.appendChild(grid);
+  section.appendChild(startStrip);
   root.appendChild(section);
 }
 
@@ -113,6 +741,7 @@ function renderHeroSelect() {
 function renderMap() {
   const snap = game.getSnapshot();
   const state = game.state;
+  const cait = state.cait ?? (state.hero ? buildCaitCompanion(state.hero.id) : null);
   const currentNode = game.floors.getCurrentNode();
 
   const section = el('section', 'map-screen');
@@ -120,6 +749,7 @@ function renderMap() {
     <div class="map-title">Floor ${snap.floor} of ${snap.maxFloor} · ${snap.gold} Gold</div>
     <div class="run-stats">
       <div class="run-stat"><div class="run-stat-value">${snap.hp}/${snap.maxHp}</div><div class="run-stat-label">HP</div></div>
+      <div class="run-stat"><div class="run-stat-value">${cait ? `${cait.hp}/${cait.maxHp}` : '--'}</div><div class="run-stat-label">Cait</div></div>
       <div class="run-stat"><div class="run-stat-value">${state.deck.length}</div><div class="run-stat-label">Deck</div></div>
       <div class="run-stat"><div class="run-stat-value">${snap.floor - 1}</div><div class="run-stat-label">Cleared</div></div>
       <div class="run-stat"><div class="run-stat-value">${snap.gold}</div><div class="run-stat-label">Gold</div></div>
@@ -158,7 +788,9 @@ function renderMap() {
     }
     section.appendChild(actions);
   }
+  appendSystemMenuButton(section, true);
   root.appendChild(section);
+  appendSystemMenuOverlay(section, true);
 }
 
 function handleMapNode(node) {
@@ -185,6 +817,7 @@ function renderCombat() {
   const snap = game.getSnapshot();
   const state = game.state;
   const hero = hydrateHeroDisplay(state.hero);
+  const cait = state.cait ?? (hero ? buildCaitCompanion(hero.id) : null);
   const theme = getHeroTheme(hero?.id);
   const heroAvatar = hero?.avatar ?? hero?.portrait ?? '';
   const heroBattlePortrait = hero?.battlePortrait ?? heroAvatar;
@@ -208,7 +841,7 @@ function renderCombat() {
     <div class="combat-top-hero-identity">
       <span class="combat-top-hero-name glitch-text" data-text="${hero?.name ?? 'HERO'}">${hero?.name ?? 'HERO'}</span>
       <span class="combat-top-hero-title">${hero?.title ?? ''}</span>
-      <span class="combat-top-duo">CAIT DUO // ${theme.duo}</span>
+      <span class="combat-top-duo">CAIT DUO // ${cait?.bondName ?? theme.duo}</span>
     </div>
     
     <div class="combat-top-stats-group">
@@ -219,6 +852,13 @@ function renderCombat() {
           <div class="top-stat-bar-fill ${hpClass(snap.hp, snap.maxHp)}" style="width:${pct(snap.hp, snap.maxHp)}%"></div>
         </div>
         <span class="top-stat-val">${snap.hp}/${snap.maxHp}</span>
+      </div>
+      <div class="top-stat-item cait-stat">
+        <span class="top-stat-icon">👑</span>
+        <div class="top-stat-bar-outer">
+          <div class="top-stat-bar-fill cait" style="width:${cait ? pct(cait.hp, cait.maxHp) : 0}%"></div>
+        </div>
+        <span class="top-stat-val">Cait ${cait ? `${cait.hp}/${cait.maxHp}` : '--'}</span>
       </div>
       
       <!-- Block Stat -->
@@ -290,6 +930,16 @@ function renderCombat() {
         ${snap.block > 0 ? `<div class="hero-battle-block">🛡️ ${snap.block}</div>` : ''}
       </div>
     </div>
+    <div class="cait-companion-platform">
+      <div class="cait-companion-frame">
+        <img class="cait-companion-image" src="${cait?.battlePortrait ?? CAIT_IDOL.battlePortrait}" alt="Cait companion" />
+      </div>
+      <div class="cait-companion-readout">
+        <span>CAIT AUTOPLAY</span>
+        <strong>${escapeHtml(cait?.intent?.name ?? 'Royal Autoplay')}</strong>
+        <p>${escapeHtml(cait?.intent?.description ?? 'Cait acts after you.')}</p>
+      </div>
+    </div>
   `;
   battlefield.appendChild(heroSpriteContainer);
 
@@ -346,7 +996,7 @@ function renderCombat() {
     <div class="console-hero-console">
       <div class="console-hero-header">
         <div class="console-hero-name">CAIT + ${hero?.name ?? 'ASSISTANT'}</div>
-        <div class="console-hero-passive-label">DUO: ${theme.duo} // PASSIVE: ${hero?.passive?.name ?? ''}</div>
+        <div class="console-hero-passive-label">DUO: ${cait?.bondName ?? theme.duo} // PASSIVE: ${hero?.passive?.name ?? ''}</div>
       </div>
       <div class="console-hero-metrics">
         <div class="console-metric">
@@ -385,6 +1035,11 @@ function renderCombat() {
           <span>HP ${selectedEnemy ? selectedEnemy.hp : 0}/${selectedEnemy ? selectedEnemy.maxHp : 0}</span>
           <span>🛡 ${selectedEnemy ? selectedEnemy.block : 0}</span>
         </div>
+      </div>
+      <div class="console-cait-module-readout">
+        ${(cait?.modules ?? []).slice(0, 3).map(module => `
+          <span><b>${escapeHtml(module.slot)}</b>${escapeHtml(module.name)}</span>
+        `).join('')}
       </div>
       
       <!-- Ultimate Control inside Portrait Console -->
@@ -463,8 +1118,10 @@ function renderCombat() {
   `;
   bottomDashboard.appendChild(deckControlConsole);
   section.appendChild(bottomDashboard);
+  appendSystemMenuButton(section, true);
 
   root.appendChild(section);
+  appendSystemMenuOverlay(section, true);
 
   // Wire event handlers asynchronously to ensure DOM availability
   setTimeout(() => {
@@ -627,14 +1284,14 @@ function renderDraft() {
     setTimeout(() => {
       const list = section.querySelector('.draft-cards');
       for (const [i, card] of draft.offeredCards.entries()) {
-        const wrap = el('button', 'draft-card-wrapper');
-        wrap.type = 'button';
+        const wrap = el('div', 'draft-card-wrapper');
         const cardEl = renderCard(card, i, true);
-        wrap.appendChild(cardEl);
-        wrap.onclick = () => {
+        cardEl.onclick = (e) => {
+          e.stopPropagation();
           draft.pickCard(i);
           render();
         };
+        wrap.appendChild(cardEl);
         list.appendChild(wrap);
       }
       section.querySelector('#cancel-refactor').onclick = () => {
@@ -644,7 +1301,9 @@ function renderDraft() {
     }, 0);
   }
 
+  appendSystemMenuButton(section, true);
   root.appendChild(section);
+  appendSystemMenuOverlay(section, true);
 }
 
 // ──────────────────────────────────────────────────────────
@@ -685,6 +1344,161 @@ function renderVictory() {
   `;
   section.querySelector('#reset-btn').onclick = () => game.reset();
   root.appendChild(section);
+}
+
+// ──────────────────────────────────────────────────────────
+// Save States
+// ──────────────────────────────────────────────────────────
+
+function renderSaveStatesPanel({ canSave = true, compact = false } = {}) {
+  const saves = readSaveSlots();
+  const rows = saves.map((save, index) => {
+    const slot = index + 1;
+    const hasSave = Boolean(save);
+    const label = hasSave ? save.label : 'Empty Slot';
+    const savedAt = hasSave ? formatSaveTime(save.savedAt) : 'No save data';
+    return `
+      <div class="save-slot ${hasSave ? 'has-save' : 'empty'}">
+        <div class="save-slot-meta">
+          <span class="save-slot-title">STATE ${slot}</span>
+          <span class="save-slot-label">${escapeHtml(label)}</span>
+          <span class="save-slot-time">${savedAt}</span>
+        </div>
+        <div class="save-slot-actions">
+          ${canSave ? `<button class="btn save-btn" data-save-slot="${index}">Save</button>` : ''}
+          <button class="btn load-btn" data-load-slot="${index}" ${hasSave ? '' : 'disabled'}>Load</button>
+          <button class="btn delete-save-btn" data-delete-slot="${index}" ${hasSave ? '' : 'disabled'}>Delete</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <div class="save-state-panel ${compact ? 'compact' : ''}">
+      <div class="save-state-header">
+        <span>// SAVE STATES</span>
+        <span>LOCAL CACHE</span>
+      </div>
+      <div class="save-state-slots">${rows}</div>
+    </div>
+  `;
+}
+
+function appendSystemMenuButton(section, canSave = true) {
+  const button = el('button', 'system-menu-button');
+  button.type = 'button';
+  button.innerHTML = '<span>MENU</span><strong>Save</strong>';
+  button.onclick = () => openSystemMenu(canSave);
+  section.appendChild(button);
+}
+
+function appendSystemMenuOverlay(section, canSave = true) {
+  if (!systemMenuOpen) return;
+  section.insertAdjacentHTML('beforeend', `
+    <div class="system-menu-overlay" role="dialog" aria-modal="true" aria-label="Save states menu">
+      <div class="system-menu-backdrop" data-close-system-menu></div>
+      <div class="system-menu-panel">
+        <div class="system-menu-header">
+          <span>// SYSTEM MENU</span>
+          <button class="system-menu-close" data-close-system-menu aria-label="Close menu">x</button>
+        </div>
+        ${renderSaveStatesPanel({ canSave })}
+      </div>
+    </div>
+  `);
+  section.querySelectorAll('[data-close-system-menu]').forEach(button => {
+    button.onclick = () => closeSystemMenu();
+  });
+  wireSaveStateControls(section);
+}
+
+function openSystemMenu(canSave = true) {
+  systemMenuOpen = true;
+  render();
+}
+
+function closeSystemMenu() {
+  systemMenuOpen = false;
+  render();
+}
+
+function wireSaveStateControls(scope) {
+  scope.querySelectorAll('[data-save-slot]').forEach(button => {
+    button.onclick = () => saveSlot(Number(button.dataset.saveSlot));
+  });
+
+  scope.querySelectorAll('[data-load-slot]').forEach(button => {
+    button.onclick = () => loadSlot(Number(button.dataset.loadSlot));
+  });
+
+  scope.querySelectorAll('[data-delete-slot]').forEach(button => {
+    button.onclick = () => deleteSlot(Number(button.dataset.deleteSlot));
+  });
+}
+
+function readSaveSlots() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(SAVE_STORAGE_KEY) ?? '[]');
+    return Array.from({ length: SAVE_SLOT_COUNT }, (_, i) => parsed[i] ?? null);
+  } catch {
+    return Array.from({ length: SAVE_SLOT_COUNT }, () => null);
+  }
+}
+
+function writeSaveSlots(slots) {
+  localStorage.setItem(SAVE_STORAGE_KEY, JSON.stringify(slots.slice(0, SAVE_SLOT_COUNT)));
+}
+
+function saveSlot(index) {
+  if (!Number.isInteger(index) || index < 0 || index >= SAVE_SLOT_COUNT) return;
+  const slots = readSaveSlots();
+  const saveState = game.createSaveState(buildSaveLabel());
+  slots[index] = saveState;
+  writeSaveSlots(slots);
+  emitToast(`Saved State ${index + 1}`, 'passive');
+  render();
+}
+
+function loadSlot(index) {
+  const saveState = readSaveSlots()[index];
+  if (!saveState) return;
+  const restored = game.restoreSaveState(saveState);
+  if (!restored) {
+    emitToast('Save state is incompatible.', 'danger');
+    return;
+  }
+  activeDraft = game.draft.offeredCards ?? [];
+  selectedTarget = 0;
+  systemMenuOpen = false;
+  emitToast(`Loaded State ${index + 1}`, 'info');
+  render();
+}
+
+function deleteSlot(index) {
+  const slots = readSaveSlots();
+  if (!slots[index]) return;
+  slots[index] = null;
+  writeSaveSlots(slots);
+  emitToast(`Deleted State ${index + 1}`, 'danger');
+  render();
+}
+
+function buildSaveLabel() {
+  const snap = game.getSnapshot();
+  const heroName = snap.hero?.name ?? 'No Hero';
+  const phase = String(snap.phase ?? 'title').toUpperCase();
+  return `${heroName} · Floor ${snap.floor}/${snap.maxFloor} · ${phase}`;
+}
+
+function formatSaveTime(value) {
+  const date = value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) return 'Unknown time';
+  return date.toLocaleString([], {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
 }
 
 // ──────────────────────────────────────────────────────────
@@ -738,7 +1552,20 @@ function btn(label, className, onClick) {
   return b;
 }
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
 function pct(cur, max) { return Math.max(1, Math.min(100, (cur / Math.max(1, max)) * 100)); }
+
+function clampNumber(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
 
 function hpClass(cur, max) {
   const r = cur / Math.max(1, max);
@@ -824,3 +1651,54 @@ function resolveEnemyTemplate(enemy) {
   const normalizedName = String(enemy.name ?? '').trim().toLowerCase();
   return Object.values(ENEMIES).find(template => template.name?.toLowerCase() === normalizedName);
 }
+
+function renderGameToText() {
+  const snap = game.getSnapshot();
+  const state = game.state;
+  const selectedCard = root.querySelector('.hero-card.selected');
+  const selectedHeroId = selectedCard?.dataset?.heroId ?? state.hero?.id ?? 'asiphyx';
+  const selectedHero = HEROES[selectedHeroId] ?? HEROES.asiphyx;
+  const cait = state.cait ?? buildCaitCompanion(selectedHeroId);
+  const payload = {
+    mode: snap.phase,
+    selectedHero: selectedHero ? {
+      id: selectedHero.id,
+      name: selectedHero.name,
+      title: selectedHero.title,
+    } : null,
+    cait: {
+      hp: cait.hp,
+      maxHp: cait.maxHp,
+      bondName: cait.bondName,
+      reliability: cait.reliability,
+      risk: cait.risk,
+      modules: (cait.modules ?? []).map(module => `${module.slot}:${module.name}`),
+      intent: cait.intent?.name ?? 'Royal Autoplay',
+    },
+    run: {
+      floor: snap.floor,
+      maxFloor: snap.maxFloor,
+      hp: snap.hp,
+      maxHp: snap.maxHp,
+      energy: snap.energy,
+      deckSize: snap.deckSize,
+    },
+    combat: {
+      enemies: snap.enemies.map(enemy => ({
+        id: enemy.id,
+        name: enemy.name,
+        hp: enemy.hp,
+        maxHp: enemy.maxHp,
+        intent: enemy.intent?.type ?? null,
+      })),
+      handSize: snap.handSize,
+    },
+    coordinateSystem: 'DOM UI, origin top-left, x right, y down',
+  };
+  return JSON.stringify(payload);
+}
+
+window.render_game_to_text = renderGameToText;
+window.advanceTime = () => {
+  render();
+};

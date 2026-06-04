@@ -37,9 +37,9 @@ export const HEROES = {
     id: 'asiphyx',
     name: 'Asiphyx',
     title: 'The Void Walker',
-    portrait: '/assets/heroes/asiphyx.png',
-    avatar: '/assets/heroes/avatars/asiphyx.png',
-    battlePortrait: '/assets/heroes/battle/asiphyx.png',
+    portrait: '/assets/heroes/asiphyx2.png',
+    avatar: '/assets/heroes/avatars/asiphyx2.png',
+    battlePortrait: '/assets/heroes/battle/asiphyx2.png',
     maxHp: 70,
     startingDeck: [
       'git_push', 'git_push', 'git_push',
