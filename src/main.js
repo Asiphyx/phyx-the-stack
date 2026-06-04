@@ -1,6 +1,7 @@
 import './index.css';
 import { GameState } from './engine/GameState.js';
 import { HEROES } from './data/heroes.js';
+import { getHeroTheme } from './data/heroThemes.js';
 import { ENEMIES, ENCOUNTERS } from './data/enemies.js';
 import { CARDS } from './data/cards.js';
 import bus from './engine/EventBus.js';
@@ -184,11 +185,21 @@ function renderCombat() {
   const snap = game.getSnapshot();
   const state = game.state;
   const hero = hydrateHeroDisplay(state.hero);
+  const theme = getHeroTheme(hero?.id);
   const heroAvatar = hero?.avatar ?? hero?.portrait ?? '';
   const heroBattlePortrait = hero?.battlePortrait ?? heroAvatar;
   const ultReady = snap.ultCharge >= snap.ultMaxCharge;
+  const selectedEnemyState = state.enemies[selectedTarget] ?? state.enemies[0];
+  const selectedEnemy = hydrateEnemyDisplay(selectedEnemyState);
+  const targetIntent = selectedEnemyState
+    ? (selectedEnemyState.pattern?.[selectedEnemyState.patternIndex] ?? selectedEnemyState.intent ?? null)
+    : null;
 
-  const section = el('section', 'combat-screen');
+  const section = el('section', `combat-screen theme-${theme.id} shell-${theme.shell}`);
+  section.style.setProperty('--hero-color', theme.accent ?? hero?.color ?? '#9933ff');
+  section.style.setProperty('--hero-accent-2', theme.accent2 ?? '#00e5ff');
+  section.style.setProperty('--hero-danger', theme.danger ?? '#ff3344');
+  section.style.setProperty('--battlefield-bg', `url('${theme.background}')`);
 
   // ─── 1. TOP STATS BAR ───
   const topBar = el('div', 'combat-top-bar');
@@ -197,6 +208,7 @@ function renderCombat() {
     <div class="combat-top-hero-identity">
       <span class="combat-top-hero-name glitch-text" data-text="${hero?.name ?? 'HERO'}">${hero?.name ?? 'HERO'}</span>
       <span class="combat-top-hero-title">${hero?.title ?? ''}</span>
+      <span class="combat-top-duo">CAIT DUO // ${theme.duo}</span>
     </div>
     
     <div class="combat-top-stats-group">
@@ -232,6 +244,7 @@ function renderCombat() {
 
   // ─── 2. MIDDLE BATTLEFIELD ───
   const battlefield = el('div', 'combat-battlefield');
+  battlefield.style.setProperty('--battlefield-bg', `url('${theme.background}')`);
   
   // High-fidelity low-opacity terminal background diagnostic logs
   const matrixBg = el('div', 'battlefield-matrix-bg');
@@ -272,6 +285,7 @@ function renderCombat() {
         <span class="hero-tag-indicator" style="background-color: ${hero?.color ?? 'var(--neon-purple)'}"></span>
         ${hero?.name?.toUpperCase() ?? 'SYS'} : READY
       </div>
+      <div class="assistant-motto">${theme.motto}</div>
       <div class="hero-sprite-stats">
         ${snap.block > 0 ? `<div class="hero-battle-block">🛡️ ${snap.block}</div>` : ''}
       </div>
@@ -281,6 +295,12 @@ function renderCombat() {
 
   // Right Side: Enemy Area
   const enemyArea = el('div', 'combat-enemy-area');
+  const arenaHeader = el('div', 'arena-header');
+  arenaHeader.innerHTML = `
+    <span class="arena-cait">CAIT BROADCAST ONLINE</span>
+    <span class="arena-theme">${theme.label}</span>
+  `;
+  battlefield.appendChild(arenaHeader);
   for (const [i, rawEnemy] of state.enemies.entries()) {
     const enemy = hydrateEnemyDisplay(rawEnemy);
     const intent = enemy.pattern?.[enemy.patternIndex] ?? { type: 'none', description: '...' };
@@ -316,14 +336,55 @@ function renderCombat() {
   const heroPortraitConsole = el('div', 'hero-portrait-console');
   heroPortraitConsole.style.setProperty('--hero-color', hero?.color ?? '#9933ff');
   heroPortraitConsole.innerHTML = `
-    <div class="console-portrait-frame">
-      <img class="console-portrait-image" src="${heroAvatar}" alt="${hero?.name ?? ''}" />
-      <div class="console-portrait-glitch"></div>
+    <div class="console-portrait-column">
+      <div class="console-portrait-frame">
+        <img class="console-portrait-image" src="${heroAvatar}" alt="${hero?.name ?? ''}" />
+        <div class="console-portrait-glitch"></div>
+      </div>
+      <div class="console-passive-line">${hero?.passive?.name ?? 'Passive'}</div>
     </div>
-    <div class="console-hero-details">
+    <div class="console-hero-console">
       <div class="console-hero-header">
-        <div class="console-hero-name">${hero?.name ?? 'Hero'}</div>
-        <div class="console-hero-passive-label">PASSIVE: ${hero?.passive?.name ?? ''}</div>
+        <div class="console-hero-name">CAIT + ${hero?.name ?? 'ASSISTANT'}</div>
+        <div class="console-hero-passive-label">DUO: ${theme.duo} // PASSIVE: ${hero?.passive?.name ?? ''}</div>
+      </div>
+      <div class="console-hero-metrics">
+        <div class="console-metric">
+          <span class="metric-label">HP</span>
+          <span class="metric-value">${snap.hp} / ${snap.maxHp}</span>
+          <div class="console-mini-bar">
+            <div class="console-mini-fill hp" style="width:${pct(snap.hp, snap.maxHp)}%"></div>
+          </div>
+        </div>
+        <div class="console-metric">
+          <span class="metric-label">BLOCK</span>
+          <span class="metric-value">${snap.block}</span>
+          <div class="console-mini-bar">
+            <div class="console-mini-fill block" style="width:${Math.min(100, Math.max(0, snap.block * 4))}%"></div>
+          </div>
+        </div>
+        <div class="console-metric">
+          <span class="metric-label">ENERGY</span>
+          <span class="metric-value">${snap.energy} / ${snap.maxEnergy}</span>
+          <div class="console-mini-bar">
+            <div class="console-mini-fill energy" style="width:${pct(snap.energy, snap.maxEnergy)}%"></div>
+          </div>
+        </div>
+        <div class="console-metric">
+          <span class="metric-label">ULT</span>
+          <span class="metric-value">${snap.ultCharge} / ${snap.ultMaxCharge}</span>
+          <div class="console-mini-bar">
+            <div class="console-mini-fill ult ${ultReady ? 'ult-ready' : ''}" style="width:${pct(snap.ultCharge, snap.ultMaxCharge)}%"></div>
+          </div>
+        </div>
+      </div>
+      <div class="console-target-readout">
+        <span class="target-label">${selectedEnemy ? `${selectedEnemy.name}` : 'NO TARGET'}</span>
+        <span class="target-intent">${selectedEnemy ? `${intentIcon(targetIntent?.type)} ${intentLabel(targetIntent)}` : 'Awaiting target'}</span>
+        <div class="console-target-stats">
+          <span>HP ${selectedEnemy ? selectedEnemy.hp : 0}/${selectedEnemy ? selectedEnemy.maxHp : 0}</span>
+          <span>🛡 ${selectedEnemy ? selectedEnemy.block : 0}</span>
+        </div>
       </div>
       
       <!-- Ultimate Control inside Portrait Console -->
@@ -341,17 +402,43 @@ function renderCombat() {
   bottomDashboard.appendChild(heroPortraitConsole);
 
   // Bottom Center: Hand Area
+  const handConsole = el('div', 'combat-hand-console');
+  handConsole.innerHTML = `
+    <div class="combat-hand-console-header">
+      <span>// CARD CONSOLE</span>
+      <span>${snap.handSize} / 10 INSTALLED</span>
+    </div>
+  `;
   const handArea = el('div', 'combat-hand-area');
   for (const [i, card] of state.hand.entries()) {
     const cost = game.combat.getCardCost(card);
     const canPlay = cost <= state.energy && state.hp > 0;
     handArea.appendChild(renderCard(card, i, canPlay));
   }
-  bottomDashboard.appendChild(handArea);
+  handConsole.appendChild(handArea);
+  bottomDashboard.appendChild(handConsole);
 
   // Bottom Right: Deck & Control Console
   const deckControlConsole = el('div', 'deck-control-console');
   deckControlConsole.innerHTML = `
+    <div class="deck-control-header">
+      <span class="deck-control-title">// DECK / TURN CONTROL</span>
+      <span class="deck-control-sub">FLOOR ${snap.floor}/${snap.maxFloor}</span>
+    </div>
+    <div class="deck-control-metrics">
+      <div class="deck-metric">
+        <span class="deck-metric-label">HAND</span>
+        <span class="deck-metric-value">${snap.handSize}</span>
+      </div>
+      <div class="deck-metric">
+        <span class="deck-metric-label">STACK</span>
+        <span class="deck-metric-value">${snap.drawPileCount}</span>
+      </div>
+      <div class="deck-metric">
+        <span class="deck-metric-label">ENEMIES</span>
+        <span class="deck-metric-value">${state.enemies.length}</span>
+      </div>
+    </div>
     <div class="deck-piles-grid">
       <div class="deck-pile-badge draw-pile" title="Draw Pile (STACK)">
         <span class="pile-icon">📥</span>

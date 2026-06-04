@@ -154,9 +154,9 @@ export const HEROES = {
     id: 'antigrav',
     name: 'Antigrav',
     title: 'The Weightless Menace',
-    portrait: '/assets/heroes/6.png',
-    avatar: '/assets/heroes/avatars/antigrav.png',
-    battlePortrait: '/assets/heroes/battle/antigrav.png',
+    portrait: '/assets/heroes/antigrav-v2.png',
+    avatar: '/assets/heroes/avatars/antigrav-v2.png',
+    battlePortrait: '/assets/heroes/battle/antigrav-v2.png',
     maxHp: 68,
     startingDeck: [
       'git_push', 'git_push', 'git_push',

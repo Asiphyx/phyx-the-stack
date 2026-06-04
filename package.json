@@ -6,9 +6,14 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "assets:inspect": "node scripts/asset-pipeline.mjs inspect",
+    "assets:contact": "node scripts/asset-pipeline.mjs contact",
+    "assets:optimize": "node scripts/asset-pipeline.mjs optimize",
+    "assets:variants": "node scripts/asset-pipeline.mjs variants"
   },
   "devDependencies": {
+    "sharp": "^0.34.5",
     "vite": "^8.0.12"
   }
 }
