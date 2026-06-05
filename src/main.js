@@ -5,13 +5,23 @@ import { getHeroTheme } from './data/heroThemes.js';
 import { CAIT_IDOL, buildCaitCompanion, getCaitLoadout } from './data/caitModules.js';
 import { ENEMIES, ENCOUNTERS } from './data/enemies.js';
 import { CARDS } from './data/cards.js';
+import { SOUNDTRACK_TRACKS, tracksForDomain } from './data/soundtrack.js';
 import bus from './engine/EventBus.js';
 
 const cardPool = Object.values(CARDS).filter(c => c.rarity !== 'starter');
 const game = new GameState();
 const SAVE_STORAGE_KEY = 'phyx-the-stack:saves:v1';
 const SAVE_SLOT_COUNT = 3;
-const INTRO_TRACK_SRC = '/assets/audio/cait-intro.mp3';
+const DEFAULT_TRACK = SOUNDTRACK_TRACKS.find(track => track.id === 'cait-intro') ?? SOUNDTRACK_TRACKS[0];
+const MUSIC_DOMAIN_FILTERS = {
+  title: { lowpass: 6200, highpass: 24, peakFrequency: 880, peakGain: 1.8, gain: 0.72, threshold: -24, ratio: 4.5 },
+  heroSelect: { lowpass: 7800, highpass: 32, peakFrequency: 1400, peakGain: 2.6, gain: 0.76, threshold: -26, ratio: 5.2 },
+  map: { lowpass: 6800, highpass: 28, peakFrequency: 720, peakGain: 1.4, gain: 0.66, threshold: -22, ratio: 4 },
+  combat: { lowpass: 10800, highpass: 46, peakFrequency: 2400, peakGain: 3.4, gain: 0.82, threshold: -31, ratio: 7.5 },
+  draft: { lowpass: 5200, highpass: 38, peakFrequency: 1100, peakGain: 2.1, gain: 0.7, threshold: -27, ratio: 5.8 },
+  gameOver: { lowpass: 4200, highpass: 22, peakFrequency: 520, peakGain: -0.8, gain: 0.62, threshold: -25, ratio: 6 },
+  victory: { lowpass: 9000, highpass: 26, peakFrequency: 1700, peakGain: 2.8, gain: 0.78, threshold: -24, ratio: 4.8 },
+};
 
 const root = document.querySelector('#screen-container');
 const damageLayer = document.querySelector('#damage-numbers-layer');
@@ -26,9 +36,27 @@ let introAudioContext = null;
 let introAnalyser = null;
 let introFrequencyData = null;
 let introVisualizerFrame = null;
+let musicUiFrame = null;
 let introBeatLevel = 0;
+let musicBassLevel = 0;
+let musicMidLevel = 0;
+let musicHighLevel = 0;
+let currentMusicTrack = DEFAULT_TRACK;
+let currentMusicDomain = 'title';
+let musicDomainCursor = {};
+let musicNodes = null;
+let musicBlockedToastShown = false;
+let interactionPulse = 0;
+let interactionPulseTimer = null;
 let systemMenuOpen = false;
 let titleWindowOffset = { x: 0, y: 0 };
+
+root.addEventListener('pointerdown', (event) => {
+  const interactive = event.target.closest('button, .game-card, .hero-card, .map-node, .terminal-opt-btn, .save-slot');
+  if (!interactive) return;
+  triggerInteractionPulse(event.clientX, event.clientY, interactive.matches('.btn-primary, .ult-btn-ready') ? 1 : 0.72);
+  if (!introMusicEnabled && game.getSnapshot().phase !== 'title') startIntroMusic();
+}, { capture: true });
 
 bus.on('stateChange', () => render());
 bus.on('combatUpdate', () => render());
@@ -48,6 +76,7 @@ render();
 function render() {
   const snapshot = game.getSnapshot();
   root.innerHTML = '';
+  prepareMusicForPhase(snapshot.phase);
 
   switch (snapshot.phase) {
     case 'title': renderTitle(); return;
@@ -83,7 +112,7 @@ function renderTitle() {
       </div>
       <div class="title-actions">
         <button class="btn btn-primary" id="start-btn">New Run</button>
-        <button class="btn title-music-btn" id="music-btn">${introMusicEnabled ? 'Mute Intro' : 'Play Intro'}</button>
+        <button class="btn title-music-btn" id="music-btn">${introMusicEnabled ? 'Mute Score' : 'Play Score'}</button>
       </div>
       <button class="btn title-save-menu-btn" id="title-save-menu-btn">Save States</button>
     </div>
@@ -94,9 +123,8 @@ function renderTitle() {
   wireTitleWindowDrag(section);
   startTitleVisualizer(section);
   section.querySelector('#start-btn').onclick = () => {
-    startIntroMusic();
-    game.state.phase = 'heroSelect';
     game.setPhase('heroSelect');
+    startIntroMusic();
   };
   section.querySelector('#music-btn').onclick = () => toggleIntroMusic(section);
   section.querySelector('#title-save-menu-btn').onclick = () => openSystemMenu(false);
@@ -155,10 +183,15 @@ function wireTitleWindowDrag(section) {
 
 function ensureIntroAudio() {
   if (introAudio) return introAudio;
-  introAudio = new Audio(INTRO_TRACK_SRC);
-  introAudio.loop = true;
-  introAudio.volume = 0.68;
+  introAudio = new Audio(currentMusicTrack?.src ?? DEFAULT_TRACK.src);
+  introAudio.loop = false;
+  introAudio.volume = MUSIC_DOMAIN_FILTERS.title.gain;
   introAudio.preload = 'auto';
+  introAudio.addEventListener('ended', () => {
+    currentMusicTrack = null;
+    prepareMusicForPhase(currentMusicDomain, { forceTrack: true });
+    if (introMusicEnabled) startIntroMusic();
+  });
   return introAudio;
 }
 
@@ -173,28 +206,53 @@ function ensureIntroAnalyser() {
   const source = introAudioContext.createMediaElementSource(audio);
   introAnalyser = introAudioContext.createAnalyser();
   introAnalyser.fftSize = 256;
-  introAnalyser.smoothingTimeConstant = 0.68;
+  introAnalyser.smoothingTimeConstant = 0.62;
   introFrequencyData = new Uint8Array(introAnalyser.frequencyBinCount);
-  source.connect(introAnalyser);
-  introAnalyser.connect(introAudioContext.destination);
+  const highpass = introAudioContext.createBiquadFilter();
+  highpass.type = 'highpass';
+  const lowpass = introAudioContext.createBiquadFilter();
+  lowpass.type = 'lowpass';
+  const presence = introAudioContext.createBiquadFilter();
+  presence.type = 'peaking';
+  presence.Q.value = 0.72;
+  const compressor = introAudioContext.createDynamicsCompressor();
+  const output = introAudioContext.createGain();
+
+  source.connect(highpass);
+  highpass.connect(lowpass);
+  lowpass.connect(presence);
+  presence.connect(compressor);
+  compressor.connect(introAnalyser);
+  introAnalyser.connect(output);
+  output.connect(introAudioContext.destination);
+  musicNodes = { source, highpass, lowpass, presence, compressor, output };
+  applyMusicDomainFilter(currentMusicDomain);
   return introAnalyser;
 }
 
 function startIntroMusic() {
+  prepareMusicForPhase(game.getSnapshot().phase);
   const audio = ensureIntroAudio();
   const analyser = ensureIntroAnalyser();
   if (introAudioContext?.state === 'suspended') {
     introAudioContext.resume();
   }
   if (analyser) startTitleVisualizer(document);
+  startMusicReactiveUi();
   introMusicEnabled = true;
   const playAttempt = audio.play();
   if (playAttempt?.catch) {
     playAttempt.catch(() => {
       introMusicEnabled = false;
-      emitToast('Browser blocked intro audio. Press Play Intro.', 'warning');
+      if (!musicBlockedToastShown) {
+        musicBlockedToastShown = true;
+        emitToast('Browser blocked score audio. Press Play Score.', 'warning');
+      }
+      syncIntroMusicButtons(document);
     });
   }
+  if (playAttempt?.then) playAttempt.then(() => { musicBlockedToastShown = false; });
+  syncIntroMusicButtons(document);
 }
 
 function toggleIntroMusic(scope = document) {
@@ -210,8 +268,91 @@ function toggleIntroMusic(scope = document) {
 
 function syncIntroMusicButtons(scope = document) {
   scope.querySelectorAll('#music-btn').forEach(button => {
-    button.textContent = introMusicEnabled ? 'Mute Intro' : 'Play Intro';
+    button.textContent = introMusicEnabled ? 'Mute Score' : 'Play Score';
+    button.title = currentMusicTrack ? currentMusicTrack.title : 'Game soundtrack';
   });
+}
+
+function musicDomainForPhase(phase) {
+  if (phase === 'boss') return 'combat';
+  return MUSIC_DOMAIN_FILTERS[phase] ? phase : 'map';
+}
+
+function prepareMusicForPhase(phase = 'title', { forceTrack = false } = {}) {
+  const domain = musicDomainForPhase(phase);
+  currentMusicDomain = domain;
+  root.dataset.musicDomain = domain;
+  document.documentElement.dataset.musicDomain = domain;
+  const nextTrack = chooseTrackForDomain(domain, forceTrack);
+  if (!nextTrack) return;
+  const audio = introAudio;
+  const shouldSwitch = forceTrack || currentMusicTrack?.id !== nextTrack.id;
+  currentMusicTrack = nextTrack;
+  if (audio && shouldSwitch) {
+    const wasPlaying = introMusicEnabled && !audio.paused;
+    audio.src = nextTrack.src;
+    audio.currentTime = 0;
+    audio.load();
+    if (wasPlaying) {
+      const playAttempt = audio.play();
+      if (playAttempt?.catch) playAttempt.catch(() => {});
+    }
+  }
+  applyMusicDomainFilter(domain);
+  syncIntroMusicButtons(document);
+}
+
+function chooseTrackForDomain(domain, forceTrack = false) {
+  const options = tracksForDomain(domain);
+  if (!options.length) return DEFAULT_TRACK;
+  if (!forceTrack && currentMusicTrack?.domains?.includes(domain)) return currentMusicTrack;
+  const cursor = musicDomainCursor[domain] ?? 0;
+  const next = options[cursor % options.length];
+  musicDomainCursor = { ...musicDomainCursor, [domain]: cursor + 1 };
+  return next;
+}
+
+function applyMusicDomainFilter(domain) {
+  if (!musicNodes || !introAudioContext) return;
+  const preset = MUSIC_DOMAIN_FILTERS[domain] ?? MUSIC_DOMAIN_FILTERS.map;
+  const now = introAudioContext.currentTime;
+  rampAudioParam(musicNodes.highpass.frequency, preset.highpass, now);
+  rampAudioParam(musicNodes.lowpass.frequency, preset.lowpass, now);
+  rampAudioParam(musicNodes.presence.frequency, preset.peakFrequency, now);
+  rampAudioParam(musicNodes.presence.gain, preset.peakGain, now);
+  rampAudioParam(musicNodes.output.gain, preset.gain, now);
+  rampAudioParam(musicNodes.compressor.threshold, preset.threshold, now);
+  rampAudioParam(musicNodes.compressor.ratio, preset.ratio, now);
+}
+
+function rampAudioParam(param, value, now) {
+  param.cancelScheduledValues(now);
+  param.linearRampToValueAtTime(value, now + 0.36);
+}
+
+function startMusicReactiveUi() {
+  if (musicUiFrame) return;
+  const tick = () => {
+    updateTitleBeat(document);
+    interactionPulse = Math.max(0, interactionPulse * 0.9 - 0.006);
+    document.documentElement.style.setProperty('--choice-pulse', interactionPulse.toFixed(3));
+    root.style.setProperty('--choice-pulse', interactionPulse.toFixed(3));
+    musicUiFrame = requestAnimationFrame(tick);
+  };
+  tick();
+}
+
+function triggerInteractionPulse(x = window.innerWidth / 2, y = window.innerHeight / 2, strength = 0.7) {
+  interactionPulse = Math.min(1, Math.max(interactionPulse, strength));
+  const px = Number.isFinite(x) ? x : window.innerWidth / 2;
+  const py = Number.isFinite(y) ? y : window.innerHeight / 2;
+  document.documentElement.style.setProperty('--choice-x', `${Math.round(px)}px`);
+  document.documentElement.style.setProperty('--choice-y', `${Math.round(py)}px`);
+  root.style.setProperty('--choice-x', `${Math.round(px)}px`);
+  root.style.setProperty('--choice-y', `${Math.round(py)}px`);
+  root.classList.add('choice-reacting');
+  clearTimeout(interactionPulseTimer);
+  interactionPulseTimer = setTimeout(() => root.classList.remove('choice-reacting'), 260);
 }
 
 function startTitleVisualizer(scope = document) {
@@ -581,15 +722,41 @@ function drawTitleCornerMeters(ctx, width, height, time) {
 
 function updateTitleBeat(scope = document) {
   let lowAverage = 0;
+  let midAverage = 0;
+  let highAverage = 0;
   if (introMusicEnabled && introFrequencyData) {
-    const sampleCount = Math.min(18, introFrequencyData.length);
-    for (let i = 0; i < sampleCount; i += 1) lowAverage += introFrequencyData[i] / 255;
-    lowAverage /= sampleCount;
+    if (introAnalyser) introAnalyser.getByteFrequencyData(introFrequencyData);
+    const lowCount = Math.min(18, introFrequencyData.length);
+    const midStart = Math.min(18, introFrequencyData.length - 1);
+    const midEnd = Math.min(54, introFrequencyData.length);
+    const highStart = Math.min(54, introFrequencyData.length - 1);
+    const highEnd = introFrequencyData.length;
+    for (let i = 0; i < lowCount; i += 1) lowAverage += introFrequencyData[i] / 255;
+    for (let i = midStart; i < midEnd; i += 1) midAverage += introFrequencyData[i] / 255;
+    for (let i = highStart; i < highEnd; i += 1) highAverage += introFrequencyData[i] / 255;
+    lowAverage /= lowCount || 1;
+    midAverage /= Math.max(1, midEnd - midStart);
+    highAverage /= Math.max(1, highEnd - highStart);
   } else {
     lowAverage = 0.12 + Math.sin(performance.now() * 0.0014) * 0.04;
+    midAverage = 0.08 + Math.sin(performance.now() * 0.0019) * 0.035;
+    highAverage = 0.06 + Math.sin(performance.now() * 0.0026) * 0.025;
   }
   const target = Math.max(0, Math.min(1, (lowAverage - 0.14) * 1.55));
   introBeatLevel = introBeatLevel * 0.82 + target * 0.18;
+  musicBassLevel = musicBassLevel * 0.78 + lowAverage * 0.22;
+  musicMidLevel = musicMidLevel * 0.8 + midAverage * 0.2;
+  musicHighLevel = musicHighLevel * 0.84 + highAverage * 0.16;
+  document.documentElement.style.setProperty('--music-beat', introBeatLevel.toFixed(3));
+  document.documentElement.style.setProperty('--music-bass', musicBassLevel.toFixed(3));
+  document.documentElement.style.setProperty('--music-mid', musicMidLevel.toFixed(3));
+  document.documentElement.style.setProperty('--music-high', musicHighLevel.toFixed(3));
+  document.documentElement.style.setProperty('--music-intensity', (currentMusicTrack?.intensity ?? 0.72).toFixed(2));
+  root.dataset.musicActive = introMusicEnabled ? 'true' : 'false';
+  root.style.setProperty('--music-beat', introBeatLevel.toFixed(3));
+  root.style.setProperty('--music-bass', musicBassLevel.toFixed(3));
+  root.style.setProperty('--music-mid', musicMidLevel.toFixed(3));
+  root.style.setProperty('--music-high', musicHighLevel.toFixed(3));
   const titleScreen = scope.querySelector?.('.title-screen') ?? document.querySelector('.title-screen');
   if (titleScreen) titleScreen.style.setProperty('--title-beat', introBeatLevel.toFixed(3));
 }
@@ -1682,6 +1849,16 @@ function renderGameToText() {
         intent: enemy.intent?.type ?? null,
       })),
       handSize: snap.handSize,
+    },
+    soundtrack: {
+      enabled: introMusicEnabled,
+      domain: currentMusicDomain,
+      trackId: currentMusicTrack?.id ?? null,
+      trackTitle: currentMusicTrack?.title ?? null,
+      beat: Number(introBeatLevel.toFixed(3)),
+      bass: Number(musicBassLevel.toFixed(3)),
+      mid: Number(musicMidLevel.toFixed(3)),
+      high: Number(musicHighLevel.toFixed(3)),
     },
     coordinateSystem: 'DOM UI, origin top-left, x right, y down',
   };

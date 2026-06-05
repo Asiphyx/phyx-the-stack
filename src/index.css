@@ -80,6 +80,16 @@
   --shadow-card-hover: 0 0 15px rgba(0, 0, 0, 0.8);
   --shadow-neon-pink: 0 0 15px var(--neon-pink-glow);
   --shadow-neon-cyan: 0 0 15px var(--neon-cyan-glow);
+
+  /* Runtime audio reactivity */
+  --music-beat: 0;
+  --music-bass: 0;
+  --music-mid: 0;
+  --music-high: 0;
+  --music-intensity: 0.72;
+  --choice-pulse: 0;
+  --choice-x: 50vw;
+  --choice-y: 50vh;
 }
 
 /* ── Reset & Base ── */
@@ -227,6 +237,61 @@ body::after {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  isolation: isolate;
+  --music-beat: 0;
+  --music-bass: 0;
+  --music-mid: 0;
+  --music-high: 0;
+  --choice-pulse: 0;
+  --choice-x: 50vw;
+  --choice-y: 50vh;
+}
+
+#screen-container::before,
+#screen-container::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+#screen-container::before {
+  background:
+    radial-gradient(circle at var(--choice-x) var(--choice-y), rgba(255, 255, 255, calc(var(--choice-pulse) * 0.18)), transparent 0 8%, rgba(255, 51, 153, calc(var(--choice-pulse) * 0.16)) 9%, transparent 24%),
+    radial-gradient(ellipse at 50% 48%, rgba(255, 51, 153, calc(var(--music-bass) * 0.08)), transparent 48%),
+    linear-gradient(90deg, transparent, rgba(0, 229, 255, calc(var(--music-high) * 0.08)), transparent);
+  mix-blend-mode: screen;
+  opacity: calc(0.18 + var(--music-beat) * 0.22 + var(--choice-pulse) * 0.4);
+}
+
+#screen-container::after {
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 51, 153, calc(var(--music-mid) * 0.035)) 0 1px, transparent 1px 90px),
+    repeating-linear-gradient(0deg, rgba(0, 229, 255, calc(var(--music-high) * 0.025)) 0 1px, transparent 1px 26px);
+  opacity: calc(0.16 + var(--music-beat) * 0.16);
+  transform: translateY(calc(var(--music-bass) * -4px));
+  mix-blend-mode: screen;
+}
+
+#screen-container > section {
+  z-index: 1;
+}
+
+#screen-container[data-music-active="true"] > section {
+  filter:
+    brightness(calc(1 + var(--music-beat) * 0.055))
+    saturate(calc(1 + var(--music-mid) * 0.16));
+}
+
+#screen-container.choice-reacting > section {
+  animation: choiceSurfacePulse 260ms var(--ease-out-expo);
+}
+
+@keyframes choiceSurfacePulse {
+  0% { transform: translateZ(0) scale(1); }
+  38% { transform: translateZ(0) scale(calc(1 + var(--choice-pulse) * 0.006)); }
+  100% { transform: translateZ(0) scale(1); }
 }
 
 #particles-layer,
@@ -884,8 +949,10 @@ body::after {
   padding: var(--space-lg) var(--space-lg) var(--space-xl);
   gap: var(--space-md);
   background:
-    radial-gradient(ellipse 60% 42% at 50% 42%, var(--selected-hero-glow, rgba(153, 51, 255, 0.28)) 0%, transparent 70%),
-    radial-gradient(ellipse 100% 50% at 50% 100%, color-mix(in srgb, var(--selected-hero-color, #9933ff) 14%, transparent) 0%, transparent 70%),
+    linear-gradient(180deg, rgba(3, 0, 7, 0.38), rgba(3, 0, 7, 0.72)),
+    radial-gradient(ellipse 60% 42% at 50% 42%, var(--selected-hero-glow, rgba(153, 51, 255, 0.22)) 0%, transparent 70%),
+    radial-gradient(ellipse 100% 50% at 50% 100%, color-mix(in srgb, var(--selected-hero-color, #9933ff) 12%, transparent) 0%, transparent 70%),
+    url('/assets/backgrounds/hero-select-background.png') center / cover no-repeat,
     var(--bg-void);
   overflow-y: auto;
 }
@@ -918,7 +985,7 @@ body::after {
   padding: var(--space-lg);
   border: 2px solid color-mix(in srgb, var(--selected-hero-color, #9933ff) 62%, #ffffff 4%);
   background:
-    linear-gradient(90deg, color-mix(in srgb, var(--selected-hero-color, #9933ff) 10%, rgba(0,0,0,0.82)), rgba(3, 5, 16, 0.9)),
+    linear-gradient(90deg, color-mix(in srgb, var(--selected-hero-color, #9933ff) 8%, rgba(0,0,0,0.68)), rgba(3, 5, 16, 0.72)),
     repeating-linear-gradient(90deg, rgba(255,255,255,0.035) 0 1px, transparent 1px 68px);
   box-shadow:
     0 0 44px color-mix(in srgb, var(--selected-hero-color, #9933ff) 28%, transparent),
@@ -1379,7 +1446,7 @@ body::after {
   padding: clamp(12px, 1.3vw, 18px);
   border: 1px solid color-mix(in srgb, var(--selected-hero-accent-2, #00e5ff) 34%, transparent);
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--selected-hero-color, #9933ff) 12%, rgba(0,0,0,0.62)), rgba(0,0,0,0.42)),
+    linear-gradient(180deg, color-mix(in srgb, var(--selected-hero-color, #9933ff) 12%, rgba(0,0,0,0.72)), rgba(0,0,0,0.5)),
     repeating-linear-gradient(0deg, rgba(255,255,255,0.025) 0 1px, transparent 1px 7px);
   box-shadow: inset 0 0 24px rgba(0,0,0,0.5);
 }
@@ -3028,6 +3095,69 @@ body::after {
 .btn-primary:hover {
   background: #ff44aa;
   box-shadow: -3px 0 0 var(--neon-cyan), 3px 0 0 var(--neon-pink), 0 0 20px var(--neon-pink-glow);
+}
+
+#screen-container[data-music-active="true"] .btn,
+#screen-container[data-music-active="true"] .hero-card,
+#screen-container[data-music-active="true"] .map-node,
+#screen-container[data-music-active="true"] .game-card,
+#screen-container[data-music-active="true"] .terminal-opt-btn,
+#screen-container[data-music-active="true"] .run-stat,
+#screen-container[data-music-active="true"] .save-slot {
+  filter:
+    brightness(calc(1 + var(--music-beat) * 0.07 + var(--choice-pulse) * 0.08))
+    saturate(calc(1 + var(--music-high) * 0.16));
+}
+
+#screen-container[data-music-active="true"] .btn:not(:disabled) {
+  box-shadow:
+    -3px 0 0 color-mix(in srgb, var(--neon-pink) calc(45% + var(--music-beat) * 35%), transparent),
+    3px 0 0 color-mix(in srgb, var(--neon-cyan) calc(42% + var(--music-high) * 35%), transparent),
+    0 0 calc(10px + var(--music-beat) * 18px + var(--choice-pulse) * 20px) rgba(0, 229, 255, 0.18);
+}
+
+#screen-container[data-music-active="true"] .hero-select-showcase,
+#screen-container[data-music-active="true"] .combat-top-bar,
+#screen-container[data-music-active="true"] .deck-control-console,
+#screen-container[data-music-active="true"] .draft-screen,
+#screen-container[data-music-active="true"] .map-screen,
+#screen-container[data-music-active="true"] .system-menu-panel {
+  box-shadow:
+    0 0 calc(18px + var(--music-bass) * 32px) rgba(0, 229, 255, 0.08),
+    inset 0 0 calc(20px + var(--music-mid) * 24px) rgba(255, 51, 153, 0.055);
+}
+
+#screen-container[data-music-domain="combat"] .combat-battlefield {
+  filter:
+    brightness(calc(1 + var(--music-bass) * 0.08))
+    contrast(calc(1 + var(--music-mid) * 0.08));
+}
+
+#screen-container[data-music-domain="combat"] .enemy-body,
+#screen-container[data-music-domain="combat"] .hero-sprite-matrix,
+#screen-container[data-music-domain="combat"] .cait-companion-platform {
+  transform: translateY(calc(var(--music-bass) * -3px));
+  box-shadow:
+    0 8px calc(20px + var(--music-beat) * 22px) rgba(0, 0, 0, 0.58),
+    0 0 calc(10px + var(--music-high) * 20px) rgba(255, 51, 153, 0.16);
+}
+
+#screen-container[data-music-domain="map"] .map-node.current,
+#screen-container[data-music-domain="draft"] .terminal-opt-btn:hover,
+#screen-container[data-music-domain="heroSelect"] .hero-card.selected {
+  box-shadow:
+    -4px 0 0 var(--selected-hero-color, var(--neon-pink)),
+    4px 0 0 var(--selected-hero-accent-2, var(--neon-cyan)),
+    0 0 calc(18px + var(--music-beat) * 30px + var(--choice-pulse) * 20px) color-mix(in srgb, var(--selected-hero-color, #9933ff) 34%, transparent);
+}
+
+#screen-container[data-music-active="true"] .duo-feature-art,
+#screen-container[data-music-active="true"] .holo-avatar-image,
+#screen-container[data-music-active="true"] .enemy-sprite,
+#screen-container[data-music-active="true"] .card-art-image {
+  filter:
+    drop-shadow(0 0 calc(8px + var(--music-high) * 18px) rgba(255, 51, 153, 0.28))
+    saturate(calc(1 + var(--music-mid) * 0.18));
 }
 
 .btn-end-turn {
