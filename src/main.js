@@ -640,6 +640,7 @@ function renderHeroSelect() {
           <div class="duo-meter"><i style="width:${Math.round(cait.reliability * 100)}%"></i></div>
           <p>${escapeHtml(cait.role)}</p>
         </div>
+        <button class="btn btn-primary hero-feature-start" data-start-hero="${hero.id}">Start Duo Run</button>
       </div>
       <div class="duo-feature-stage">
         <div class="duo-portrait-shell hero-duo-shell">
@@ -675,7 +676,6 @@ function renderHeroSelect() {
             </article>
           `).join('')}
         </div>
-        <button class="btn btn-primary hero-feature-start" data-start-hero="${hero.id}">Start Duo Run</button>
       </div>
     `;
     showcase.querySelector('[data-start-hero]').onclick = () => {
@@ -720,17 +720,7 @@ function renderHeroSelect() {
     };
     grid.appendChild(card);
   }
-  const startStrip = el('div', 'duo-select-start-strip');
-  startStrip.innerHTML = `
-    <span>CAIT IS ALWAYS IN THE RUN</span>
-    <button class="btn btn-primary" id="duo-start-selected">Deploy Selected Duo</button>
-  `;
-  startStrip.querySelector('#duo-start-selected').onclick = () => {
-    game.selectHero(selectedHero);
-    game.startRun(15, cardPool, enemyCatalogue);
-  };
   section.appendChild(grid);
-  section.appendChild(startStrip);
   root.appendChild(section);
 }
 
