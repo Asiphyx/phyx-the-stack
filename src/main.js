@@ -50,6 +50,8 @@ let interactionPulse = 0;
 let interactionPulseTimer = null;
 let systemMenuOpen = false;
 let titleWindowOffset = { x: 0, y: 0 };
+let titleLauncherOpen = false;
+let caitCodecOffset = { x: 0, y: 0 };
 
 root.addEventListener('pointerdown', (event) => {
   const interactive = event.target.closest('button, .game-card, .hero-card, .map-node, .terminal-opt-btn, .save-slot');
@@ -96,42 +98,48 @@ function render() {
 
 function renderTitle() {
   const section = el('section', 'title-screen');
+  if (titleLauncherOpen) section.classList.add('launcher-open');
   section.innerHTML = `
     <div class="title-cait-lab-backdrop" aria-hidden="true"></div>
     <canvas class="title-spectrum title-spectrum-back" id="title-spectrum" width="960" height="360" aria-hidden="true"></canvas>
     <canvas class="title-spectrum title-spectrum-front" id="title-spectrum-front" width="960" height="360" aria-hidden="true"></canvas>
-    <div class="title-fold-anchor">
+    <div class="title-top-wordmark">
+      <span>CAIT LABS // PEON QUEEN ROUTE</span>
+      <h1 class="glitch-text" data-text="Phyx the Stack">Phyx the Stack</h1>
+      <i aria-hidden="true"></i>
+    </div>
+    <div class="title-cat-launcher">
+      <div class="title-cat-menu" aria-label="Title controls">
       <div class="title-terminal-top">
-        <span class="title-window-grip">CaitOS://PhyxLauncher.exe</span>
+          <span class="title-window-grip">CaitOS://Controls</span>
         <span>QUEEN_SESSION_READY</span>
-        <button class="title-window-center" type="button" aria-label="Center launcher window">CENTER</button>
       </div>
-      <div class="title-logo">
-        <h1 class="glitch-text" data-text="Phyx the Stack">Phyx the Stack</h1>
-        <div class="title-signal-spine" aria-hidden="true"><span></span></div>
-      </div>
+        <div class="title-cat-menu-title">Phyx Launch</div>
       <div class="title-actions">
         <button class="btn btn-primary" id="start-btn">New Run</button>
         <button class="btn title-music-btn" id="music-btn">${introMusicEnabled ? 'Mute Score' : 'Play Score'}</button>
       </div>
       <button class="btn title-save-menu-btn" id="title-save-menu-btn">Save States</button>
     </div>
+      <button class="title-cat-button" id="title-cat-button" type="button" aria-expanded="${titleLauncherOpen ? 'true' : 'false'}" aria-label="Open CaitOS launch controls">
+        <span>CAIT</span>
+      </button>
+    </div>
     <div class="title-version">v0.1.0 · Cait Labs</div>
   `;
   root.appendChild(section);
-  applyTitleWindowOffset(section.querySelector('.title-fold-anchor'));
-  wireTitleWindowDrag(section);
   startTitleVisualizer(section);
+  section.querySelector('#title-cat-button').onclick = () => {
+    titleLauncherOpen = !titleLauncherOpen;
+    section.classList.toggle('launcher-open', titleLauncherOpen);
+    section.querySelector('#title-cat-button').setAttribute('aria-expanded', titleLauncherOpen ? 'true' : 'false');
+  };
   section.querySelector('#start-btn').onclick = () => {
     game.setPhase('heroSelect');
     startIntroMusic();
   };
   section.querySelector('#music-btn').onclick = () => toggleIntroMusic(section);
   section.querySelector('#title-save-menu-btn').onclick = () => openSystemMenu(false);
-  section.querySelector('.title-window-center').onclick = () => {
-    titleWindowOffset = { x: 0, y: 0 };
-    applyTitleWindowOffset(section.querySelector('.title-fold-anchor'));
-  };
   appendSystemMenuOverlay(section, false);
 }
 
@@ -170,6 +178,51 @@ function wireTitleWindowDrag(section) {
       y: clampNumber(drag.originY + event.clientY - drag.startY, -maxY, maxY),
     };
     applyTitleWindowOffset(windowEl);
+  });
+
+  const endDrag = (event) => {
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    drag = null;
+    windowEl.classList.remove('dragging');
+  };
+  dragBar.addEventListener('pointerup', endDrag);
+  dragBar.addEventListener('pointercancel', endDrag);
+}
+
+function applyCaitCodecOffset(windowEl) {
+  if (!windowEl) return;
+  windowEl.style.setProperty('--cait-codec-x', `${Math.round(caitCodecOffset.x)}px`);
+  windowEl.style.setProperty('--cait-codec-y', `${Math.round(caitCodecOffset.y)}px`);
+}
+
+function wireCaitCodecDrag(windowEl) {
+  const dragBar = windowEl?.querySelector('.cait-codec-top');
+  if (!windowEl || !dragBar) return;
+
+  let drag = null;
+  dragBar.addEventListener('pointerdown', (event) => {
+    if (event.target.closest('button')) return;
+    drag = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: caitCodecOffset.x,
+      originY: caitCodecOffset.y,
+    };
+    dragBar.setPointerCapture(event.pointerId);
+    windowEl.classList.add('dragging');
+  });
+
+  dragBar.addEventListener('pointermove', (event) => {
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const rect = windowEl.getBoundingClientRect();
+    const maxX = Math.max(120, window.innerWidth - rect.width - 90);
+    const maxY = Math.max(90, window.innerHeight - rect.height - 100);
+    caitCodecOffset = {
+      x: clampNumber(drag.originX + event.clientX - drag.startX, -maxX * 0.55, maxX),
+      y: clampNumber(drag.originY + event.clientY - drag.startY, -maxY, maxY * 0.62),
+    };
+    applyCaitCodecOffset(windowEl);
   });
 
   const endDrag = (event) => {
@@ -976,14 +1029,17 @@ function renderCombat() {
   const hero = hydrateHeroDisplay(state.hero);
   const cait = state.cait ?? (hero ? buildCaitCompanion(hero.id) : null);
   const theme = getHeroTheme(hero?.id);
-  const heroAvatar = hero?.avatar ?? hero?.portrait ?? '';
-  const heroBattlePortrait = hero?.battlePortrait ?? heroAvatar;
+  const heroBattlePortrait = hero?.battlePortrait ?? hero?.avatar ?? hero?.portrait ?? '';
   const ultReady = snap.ultCharge >= snap.ultMaxCharge;
   const selectedEnemyState = state.enemies[selectedTarget] ?? state.enemies[0];
   const selectedEnemy = hydrateEnemyDisplay(selectedEnemyState);
   const targetIntent = selectedEnemyState
     ? (selectedEnemyState.pattern?.[selectedEnemyState.patternIndex] ?? selectedEnemyState.intent ?? null)
     : null;
+  const caitIntent = cait?.intent ?? {
+    name: 'Royal Autoplay',
+    description: 'Cait acts after you.',
+  };
 
   const section = el('section', `combat-screen theme-${theme.id} shell-${theme.shell}`);
   section.style.setProperty('--hero-color', theme.accent ?? hero?.color ?? '#9933ff');
@@ -1087,18 +1143,27 @@ function renderCombat() {
         ${snap.block > 0 ? `<div class="hero-battle-block">🛡️ ${snap.block}</div>` : ''}
       </div>
     </div>
-    <div class="cait-companion-platform">
-      <div class="cait-companion-frame">
-        <img class="cait-companion-image" src="${cait?.battlePortrait ?? CAIT_IDOL.battlePortrait}" alt="Cait companion" />
-      </div>
-      <div class="cait-companion-readout">
+  `;
+  battlefield.appendChild(heroSpriteContainer);
+
+  const caitCodecWindow = el('div', 'cait-codec-window');
+  caitCodecWindow.innerHTML = `
+    <div class="cait-codec-top">
+      <span>CAIT_CODEC://PEON_QUEEN</span>
+      <button class="cait-codec-center" type="button" aria-label="Center Cait codec window">CENTER</button>
+    </div>
+    <div class="cait-codec-body">
+      <img class="cait-codec-image" src="${cait?.battlePortrait ?? CAIT_IDOL.battlePortrait}" alt="Cait companion" />
+      <div class="cait-codec-copy">
         <span>CAIT AUTOPLAY</span>
-        <strong>${escapeHtml(cait?.intent?.name ?? 'Royal Autoplay')}</strong>
-        <p>${escapeHtml(cait?.intent?.description ?? 'Cait acts after you.')}</p>
+        <strong>${escapeHtml(caitIntent.name)}</strong>
+        <p>${escapeHtml(caitIntent.description)}</p>
+        <small>${escapeHtml(cait?.bondName ?? theme.duo)} // ${cait ? `${cait.hp}/${cait.maxHp} HP` : 'SYNCING'}</small>
       </div>
     </div>
   `;
-  battlefield.appendChild(heroSpriteContainer);
+  applyCaitCodecOffset(caitCodecWindow);
+  battlefield.appendChild(caitCodecWindow);
 
   // Right Side: Enemy Area
   const enemyArea = el('div', 'combat-enemy-area');
@@ -1143,13 +1208,6 @@ function renderCombat() {
   const heroPortraitConsole = el('div', 'hero-portrait-console');
   heroPortraitConsole.style.setProperty('--hero-color', hero?.color ?? '#9933ff');
   heroPortraitConsole.innerHTML = `
-    <div class="console-portrait-column">
-      <div class="console-portrait-frame">
-        <img class="console-portrait-image" src="${heroAvatar}" alt="${hero?.name ?? ''}" />
-        <div class="console-portrait-glitch"></div>
-      </div>
-      <div class="console-passive-line">${hero?.passive?.name ?? 'Passive'}</div>
-    </div>
     <div class="console-hero-console">
       <div class="console-hero-header">
         <div class="console-hero-name">CAIT + ${hero?.name ?? 'ASSISTANT'}</div>
@@ -1279,6 +1337,14 @@ function renderCombat() {
 
   root.appendChild(section);
   appendSystemMenuOverlay(section, true);
+  wireCaitCodecDrag(caitCodecWindow);
+  const caitCodecCenter = caitCodecWindow.querySelector('.cait-codec-center');
+  if (caitCodecCenter) {
+    caitCodecCenter.onclick = () => {
+      caitCodecOffset = { x: 0, y: 0 };
+      applyCaitCodecOffset(caitCodecWindow);
+    };
+  }
 
   // Wire event handlers asynchronously to ensure DOM availability
   setTimeout(() => {
