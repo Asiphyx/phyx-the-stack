@@ -112,7 +112,7 @@ function renderTitle() {
       <div class="title-cat-menu" aria-label="Title controls">
       <div class="title-terminal-top">
           <span class="title-window-grip">CaitOS://Controls</span>
-        <span>QUEEN_SESSION_READY</span>
+        <span>READY</span>
       </div>
         <div class="title-cat-menu-title">Phyx Launch</div>
       <div class="title-actions">
