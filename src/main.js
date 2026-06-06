@@ -125,7 +125,7 @@ function renderTitle() {
       <button class="btn title-save-menu-btn" id="title-save-menu-btn">Save States</button>
     </div>
       <button class="title-cat-button" id="title-cat-button" type="button" aria-expanded="${titleLauncherOpen ? 'true' : 'false'}" aria-label="Open CaitOS launch controls">
-        <span>CAIT</span>
+        ♥
       </button>
     </div>
     <div class="title-version">v0.1.0 · Cait Labs</div>

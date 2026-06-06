@@ -668,47 +668,51 @@ body::after {
 
 .title-cat-launcher {
   position: absolute;
-  left: clamp(168px, 10.1vw, 190px);
-  bottom: clamp(40px, 6.8vh, 66px);
+  left: 50%;
+  top: 42%;
   z-index: 6;
-  width: 150px;
-  height: 112px;
+  width: 0;
+  height: 0;
 }
 
 .title-cat-button {
   position: absolute;
-  left: 0;
-  bottom: 0;
-  width: 150px;
-  height: 112px;
-  border: 1px solid rgba(255, 111, 31, 0.62);
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 56px;
+  height: 52px;
+  border: 2px solid rgba(255, 51, 153, 0.78);
+  border-radius: 0;
   background:
-    radial-gradient(circle at 50% 48%, rgba(255, 51, 153, calc(0.08 + var(--title-beat) * 0.08)), transparent 58%),
-    rgba(0, 0, 0, 0.08);
-  color: rgba(255, 180, 108, 0.82);
-  font-family: var(--font-pixel);
-  font-size: 0.48rem;
+    radial-gradient(circle at 50% 40%, rgba(255, 51, 153, calc(0.12 + var(--title-beat) * 0.1)), transparent 62%),
+    rgba(0, 0, 0, 0.06);
+  color: rgba(255, 51, 153, 0.9);
+  font-size: 1.4rem;
+  line-height: 1;
   cursor: pointer;
-  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  clip-path: polygon(50% 8%, 74% 0, 100% 22%, 94% 48%, 50% 100%, 6% 48%, 0 22%, 26% 0);
   box-shadow:
-    0 0 calc(12px + var(--title-beat) * 18px) rgba(255, 51, 153, 0.18),
-    inset 0 0 18px rgba(255, 51, 153, 0.08);
-}
-
-.title-cat-button span {
-  position: absolute;
-  left: 16px;
-  bottom: 11px;
-  text-shadow: 0 0 10px rgba(255, 51, 153, 0.72);
+    0 0 calc(14px + var(--title-beat) * 22px) rgba(255, 51, 153, 0.28),
+    inset 0 0 16px rgba(255, 51, 153, 0.1);
+  transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms var(--ease-out-expo);
 }
 
 .title-cat-button:hover,
 .title-screen.launcher-open .title-cat-button {
-  border-color: rgba(255, 51, 153, 0.92);
+  border-color: rgba(255, 51, 153, 1);
   background:
-    radial-gradient(circle at 50% 48%, rgba(255, 51, 153, 0.18), transparent 60%),
-    rgba(0, 0, 0, 0.16);
-  color: #ffc2df;
+    radial-gradient(circle at 50% 40%, rgba(255, 51, 153, 0.24), transparent 62%),
+    rgba(0, 0, 0, 0.12);
+  color: #ff80c0;
+  box-shadow:
+    0 0 calc(22px + var(--title-beat) * 28px) rgba(255, 51, 153, 0.42),
+    inset 0 0 22px rgba(255, 51, 153, 0.16);
+  transform: translate(-50%, -50%) scale(1.08);
+}
+
+.title-cat-button:active {
+  transform: translate(-50%, -50%) scale(0.94);
 }
 
 .title-cat-menu {
