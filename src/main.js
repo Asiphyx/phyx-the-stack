@@ -82,14 +82,17 @@ function render() {
 
   switch (snapshot.phase) {
     case 'title': renderTitle(); return;
-    case 'heroSelect': renderHeroSelect(); return;
-    case 'map': renderMap(); return;
-    case 'combat': renderCombat(); return;
-    case 'draft': renderDraft(); return;
-    case 'gameOver': renderGameOver(); return;
-    case 'victory': renderVictory(); return;
-    default: renderTitle();
+    case 'heroSelect': renderHeroSelect(); break;
+    case 'map': renderMap(); break;
+    case 'combat': renderCombat(); break;
+    case 'draft': renderDraft(); break;
+    case 'gameOver': renderGameOver(); break;
+    case 'victory': renderVictory(); break;
+    default: renderTitle(); return;
   }
+
+  // Attach persistent music controls for non-title phases
+  appendMusicControlBar();
 }
 
 // ──────────────────────────────────────────────────────────
@@ -238,7 +241,7 @@ function ensureIntroAudio() {
   if (introAudio) return introAudio;
   introAudio = new Audio(currentMusicTrack?.src ?? DEFAULT_TRACK.src);
   introAudio.loop = false;
-  introAudio.volume = MUSIC_DOMAIN_FILTERS.title.gain;
+  introAudio.volume = getMusicVolume() * (MUSIC_DOMAIN_FILTERS.title.gain);
   introAudio.preload = 'auto';
   introAudio.addEventListener('ended', () => {
     currentMusicTrack = null;
@@ -346,6 +349,7 @@ function prepareMusicForPhase(phase = 'title', { forceTrack = false } = {}) {
     audio.src = nextTrack.src;
     audio.currentTime = 0;
     audio.load();
+    audio.volume = getMusicVolume() * (MUSIC_DOMAIN_FILTERS[domain]?.gain ?? 0.72);
     if (wasPlaying) {
       const playAttempt = audio.play();
       if (playAttempt?.catch) playAttempt.catch(() => {});
@@ -407,6 +411,75 @@ function triggerInteractionPulse(x = window.innerWidth / 2, y = window.innerHeig
   clearTimeout(interactionPulseTimer);
   interactionPulseTimer = setTimeout(() => root.classList.remove('choice-reacting'), 260);
 }
+
+// ──────────────────────────────────────────────────────────
+// Music Control Bar — persistent in-game audio controls
+// ──────────────────────────────────────────────────────────
+
+function getMusicVolume() {
+  try { return parseFloat(localStorage.getItem('phyx-music-volume') ?? '0.75'); }
+  catch { return 0.75; }
+}
+
+function setMusicVolume(value) {
+  const clamped = Math.max(0, Math.min(1, value));
+  localStorage.setItem('phyx-music-volume', String(clamped));
+  if (introAudio) introAudio.volume = clamped * (MUSIC_DOMAIN_FILTERS[currentMusicDomain]?.gain ?? 0.72);
+  document.documentElement.style.setProperty('--music-volume', clamped.toFixed(3));
+  return clamped;
+}
+
+let musicCtrlBar = null;
+
+function appendMusicControlBar() {
+  const old = root.querySelector('.music-control-bar');
+  if (old) old.remove();
+
+  const bar = el('div', 'music-control-bar');
+  bar.dataset.musicActive = introMusicEnabled ? 'true' : 'false';
+
+  const trackName = el('span', 'music-ctrl-track-name');
+  trackName.innerHTML = introMusicEnabled
+    ? `<strong>♪</strong> ${currentMusicTrack?.title ?? 'No Track'}`
+    : `<strong>♪</strong> Paused`;
+  bar.appendChild(trackName);
+
+  const toggleBtn = el('button', `music-ctrl-btn${introMusicEnabled ? '' : ' muted'}`);
+  toggleBtn.type = 'button';
+  toggleBtn.textContent = introMusicEnabled ? '❚❚' : '▶';
+  toggleBtn.title = introMusicEnabled ? 'Pause music' : 'Play music';
+  toggleBtn.onclick = () => {
+    toggleIntroMusic();
+    render();
+  };
+  bar.appendChild(toggleBtn);
+
+  const vol = el('span', 'music-ctrl-volume-icon');
+  const volVal = getMusicVolume();
+  vol.textContent = volVal === 0 ? '🔇' : volVal < 0.4 ? '🔉' : '🔊';
+  bar.appendChild(vol);
+
+  const slider = document.createElement('input');
+  slider.type = 'range';
+  slider.className = 'music-ctrl-slider';
+  slider.min = 0;
+  slider.max = 1;
+  slider.step = 0.05;
+  slider.value = volVal;
+  slider.oninput = () => {
+    const v = parseFloat(slider.value);
+    setMusicVolume(v);
+    vol.textContent = v === 0 ? '🔇' : v < 0.4 ? '🔉' : '🔊';
+  };
+  bar.appendChild(slider);
+
+  root.appendChild(bar);
+  musicCtrlBar = bar;
+}
+
+// Apply stored volume on init
+const _initVolume = getMusicVolume();
+setMusicVolume(_initVolume);
 
 function startTitleVisualizer(scope = document) {
   const canvases = [

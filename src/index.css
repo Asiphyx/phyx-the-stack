@@ -87,6 +87,7 @@
   --music-mid: 0;
   --music-high: 0;
   --music-intensity: 0.72;
+  --music-volume: 0.75;
   --choice-pulse: 0;
   --choice-x: 50vw;
   --choice-y: 50vh;
@@ -4002,6 +4003,261 @@ body::after {
   60% { transform: translate(4px, -4px); }
   70% { transform: translate(-2px, 2px); }
   80% { transform: translate(2px, -2px); }
+}
+
+/* ══════════════════════════════════════════════
+   MUSIC CONTROL BAR — persistent in-game audio controls
+   ══════════════════════════════════════════════ */
+
+.music-control-bar {
+  position: fixed;
+  bottom: 12px;
+  right: 12px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgba(6, 6, 12, 0.88);
+  border: 1px solid rgba(0, 229, 255, 0.15);
+  border-radius: 6px;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  backdrop-filter: blur(6px);
+  cursor: default;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  user-select: none;
+  box-shadow: 0 0 12px rgba(0,0,0,0.6);
+}
+
+.music-control-bar:hover {
+  border-color: rgba(0, 229, 255, 0.3);
+}
+
+.music-control-bar[data-music-active="false"] {
+  opacity: 0.5;
+}
+
+.music-ctrl-track-name {
+  color: var(--text-secondary);
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.65rem;
+}
+
+.music-ctrl-track-name strong {
+  color: var(--neon-cyan);
+  font-weight: normal;
+}
+
+.music-ctrl-btn {
+  background: none;
+  border: 1px solid rgba(255,255,255,0.1);
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  padding: 3px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  line-height: 1;
+  transition: all 0.2s ease;
+}
+
+.music-ctrl-btn:hover {
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(0, 229, 255, 0.3);
+}
+
+.music-ctrl-btn.muted {
+  color: var(--text-muted);
+}
+
+.music-ctrl-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 48px;
+  height: 3px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.music-ctrl-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--neon-cyan);
+  cursor: pointer;
+  box-shadow: 0 0 4px var(--neon-cyan-glow);
+}
+
+.music-ctrl-slider::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--neon-cyan);
+  border: none;
+  cursor: pointer;
+}
+
+.music-ctrl-slider::-moz-range-track {
+  height: 3px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 2px;
+}
+
+.music-ctrl-volume-icon {
+  color: var(--text-muted);
+  font-size: 0.65rem;
+  width: 14px;
+  text-align: center;
+}
+
+/* ══════════════════════════════════════════════
+   AUDIO-REACTIVE ELEMENTS — beat/bass/mid/high hooks
+   ══════════════════════════════════════════════ */
+
+/* Beat-pulsing glow on hero sprite platform */
+.hero-sprite-glow {
+  transition: opacity 0.1s ease, transform 0.1s ease;
+  opacity: calc(0.35 + var(--music-beat, 0) * 0.5) !important;
+  transform: scale(calc(0.9 + var(--music-beat, 0) * 0.2));
+}
+
+/* Battlefield divider pulses with music intensity */
+.battlefield-divider {
+  box-shadow: 0 0 calc(6px + var(--music-beat, 0) * 20px) rgba(0, 229, 255, calc(0.08 + var(--music-bass, 0) * 0.25)) !important;
+  background: linear-gradient(180deg,
+    transparent 0%,
+    rgba(0, 229, 255, calc(0.08 + var(--music-bass, 0) * 0.3)) 25%,
+    rgba(255, 51, 153, calc(0.08 + var(--music-mid, 0) * 0.2)) 50%,
+    rgba(0, 229, 255, calc(0.08 + var(--music-bass, 0) * 0.3)) 75%,
+    transparent 100%
+  ) !important;
+}
+
+/* Combat screen background gets a subtle bass-pulse overlay */
+.combat-screen::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(ellipse at 50% 60%,
+    rgba(255, 51, 153, calc(var(--music-beat, 0) * 0.03)) 0%,
+    rgba(0, 229, 255, calc(var(--music-bass, 0) * 0.02)) 40%,
+    transparent 70%
+  );
+  transition: background 0.08s ease;
+}
+
+/* Enemy slot borders pulse on beat */
+.enemy-slot {
+  transition: box-shadow 0.1s ease;
+  box-shadow: 0 0 calc(2px + var(--music-beat, 0) * 10px) rgba(255, 51, 153, calc(var(--music-mid, 0) * 0.12));
+}
+
+/* Top stats bar gets a subtle background pulse */
+.combat-top-bar {
+  transition: border-bottom-color 0.15s ease;
+  border-bottom-color: rgba(0, 229, 255, calc(0.04 + var(--music-bass, 0) * 0.12)) !important;
+}
+
+/* Map node current glow pulses with beat */
+.map-screen .map-node.current {
+  transition: box-shadow 0.1s ease, border-color 0.1s ease;
+  box-shadow: 0 0 calc(4px + var(--music-beat, 0) * 16px) rgba(0, 229, 255, calc(0.15 + var(--music-beat, 0) * 0.3));
+  border-color: rgba(0, 229, 255, calc(0.3 + var(--music-beat, 0) * 0.5));
+}
+
+/* Draft terminal buttons pulse with beat */
+.terminal-opt-btn {
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+  box-shadow: 0 0 calc(2px + var(--music-beat, 0) * 8px) rgba(255, 51, 153, calc(var(--music-mid, 0) * 0.08));
+}
+
+/* Draft title glitch text get extra flicker on beat */
+.draft-screen .glitch-text {
+  animation: glitchBeat calc(0.4s - var(--music-beat, 0) * 0.2s) infinite alternate;
+}
+
+@keyframes glitchBeat {
+  0% { transform: translate(0); }
+  30% { transform: translate(calc(var(--music-beat, 0) * 2px), calc(var(--music-beat, 0) * -1px)); }
+  60% { transform: translate(calc(var(--music-beat, 0) * -1px), 0); }
+  100% { transform: translate(0); }
+}
+
+/* Arena headers pulse with music */
+.arena-cait, .arena-theme {
+  transition: box-shadow 0.12s ease, border-color 0.12s ease;
+  box-shadow: 0 0 calc(10px + var(--music-beat, 0) * 16px) rgba(0,0,0,0.8),
+              0 0 calc(8px + var(--music-beat, 0) * 18px) color-mix(in srgb, var(--hero-color) calc(20% + var(--music-bass, 0) * 30%), transparent);
+  border-color: color-mix(in srgb, var(--hero-color) calc(40% + var(--music-bass, 0) * 40%), transparent);
+}
+
+/* Screen background matrix logs flicker with mid frequencies */
+.battlefield-matrix-bg div {
+  transition: opacity 0.2s ease;
+}
+
+.battlefield-matrix-bg div:nth-child(odd) {
+  opacity: calc(0.4 + var(--music-mid, 0) * 0.4);
+}
+
+.battlefield-matrix-bg div:nth-child(even) {
+  opacity: calc(0.2 + var(--music-high, 0) * 0.5);
+}
+
+/* Cait codec window border pulses */
+.cait-codec-window {
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+  box-shadow: 0 0 calc(4px + var(--music-beat, 0) * 12px) rgba(255, 51, 153, calc(0.08 + var(--music-beat, 0) * 0.2));
+}
+
+/* Choice pulse reactive ring (existing var now used) */
+.choice-reacting .combat-battlefield::before {
+  content: '';
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  left: calc(var(--choice-x, 50vw) - 60px);
+  top: calc(var(--choice-y, 50vh) - 60px);
+  background: radial-gradient(circle, rgba(255, 255, 255, calc(var(--choice-pulse, 0) * 0.2)), transparent 70%);
+  pointer-events: none;
+  z-index: 10;
+  animation: choiceRingFade 0.3s ease-out;
+}
+
+@keyframes choiceRingFade {
+  from { transform: scale(0.5); opacity: 1; }
+  to { transform: scale(2); opacity: 0; }
+}
+
+/* Music reactive footer for all screens — subtle bottom glow */
+#screen-container::after {
+  content: '';
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: calc(2px + var(--music-beat, 0) * 6px);
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(255, 51, 153, calc(var(--music-mid, 0) * 0.25)) 25%,
+    rgba(0, 229, 255, calc(var(--music-bass, 0) * 0.25)) 50%,
+    rgba(255, 51, 153, calc(var(--music-mid, 0) * 0.25)) 75%,
+    transparent 100%
+  );
+  pointer-events: none;
+  z-index: 999;
+  transition: height 0.1s ease, background 0.15s ease;
 }
 
 /* ══════════════════════════════════════════════
