@@ -674,59 +674,51 @@ body::after {
   box-shadow: 0 0 calc(12px + var(--title-beat) * 16px) rgba(255, 51, 153, 0.44);
 }
 
+/* Anchored to the cat's nose in cait-labs-title.png (stretched 100%/100%,
+   so percentages track the artwork at any window size). */
 .title-cat-launcher {
   position: absolute;
-  left: clamp(32px, 7.2vw, 118px);
-  bottom: clamp(116px, 14vh, 154px);
+  left: 47.8%;
+  top: 53.8%;
   z-index: 8;
-  width: min(370px, calc(100vw - 48px));
-  height: 62px;
+  width: 0;
+  height: 0;
 }
 
 .title-cat-button {
   position: absolute;
   left: 0;
-  bottom: 0;
-  transform: none;
-  width: 56px;
-  height: 52px;
-  border: 2px solid rgba(255, 51, 153, 0.78);
+  top: 0;
+  transform: translate(-50%, -50%);
+  width: clamp(40px, 4.6vw, 62px);
+  height: clamp(32px, 3.8vw, 50px);
+  border: none;
   border-radius: 0;
-  background:
-    radial-gradient(circle at 50% 40%, rgba(255, 51, 153, calc(0.12 + var(--title-beat) * 0.1)), transparent 62%),
-    rgba(0, 0, 0, 0.06);
-  color: rgba(255, 51, 153, 0.9);
+  background: radial-gradient(ellipse at 50% 36%, rgba(255, 51, 153, calc(0.3 + var(--title-beat) * 0.26)), rgba(255, 51, 153, 0.08) 58%, transparent 76%);
+  color: transparent;
   font-size: 1.4rem;
   line-height: 1;
   cursor: pointer;
-  clip-path: polygon(50% 8%, 74% 0, 100% 22%, 94% 48%, 50% 100%, 6% 48%, 0 22%, 26% 0);
-  box-shadow:
-    0 0 calc(14px + var(--title-beat) * 22px) rgba(255, 51, 153, 0.28),
-    inset 0 0 16px rgba(255, 51, 153, 0.1);
-  transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms var(--ease-out-expo);
+  clip-path: polygon(16% 4%, 84% 4%, 100% 26%, 96% 46%, 56% 96%, 44% 96%, 4% 46%, 0 26%);
+  box-shadow: 0 0 calc(10px + var(--title-beat) * 20px) rgba(255, 51, 153, 0.3);
+  transition: background 140ms ease, box-shadow 140ms ease, transform 140ms var(--ease-out-expo);
 }
 
 .title-cat-button:hover,
 .title-screen.launcher-open .title-cat-button {
-  border-color: rgba(255, 51, 153, 1);
-  background:
-    radial-gradient(circle at 50% 40%, rgba(255, 51, 153, 0.24), transparent 62%),
-    rgba(0, 0, 0, 0.12);
-  color: #ff80c0;
-  box-shadow:
-    0 0 calc(22px + var(--title-beat) * 28px) rgba(255, 51, 153, 0.42),
-    inset 0 0 22px rgba(255, 51, 153, 0.16);
-  transform: scale(1.08);
+  background: radial-gradient(ellipse at 50% 36%, rgba(255, 102, 178, calc(0.5 + var(--title-beat) * 0.2)), rgba(255, 51, 153, 0.16) 60%, transparent 78%);
+  box-shadow: 0 0 calc(20px + var(--title-beat) * 26px) rgba(255, 51, 153, 0.5);
+  transform: translate(-50%, -50%) scale(1.14);
 }
 
 .title-cat-button:active {
-  transform: scale(0.94);
+  transform: translate(-50%, -50%) scale(0.92);
 }
 
 .title-cat-menu {
   position: absolute;
   left: 0;
-  bottom: 72px;
+  top: clamp(36px, 5.4vh, 58px);
   width: min(370px, calc(100vw - 48px));
   min-height: 190px;
   display: grid;
@@ -742,15 +734,15 @@ body::after {
     inset 0 0 24px rgba(0, 0, 0, 0.72);
   backdrop-filter: blur(5px) saturate(1.16);
   clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
-  transform: translateY(18px) scale(0.96);
-  transform-origin: bottom left;
+  transform: translate(-50%, -14px) scale(0.96);
+  transform-origin: top center;
   opacity: 0;
   pointer-events: none;
   transition: transform 180ms var(--ease-out-expo), opacity 160ms ease;
 }
 
 .title-screen.launcher-open .title-cat-menu {
-  transform: translateY(0) scale(1);
+  transform: translate(-50%, 0) scale(1);
   opacity: 1;
   pointer-events: auto;
 }
@@ -5434,14 +5426,9 @@ body::after {
     justify-content: center;
   }
 
-  .title-cat-launcher {
-    left: 18px;
-    bottom: 92px;
-    width: calc(100vw - 36px);
-  }
-
   .title-cat-menu {
-    width: 100%;
+    width: calc(100vw - 28px);
+    max-width: 370px;
   }
 
   .title-lab-rail {

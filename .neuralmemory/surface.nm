@@ -5,9 +5,9 @@
 # ═══════════════════════════════════════════════════
 ---
 brain: default
-updated: 2026-06-11T08:50:58
-neurons: 2638
-synapses: 21426
+updated: 2026-06-11T18:47:27
+neurons: 2927
+synapses: 22668
 token_budget: 1200
 depth_available: [surface, detail, deep]
 ---
@@ -17,75 +17,64 @@ depth_available: [surface, detail, deep]
 # Agent: scan this section to understand the knowledge landscape.
 # Format: [id] content (type) {p:N} →edge→ [target_id_or_text]
 
-[c25] Insight: the oracle passes integration, fallback, and replay gates (concept) {p:6}
-  →stored_by→ "Insight: the oracle passes integration, fallback, and…"
-  →co_occurs→ "Error: agent  [src=mcp_tool \u00b7 2026-06-09 \u00b7 conf=0"
-
-[c26] Error: agent  [src=mcp_tool \u00b7 2026-06-09 \u00b7 conf=0 (concept) {p:6}
-  →alias→ [c20] "Error: uploaded  [src=mcp_tool \u00b7 2026-06-09 \u00b7…"
-  →alias→ [c20] "Error: uploaded  [src=mcp_tool \u00b7 2026-06-09 \u00b7…"
-  →alias→ [c20] "Error: uploaded  [src=mcp_tool \u00b7 2026-06-09 \u00b7…"
-  →alias→ [c20] "Error: uploaded  [src=mcp_tool \u00b7 2026-06-09 \u00b7…"
-  →alias→ [c20] "Error: uploaded  [src=mcp_tool \u00b7 2026-06-09 \u00b7…"
-
-[c27] Insight: i have built it into the solid oracle i want (concept) {p:6}
-  →stored_by→ "Insight: i have built it into the solid oracle i want"
-  →co_occurs→ "Error: in the uploaded file is excellent: the belief…"
-  →co_occurs→ "Error: `experimental-branch"
-
-[c28] Insight: you decide it is solid enough to offer cait anything native (concept) {p:6}
-  →stored_by→ "Insight: you decide it is solid enough to offer cait…"
+[c27] Insight: the oracle is solid enough to offer cait anything native (concept) {p:6}
+  →stored_by→ "Insight: the oracle is solid enough to offer cait anything…"
   →co_occurs→ "Insight: i have built it into the solid oracle i want"
-  →co_occurs→ "Insight: the oracle is solid enough to offer cait anything…"
+  →co_occurs→ "Insight: promoted  [src=mcp_tool \u00b7 2026-06-09 \u00b7…"
+  →co_occurs→ "Error: in the uploaded file is excellent: the belief…"
+
+[c28] Error: uploaded  [src=mcp_tool \u00b7 2026-06-09 \u00b7 conf=0 (concept) {p:6}
+  →alias→ [c20] "Error: uploaded  [src=mcp_tool \u00b7 2026-06-09 \u00b7…"
+  →alias→ [c20] "Error: uploaded  [src=mcp_tool \u00b7 2026-06-09 \u00b7…"
+  →alias→ [c20] "Error: uploaded  [src=mcp_tool \u00b7 2026-06-09 \u00b7…"
+  →alias→ [c20] "Error: uploaded  [src=mcp_tool \u00b7 2026-06-09 \u00b7…"
+  →alias→ [c20] "Error: uploaded  [src=mcp_tool \u00b7 2026-06-09 \u00b7…"
 
 [c1] decision keep (concept) {p:7}
 
 [c2] Error: for reusable failures, and type=prefer\\\\n\\\\n## related… (concept) {p:7}
   →stored_by→ "Error: for reusable failures, and type=prefer\\\\n\\\\n##…"
-  →related_to→ "prior"
-  →related_to→ "prior"
-  →related_to→ "HEARTBEAT"
-  →related_to→ "HEARTBEAT"
+  →co_occurs→ "Error: reporting  [src=mcp_tool \u00b7 2026-06-09 \u00b7…"
+  →co_occurs→ "Decision: keep cait's voice, but make tool truth…"
+  →co_occurs→ "Error: \u2014 just reporting granularity \u2014 but worth…"
 
 [e1] Error = (404): security notice: the following content is from an external,… (entity) {p:8}
-  →co_occurs→ "error = (404): security notice: the following content is…"
 
 # ── CLUSTERS ───────────────────────────────────────
 # Auto-detected topic groups from brain.db entity co-occurrence.
 # Agent: use clusters to scope recall queries.
 
 @decision: [00ff6eeb-c091-4389-9c81-878c31b3fcea, 0356c515-c568-4823-817b-de2a9febe6b9] "Decision: keep cait's voice, but make to, decision keep"
-@error: [001bdf9c-b56b-40b0-a310-0b33b2bc5a45, 01117286-613b-4280-89b6-8ee09344935f, 01162bf5-e501-4e29-96ae-c9ce2d69ff3c, 046c2532-92f5-4309-bb77-e5e75a8b6d52, 057f30a4-d6c5-467f-8e55-728bda596ae0] "Error: (404): security notice: the follo, Error: = (404): security notice: the fol, Error: uploaded  [src=mcp_tool \u00b7 20"
+@error: [001bdf9c-b56b-40b0-a310-0b33b2bc5a45, 01117286-613b-4280-89b6-8ee09344935f, 01162bf5-e501-4e29-96ae-c9ce2d69ff3c, 046c2532-92f5-4309-bb77-e5e75a8b6d52, 057f30a4-d6c5-467f-8e55-728bda596ae0] "Error: (404): security notice: the follo, Error: reusable  [src=mcp_tool \u00b7 20, Error: uploaded  [src=mcp_tool \u00b7 20"
 
 # ── SIGNALS ────────────────────────────────────────
 # Active alerts, unresolved items, pending decisions.
 # Agent: check this FIRST each session for urgent context.
 
-! Session activity: - IDENTITY CANDIDATE: [one-line description] ## Output format
-! [agent:openclaw-neuralmemory, error, error security, mcp_tool, notice following]
-! [agent:openclaw-neuralmemory, error, error fix, fix, less confusion]
 ! [agent:openclaw-neuralmemory, error reporting, granularity worth, mcp_tool, reporting granularity]
-! [agent:openclaw-neuralmemory, error reporting, granularity worth, mcp_tool, reporting granularity]
-! [agent:openclaw-neuralmemory, error, error fix, fix, less confusion]
-! [agent:openclaw-neuralmemory, error, error security, mcp_tool, notice following]
-! [agent:openclaw-neuralmemory, error, error fix, fix, less confusion]
-! [agent:openclaw-neuralmemory, error, error security, mcp_tool, notice following]
 ! [agent:openclaw-neuralmemory, decision, decision keep, keep, keep src]
+! [agent:openclaw-neuralmemory, confusion seed, error, error fix, less confusion]
+! [agent:openclaw-neuralmemory, error reporting, granularity worth, mcp_tool, reporting granularity]
+! [agent:openclaw-neuralmemory, error, error security, mcp_tool, notice following]
+! [agent:openclaw-neuralmemory, confusion seed, error, error fix, less confusion]
+! [agent:openclaw-neuralmemory, decision, decision keep, keep, keep src]
+! [agent:openclaw-neuralmemory, error, error fix, fix, less confusion]
+! [agent:openclaw-neuralmemory, confusion seed, error, error fix, less confusion]
+! [agent:openclaw-neuralmemory, error reporting, granularity worth, mcp_tool, reporting granularity]
 
 # ── DEPTH MAP ──────────────────────────────────────
 # When surface isn't enough, this tells agent WHERE to dig.
 # Format: [id] → depth_hint (context)
 
+[e1] → NEEDS_DEEP (1 synapses in brain.db, recall "Error = (404): security notice: the…")
 [c2] → NEEDS_DEEP (17 synapses in brain.db, recall "Error: for reusable failures, and…")
-[c25] → NEEDS_DEEP (10 synapses in brain.db, recall "Insight: the oracle passes…")
-[c26] → NEEDS_DEEP (24 synapses in brain.db, recall "Error: agent  [src=mcp_tool \u00b7…")
-[c27] → NEEDS_DEEP (10 synapses in brain.db, recall "Insight: i have built it into the…")
-[c28] → NEEDS_DEEP (10 synapses in brain.db, recall "Insight: you decide it is solid enough…")
+[c27] → NEEDS_DETAIL (10 total synapses, recall "Insight: the oracle is solid enough to…")
+[c28] → NEEDS_DEEP (24 synapses in brain.db, recall "Error: uploaded  [src=mcp_tool \u00b7…")
 
 # ── META ───────────────────────────────────────────
 # Stats for agent to gauge brain richness
 
 coverage: 0.01
-staleness: 0.01
-last_consolidation: 2026-06-11T08:50:58
+staleness: 0.02
+last_consolidation: 2026-06-11T18:47:27
 top_entities: [Error:, MogulMatrix, Error:, Error:, Error:]
