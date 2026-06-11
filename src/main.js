@@ -1,4 +1,5 @@
 import './index.css';
+import { injectSpeedInsights } from '@vercel/speed-insights';
 import { GameState } from './engine/GameState.js';
 import { HEROES } from './data/heroes.js';
 import { getHeroTheme } from './data/heroThemes.js';
@@ -7,6 +8,9 @@ import { ENEMIES, ENCOUNTERS } from './data/enemies.js';
 import { CARDS } from './data/cards.js';
 import { SOUNDTRACK_TRACKS, tracksForDomain } from './data/soundtrack.js';
 import bus from './engine/EventBus.js';
+
+// Initialize Vercel Speed Insights
+injectSpeedInsights();
 
 const cardPool = Object.values(CARDS).filter(c => c.rarity !== 'starter');
 const game = new GameState();
