@@ -403,6 +403,7 @@ body::after {
   content: '';
   position: absolute;
   inset: 2.2%;
+  display: none;
   border: 1px solid rgba(255, 51, 153, calc(0.14 + var(--title-beat) * 0.08));
   background:
     repeating-linear-gradient(90deg, rgba(255,255,255,0.014) 0 1px, transparent 1px 72px),
@@ -426,12 +427,13 @@ body::after {
     radial-gradient(circle at 50% 44%, rgba(255, 51, 153, calc(0.06 + var(--title-beat) * 0.06)), transparent 28%),
     repeating-linear-gradient(0deg, rgba(255, 51, 153, 0.04) 0 1px, transparent 1px 5px);
   mix-blend-mode: screen;
-  opacity: calc(0.58 + var(--title-beat) * 0.18);
+  opacity: calc(0.18 + var(--title-beat) * 0.08);
 }
 
 .title-cait-lab-backdrop {
   position: absolute;
   inset: clamp(8px, 1.25vw, 18px);
+  display: none;
   z-index: 1;
   pointer-events: none;
   overflow: hidden;
@@ -603,21 +605,27 @@ body::after {
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  opacity: 0.24;
+  opacity: 0.17;
   filter:
     blur(0.1px)
     drop-shadow(0 0 calc(22px + var(--title-beat) * 28px) rgba(255, 51, 153, 0.24));
   pointer-events: none;
   z-index: 2;
+  mix-blend-mode: screen;
+}
+
+.title-spectrum-back {
+  z-index: 2;
 }
 
 .title-spectrum-front {
-  opacity: 0.22;
+  opacity: 0.14;
   z-index: 3;
   filter:
     blur(0.05px)
     drop-shadow(0 0 calc(16px + var(--title-beat) * 26px) rgba(255, 111, 31, 0.25))
     drop-shadow(0 0 calc(10px + var(--title-beat) * 20px) rgba(255, 51, 153, 0.24));
+  mix-blend-mode: screen;
 }
 
 .title-top-wordmark {
@@ -668,18 +676,18 @@ body::after {
 
 .title-cat-launcher {
   position: absolute;
-  left: 50%;
-  top: 42%;
-  z-index: 6;
-  width: 0;
-  height: 0;
+  left: clamp(32px, 7.2vw, 118px);
+  bottom: clamp(116px, 14vh, 154px);
+  z-index: 8;
+  width: min(370px, calc(100vw - 48px));
+  height: 62px;
 }
 
 .title-cat-button {
   position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
+  left: 0;
+  bottom: 0;
+  transform: none;
   width: 56px;
   height: 52px;
   border: 2px solid rgba(255, 51, 153, 0.78);
@@ -708,18 +716,18 @@ body::after {
   box-shadow:
     0 0 calc(22px + var(--title-beat) * 28px) rgba(255, 51, 153, 0.42),
     inset 0 0 22px rgba(255, 51, 153, 0.16);
-  transform: translate(-50%, -50%) scale(1.08);
+  transform: scale(1.08);
 }
 
 .title-cat-button:active {
-  transform: translate(-50%, -50%) scale(0.94);
+  transform: scale(0.94);
 }
 
 .title-cat-menu {
   position: absolute;
-  left: 50%;
-  bottom: calc(100% - 4px);
-  width: min(360px, calc(100vw - 48px));
+  left: 0;
+  bottom: 72px;
+  width: min(370px, calc(100vw - 48px));
   min-height: 190px;
   display: grid;
   justify-items: center;
@@ -734,15 +742,15 @@ body::after {
     inset 0 0 24px rgba(0, 0, 0, 0.72);
   backdrop-filter: blur(5px) saturate(1.16);
   clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
-  transform: translate(-50%, 22px) scaleY(0.82);
-  transform-origin: bottom center;
+  transform: translateY(18px) scale(0.96);
+  transform-origin: bottom left;
   opacity: 0;
   pointer-events: none;
   transition: transform 180ms var(--ease-out-expo), opacity 160ms ease;
 }
 
 .title-screen.launcher-open .title-cat-menu {
-  transform: translate(-50%, 0) scaleY(1);
+  transform: translateY(0) scale(1);
   opacity: 1;
   pointer-events: auto;
 }
@@ -1097,7 +1105,7 @@ body::after {
     linear-gradient(180deg, rgba(3, 0, 7, 0.38), rgba(3, 0, 7, 0.72)),
     radial-gradient(ellipse 60% 42% at 50% 42%, var(--selected-hero-glow, rgba(153, 51, 255, 0.22)) 0%, transparent 70%),
     radial-gradient(ellipse 100% 50% at 50% 100%, color-mix(in srgb, var(--selected-hero-color, #9933ff) 12%, transparent) 0%, transparent 70%),
-    url('/assets/backgrounds/hero-select-background.png') center / cover no-repeat,
+    url('/assets/backgrounds/hero-select-background-clean.png') center / cover no-repeat,
     var(--bg-void);
   overflow-y: auto;
 }
@@ -1388,10 +1396,26 @@ body::after {
 
 .cait-module-chip {
   display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
   gap: 4px;
+  align-items: center;
   padding: 8px 10px;
   border: 1px solid color-mix(in srgb, var(--selected-hero-accent-2, #00e5ff) 36%, transparent);
   background: rgba(0,0,0,0.36);
+}
+
+.cait-module-icon {
+  grid-row: 1 / span 2;
+  width: 34px;
+  aspect-ratio: 1;
+  display: block;
+  background-image: url('/assets/modules/cait-audio-modules-sheet.png');
+  background-repeat: no-repeat;
+  background-size: 500% 100%;
+  background-position: calc(var(--module-index, 0) * 25%) center;
+  filter:
+    drop-shadow(0 0 8px rgba(255, 51, 153, 0.36))
+    drop-shadow(0 0 5px rgba(0, 229, 255, 0.24));
 }
 
 .cait-module-chip b {
@@ -1565,13 +1589,13 @@ body::after {
     0 0,
     50% 42%,
     50% 100%,
-    93% 50%,
+    50% 50%,
     0 0;
   background-size:
     auto,
     auto,
     auto,
-    auto 124%,
+    cover,
     auto;
 }
 
@@ -1613,7 +1637,7 @@ body::after {
 }
 
 .hero-feature-copy {
-  justify-content: center;
+  justify-content: stretch;
 }
 
 .hero-feature-name {
@@ -1737,7 +1761,12 @@ body::after {
 
 .cait-module-chip {
   gap: 2px;
+  grid-template-columns: 30px minmax(0, 1fr);
   padding: 5px 7px;
+}
+
+.cait-module-icon {
+  width: 28px;
 }
 
 .cait-module-chip b {
@@ -1754,10 +1783,11 @@ body::after {
 }
 
 .hero-feature-start {
-  min-height: 42px;
+  min-height: 52px;
   width: 100%;
   justify-content: center;
-  margin-top: 8px;
+  margin-top: auto;
+  font-size: 0.76rem;
 }
 
 .hero-grid {
@@ -2652,13 +2682,20 @@ body::after {
 .console-cait-module-readout span {
   min-width: 0;
   display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
   gap: 2px;
+  align-items: center;
   padding: 5px 6px;
   border: 1px solid rgba(255, 51, 153, 0.26);
   background: rgba(255, 51, 153, 0.06);
   color: var(--text-secondary);
   font-size: 0.52rem;
   line-height: 1.2;
+}
+
+.console-cait-module-readout .cait-module-icon {
+  grid-row: 1 / span 2;
+  width: 22px;
 }
 
 .console-cait-module-readout b {
@@ -4078,6 +4115,11 @@ body::after {
   color: var(--text-muted);
 }
 
+.music-ctrl-skip {
+  font-size: 0.65rem;
+  padding: 3px 6px;
+}
+
 .music-ctrl-slider {
   -webkit-appearance: none;
   appearance: none;
@@ -5390,6 +5432,16 @@ body::after {
   .title-screen {
     padding: 14px;
     justify-content: center;
+  }
+
+  .title-cat-launcher {
+    left: 18px;
+    bottom: 92px;
+    width: calc(100vw - 36px);
+  }
+
+  .title-cat-menu {
+    width: 100%;
   }
 
   .title-lab-rail {

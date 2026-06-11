@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CaitOS Asset Forge — Prompt Bricks</title>
+<style>
+  :root { --pink:#ff3d9a; --cyan:#00e5ff; --gold:#f5c542; --bg:#0a0a0f; --panel:#13131c; --text:#e8e8f0; --muted:#8a8aa0; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.55 'JetBrains Mono', ui-monospace, monospace; padding:2rem 1rem 6rem; }
+  .wrap { max-width:960px; margin:0 auto; }
+  h1 { color:var(--pink); letter-spacing:.04em; margin:0; font-size:1.6rem; }
+  h1 small { color:var(--muted); display:block; font-size:.8rem; font-weight:400; }
+  h2 { color:var(--cyan); border-bottom:1px solid #222; padding-bottom:.3rem; margin-top:3rem; font-size:1.1rem; letter-spacing:.08em; }
+  .toplinks { margin:1rem 0 0; }
+  .toplinks a { color:var(--gold); }
+  .brick { background:var(--panel); border:1px solid #232334; border-left:3px solid var(--pink); border-radius:6px; margin:1.2rem 0; padding:1rem 1.2rem; }
+  .brick h3 { margin:.1rem 0 .2rem; color:var(--text); font-size:1rem; }
+  .meta { color:var(--muted); font-size:.78rem; margin-bottom:.6rem; }
+  .meta b { color:var(--gold); font-weight:600; }
+  pre { background:#0d0d14; border:1px solid #1d1d2c; border-radius:4px; padding:.8rem .9rem; white-space:pre-wrap; word-break:break-word; font-size:.82rem; color:#cfd3e8; margin:0; }
+  .copy { float:right; background:none; border:1px solid var(--cyan); color:var(--cyan); border-radius:4px; padding:.25rem .8rem; font:inherit; font-size:.75rem; cursor:pointer; }
+  .copy:hover { background:rgba(0,229,255,.12); }
+  .copy.ok { border-color:var(--gold); color:var(--gold); }
+  .note { color:var(--muted); font-size:.8rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>CAITOS ASSET FORGE <small>Phyx the Stack · copy a brick, paste into your image-gen tool, save to the target path</small></h1>
+  <p class="toplinks">📋 Fulfillment tracker: <a href="checklist.html">checklist.html</a> — mark assets done there as they land.</p>
+  <p class="note">Every brick below already includes the style core and character identity locks. Generated output is <em>concept reference</em> — final sprites still get redrawn at target resolution on a clean grid (see docs/character-direction.md). Paste prompts whole; trim only if your tool has a length cap.</p>
+
+  <h2>0 · STYLE CORE (prepend if a tool loses style between generations)</h2>
+  <div class="brick" data-id="style-core">
+    <button class="copy">copy</button>
+    <h3>Universal style prefix</h3>
+    <div class="meta">Use: prefix for any brick · not an asset itself</div>
+    <pre>Clean production pixel art, limited indexed palette (max 32 colors), bold readable silhouette, large clean pixel clusters, no painterly gradients, no anti-aliased mush, crisp 1px outlines where needed, transparent background, cyberpunk fake-OS aesthetic "CaitOS": hot pink (#ff3d9a), black, white panels, gold hardware accents, cyan glow accents. Character-first composition, no baked-in UI frames, no text, no watermark.</pre>
+  </div>
+
+  <h2>1 · CAIT — core production set</h2>
+  <div class="brick" data-id="cait-model-sheet">
+    <button class="copy">copy</button>
+    <h3>Cait clean model sheet (turnaround)</h3>
+    <div class="meta">Target: <b>comfy/refs/cait/cait-model-sheet.png</b> · 5 views on one row, shared baseline · canvas ~2560×1024</div>
+    <pre>Pixel-art character model sheet of CAIT, cute android idol "Peon Queen": pure black void face with glowing neon-pink eyes and smug mouth, long hot-pink twin-tail pigtails with orange tips, chunky headphones, oversized glowing pink heart core centered on chest, sleek black tech bodysuit with white side panels, black gloves with white cyber forearms, heavy black boots, exactly two gold buckle accents. FIVE VIEWS in one horizontal row: front, 3/4 front, side, 3/4 back, back. All views identical height, feet locked to one shared baseline, identical shoulder/hip/heart positions, pigtails attach at same skull points in every view. Neutral relaxed standing pose, arms at sides. Flat lighting, limited 32-color palette, transparent background, no crown, no fishnets, no chains, no text.</pre>
+  </div>
+
+  <div class="brick" data-id="cait-master-sprite">
+    <button class="copy">copy</button>
+    <h3>Cait master neutral sprite</h3>
+    <div class="meta">Target: <b>comfy/refs/cait/cait-master-96x128.png</b> · character ≈96×128 in a 128×160 cell, pivot bottom-center</div>
+    <pre>Single pixel-art game sprite of CAIT the android idol, 3/4 front view, relaxed confident idle pose. Identity locks: black void face, neon-pink glowing eyes and smug mouth, pink twin-tails with orange tips as the dominant silhouette mass, oversized glowing pink heart core on chest, headphones, black bodysuit with white side panels, black boots, two gold buckles. Character about 96 pixels wide by 128 tall centered in frame, feet on baseline, transparent background. Bold readable silhouette that still reads at 25% zoom: pink hair mass + black face + glowing expression + heart chest. Max 32 colors, clean pixel clusters, no stray single pixels, no gradients, no background, no text.</pre>
+  </div>
+
+  <div class="brick" data-id="cait-idle-strip">
+    <button class="copy">copy</button>
+    <h3>Cait idle animation strip (6 frames)</h3>
+    <div class="meta">Target: <b>comfy/refs/cait/cait-idle-front-strip.png</b> · 6 cells of 128×160, one row</div>
+    <pre>Pixel-art sprite animation strip, 6 frames in one horizontal row, of CAIT android idol (black void face, neon-pink eyes/mouth, pink twin-tails with orange tips, glowing chest heart core, headphones, black suit with white panels) in a SUBTLE idle loop, front view: frame0 base pose, frame1 chest rises 1px and heart glow begins, frame2 pigtails lag down 1px, frame3 heart at brightest, frame4 eye half-blink, frame5 return to base. Torso stays stable, only face/heart/hair move. Identical proportions and palette in every frame, feet locked to baseline, equal cell spacing, transparent background, max 32 colors, no text.</pre>
+  </div>
+
+  <div class="brick" data-id="cait-talk-strip">
+    <button class="copy">copy</button>
+    <h3>Cait talk strip (6 frames)</h3>
+    <div class="meta">Target: <b>comfy/refs/cait/cait-talk-front-strip.png</b> · 6 cells, mouth/eyes only change</div>
+    <pre>Pixel-art sprite animation strip, 6 frames in one row, of CAIT android idol talking, front view. Body completely static across all frames; ONLY the glowing neon-pink mouth and eyes change: frame0 mouth closed, frame1 small smile, frame2 open smile, frame3 wide yap mouth, frame4 tongue-out / heart-shaped mouth, frame5 back to closed smug. Black void face, pink twin-tails, glowing heart core, headphones, black suit with white panels. Identical palette and proportions every frame, transparent background, max 32 colors, no text.</pre>
+  </div>
+
+  <div class="brick" data-id="cait-heart-pulse">
+    <button class="copy">copy</button>
+    <h3>Heart-core pulse VFX overlay (4 frames)</h3>
+    <div class="meta">Target: <b>comfy/refs/cait/cait-heart-pulse-strip.png</b> · 4 cells, heart only, reusable overlay</div>
+    <pre>Pixel-art VFX animation strip, 4 frames in one row, of a glowing hot-pink heart core icon only (no character): frame0 normal heart, frame1 inner heart brightens toward white-pink, frame2 a 1px outer glow ring expands, frame3 returns to normal. Clean emissive pixel clusters, hot pink to white-pink ramp plus one cyan glint, transparent background, max 12 colors, each heart about 32×32 centered in equal cells, no text.</pre>
+  </div>
+
+  <div class="brick" data-id="cait-walk-side">
+    <button class="copy">copy</button>
+    <h3>Cait walk cycle, side view (6 frames)</h3>
+    <div class="meta">Target: <b>comfy/refs/cait/cait-walk-side-strip.png</b> · 6 cells: contact/down/passing/up/contact-opposite/settle</div>
+    <pre>Pixel-art sprite walk-cycle strip, 6 frames in one row, of CAIT android idol walking, SIDE view: contact, down, passing, up, opposite contact, settle. Twin pink pigtails swing opposite to hip motion with one frame of lag, orange tips overshoot 1px then settle. Black void face with neon-pink eye, glowing chest heart visible from side, black suit with white side panel, black boots (simplified flat soles, not high heels). Feet locked to a shared baseline, identical proportions and palette in every frame, transparent background, max 32 colors, no text.</pre>
+  </div>
+
+  <div class="brick" data-id="cait-emotes">
+    <button class="copy">copy</button>
+    <h3>Cait emote set (8 heads)</h3>
+    <div class="meta">Target: <b>comfy/refs/cait/cait-emotes.png</b> · 8 cells, head+shoulders only</div>
+    <pre>Pixel-art emote sheet, 8 equal cells in one row, head-and-shoulders of CAIT android idol (black void face, pink twin-tails, headphones). Each cell one expression rendered only with neon-pink glowing eyes/mouth on the black face: 1 normal smug, 2 happy arc-eyes, 3 heart-eyes, 4 angry glitch brows, 5 sad droop, 6 surprised wide, 7 smug half-lid wink, 8 OFFLINE error face (flat dim dashes, slight static glitch). Identical head proportions every cell, transparent background, max 24 colors, no text.</pre>
+  </div>
+
+  <div class="brick" data-id="cait-bust">
+    <button class="copy">copy</button>
+    <h3>Cait dialogue bust</h3>
+    <div class="meta">Target: <b>comfy/refs/cait/cait-bust-256.png</b> · 256×256, waist-up, richer detail allowed (≤64 colors)</div>
+    <pre>Pixel-art dialogue portrait bust, waist-up, of CAIT the Peon Queen android idol: black void face with expressive neon-pink glowing eyes and smug grin, lush pink twin-tails with orange gradient tips, chunky headphones with gold accents, oversized glowing pink heart core on chest, black tech bodysuit with white side panels, subtle fur collar allowed at this size. Confident digital-queen attitude, slight 3/4 head tilt. 256×256 canvas, up to 64 colors, controlled dithering allowed, transparent background, no UI frame, no text.</pre>
+  </div>
+
+  <div class="brick" data-id="cait-icon">
+    <button class="copy">copy</button>
+    <h3>Cait tiny UI icon</h3>
+    <div class="meta">Target: <b>comfy/refs/cait/cait-icon-48.png</b> · 48×48 avatar chip</div>
+    <pre>Tiny 48×48 pixel-art game UI avatar icon of CAIT: black void face with two neon-pink eye dots and tiny smug mouth, pink twin-tail side masses, small pink heart at bottom center. Maximum readability at small size, max 12 colors, chunky pixels, transparent background, no outline noise, no text.</pre>
+  </div>
+
+  <div class="brick" data-id="cait-poses">
+    <button class="copy">copy</button>
+    <h3>Cait signature pose sheet (4 poses)</h3>
+    <div class="meta">Target: <b>comfy/refs/cait/cait-signature-poses.png</b> · selfie / headphones / queen smug / glitch-offline</div>
+    <pre>Pixel-art pose sheet, 4 equal cells in one row, full-body CAIT android idol (black void face, neon-pink expression, pink twin-tails with orange tips, glowing heart core, headphones, black suit with white panels): cell1 selfie pose holding a pink phone up, winking heart-eye; cell2 both hands pressed to headphones, blissful listening, eyes as happy arcs; cell3 queen smug idle, hand on hip, chin up; cell4 glitch/offline state, slight pixel-displacement static, dim dashed eyes, heart core flickering gray-pink. Same proportions and palette every cell, feet on shared baseline, transparent background, max 32 colors, no text.</pre>
+  </div>
+
+  <h2>2 · BINDAX — companion module</h2>
+  <div class="brick" data-id="bindax-sprite">
+    <button class="copy">copy</button>
+    <h3>Bindax simplified sprite</h3>
+    <div class="meta">Target: <b>comfy/refs/bindax/bindax-master-64x96.png</b> · character ≈64×96, round bouncy shapes</div>
+    <pre>Single pixel-art game sprite of BINDAX, cheerful cyber-clown helper companion, 3/4 front view, bouncy friendly pose flashing a peace sign. Simplified identity locks ONLY: soft clown hat, round blue nose, star-shaped eyes, one chunky rainbow hair block (not individual strands), pale robotic face, small cat-icon collar tag, pastel circus-tech outfit in cyan/pastel rainbow with white. Round circular shape language, softer than Cait. Character about 64×96 centered in frame, feet on baseline, transparent background, max 28 colors, clean clusters, no ruffle micro-detail, no earrings, no text.</pre>
+  </div>
+  <div class="brick" data-id="bindax-bust">
+    <button class="copy">copy</button>
+    <h3>Bindax dialogue bust</h3>
+    <div class="meta">Target: <b>comfy/refs/bindax/bindax-bust-256.png</b> · 256×256</div>
+    <pre>Pixel-art dialogue portrait bust, waist-up, of BINDAX the cyber-clown helper: pale robotic face, big star-shaped sparkling eyes, round blue clown nose, floppy clown hat, chunky rainbow hair, soft ruffle collar with a small cat-icon tag, one robotic hand raised in a peace sign. Friendly tutorial-mascot energy, pastel rainbow + cyan palette with white, 256×256, up to 64 colors, transparent background, no UI frame, no text.</pre>
+  </div>
+  <div class="brick" data-id="bindax-emotes">
+    <button class="copy">copy</button>
+    <h3>Bindax emote set (6 heads)</h3>
+    <div class="meta">Target: <b>comfy/refs/bindax/bindax-emotes.png</b> · 6 cells</div>
+    <pre>Pixel-art emote sheet, 6 equal cells in one row, head-and-shoulders of BINDAX cyber-clown (clown hat, blue nose, star eyes, rainbow hair block): 1 happy sparkle, 2 star-eye blink mid-frame, 3 excited double-star, 4 worried wobble, 5 mischievous grin, 6 hat-bob surprise. Identical proportions every cell, pastel palette max 24 colors, transparent background, no text.</pre>
+  </div>
+
+  <h2>3 · XADNIB — oracle boss</h2>
+  <div class="brick" data-id="xadnib-sprite">
+    <button class="copy">copy</button>
+    <h3>Xadnib boss sprite</h3>
+    <div class="meta">Target: <b>comfy/refs/xadnib/xadnib-boss-128x160.png</b> · larger canvas than Cait, imposing and still</div>
+    <pre>Single pixel-art boss sprite of XADNIB, imposing divination oracle warrior, front view, arms crossed, ceremonial stillness. Simplified identity locks ONLY: broad shoulder silhouette with large simplified shoulder plates, crescent-and-spike headdress crown shape, deep blue and gold palette with cyan glow accents, one glowing star pendant on chest, confident stern face with simple glowing facial markings, exactly two readable astrology glyphs total (one crescent, one star). Character about 128×160, heavy grounded stance, feet on baseline, transparent background, max 32 colors, large clean clusters, no zodiac micro-symbols, no ornate filigree, no text.</pre>
+  </div>
+  <div class="brick" data-id="xadnib-bust">
+    <button class="copy">copy</button>
+    <h3>Xadnib dialogue bust</h3>
+    <div class="meta">Target: <b>comfy/refs/xadnib/xadnib-bust-256.png</b> · 256×256 (384×384 also acceptable)</div>
+    <pre>Pixel-art dialogue portrait bust, chest-up, of XADNIB the divination oracle: stern noble face with glowing cyan facial markings, crescent-and-spike golden headdress, broad armored shoulders with gold trim, glowing star pendant, deep blue/gold/cyan palette. Heavy, still, prophetic presence — large readable shapes, minimal ornament. 256×256, up to 64 colors, transparent background, no UI frame, no text.</pre>
+  </div>
+
+  <h2>4 · UI &amp; VFX kit</h2>
+  <div class="brick" data-id="ui-banner-kit">
+    <button class="copy">copy</button>
+    <h3>CaitOS UI banner / header kit</h3>
+    <div class="meta">Target: <b>comfy/refs/ui/caitos-banner-kit.png</b> · loading screens, menu headers, alert banners</div>
+    <pre>Pixel-art cyberpunk fake-OS UI kit sheet in the "CaitOS" style: horizontal HUD banner frames with chunky pixel borders, scanline texture panels, magenta/hot-pink against orange contrast bars, glitch corner brackets, small cat-head icon badges, heart status chips, terminal window chrome with title bars. Dark charcoal base (#0a0a0f), hot pink #ff3d9a, orange, cyan accents, gold stamps. Elements separated on a grid with transparent background between them, no readable words (use fake glyph blocks), max 32 colors.</pre>
+  </div>
+  <div class="brick" data-id="vfx-icons">
+    <button class="copy">copy</button>
+    <h3>Brand icon micro-set (cat / heart / glitch)</h3>
+    <div class="meta">Target: <b>comfy/refs/ui/caitos-micro-icons.png</b> · 32×32 cells</div>
+    <pre>Pixel-art micro-icon sheet, one row of 32×32 cells on transparent background: 1 black cat head with pink eyes, 2 hot-pink heart, 3 heart with cyan glitch slice, 4 crown, 5 star, 6 crescent moon, 7 music note, 8 error/static square. CaitOS palette: hot pink, gold, cyan, white on dark. Max 16 colors, chunky readable pixels, no text.</pre>
+  </div>
+
+  <p class="note" style="margin-top:3rem">When an asset lands: save to the target path above, then flip its status in <a href="checklist.html">checklist.html</a>. Raw gen output goes in comfy/refs/&lt;character&gt;/ — production-clean redraws graduate into public/assets/.</p>
+</div>
+<script>
+document.querySelectorAll('.copy').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const pre = btn.closest('.brick').querySelector('pre');
+    try { await navigator.clipboard.writeText(pre.textContent); }
+    catch { const r = document.createRange(); r.selectNode(pre); getSelection().removeAllRanges(); getSelection().addRange(r); document.execCommand('copy'); getSelection().removeAllRanges(); }
+    btn.textContent = 'copied ✓'; btn.classList.add('ok');
+    setTimeout(() => { btn.textContent = 'copy'; btn.classList.remove('ok'); }, 1400);
+  });
+});
+</script>
+</body>
+</html>

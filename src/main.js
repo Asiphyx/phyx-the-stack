@@ -22,6 +22,18 @@ const MUSIC_DOMAIN_FILTERS = {
   gameOver: { lowpass: 4200, highpass: 22, peakFrequency: 520, peakGain: -0.8, gain: 0.62, threshold: -25, ratio: 6 },
   victory: { lowpass: 9000, highpass: 26, peakFrequency: 1700, peakGain: 2.8, gain: 0.78, threshold: -24, ratio: 4.8 },
 };
+const TITLE_MODULE_SHAPES = ['dodeca', 'tri', 'astra', 'crown', 'spike', 'sigil'];
+const AUDIO_MODULE_SPRITE = {
+  src: '/assets/modules/cait-audio-modules-sheet.png',
+  count: 5,
+  indexByShape: { dodeca: 0, tri: 1, astra: 2, sigil: 2, crown: 3, spike: 4 },
+};
+const audioModuleSprite = typeof Image !== 'undefined' ? new Image() : null;
+let audioModuleSpriteReady = false;
+if (audioModuleSprite) {
+  audioModuleSprite.onload = () => { audioModuleSpriteReady = true; };
+  audioModuleSprite.src = AUDIO_MODULE_SPRITE.src;
+}
 
 const root = document.querySelector('#screen-container');
 const damageLayer = document.querySelector('#damage-numbers-layer');
@@ -59,6 +71,23 @@ root.addEventListener('pointerdown', (event) => {
   triggerInteractionPulse(event.clientX, event.clientY, interactive.matches('.btn-primary, .ult-btn-ready') ? 1 : 0.72);
   if (!introMusicEnabled && game.getSnapshot().phase !== 'title') startIntroMusic();
 }, { capture: true });
+
+// Music hotkeys: M toggles play/pause, Shift+< / Shift+> skip tracks.
+window.addEventListener('keydown', (event) => {
+  if (event.repeat) return;
+  const target = event.target;
+  if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+  if (!event.shiftKey && (event.key === 'm' || event.key === 'M')) {
+    event.preventDefault();
+    toggleIntroMusic();
+  } else if (event.shiftKey && (event.key === '>' || event.key === '.')) {
+    event.preventDefault();
+    switchMusicTrack(1);
+  } else if (event.shiftKey && (event.key === '<' || event.key === ',')) {
+    event.preventDefault();
+    switchMusicTrack(-1);
+  }
+});
 
 bus.on('stateChange', () => render());
 bus.on('combatUpdate', () => render());
@@ -241,12 +270,10 @@ function ensureIntroAudio() {
   if (introAudio) return introAudio;
   introAudio = new Audio(currentMusicTrack?.src ?? DEFAULT_TRACK.src);
   introAudio.loop = false;
-  introAudio.volume = getMusicVolume() * (MUSIC_DOMAIN_FILTERS.title.gain);
   introAudio.preload = 'auto';
+  applyMusicVolume();
   introAudio.addEventListener('ended', () => {
-    currentMusicTrack = null;
-    prepareMusicForPhase(currentMusicDomain, { forceTrack: true });
-    if (introMusicEnabled) startIntroMusic();
+    if (introMusicEnabled) switchMusicTrack(1);
   });
   return introAudio;
 }
@@ -327,6 +354,7 @@ function syncIntroMusicButtons(scope = document) {
     button.textContent = introMusicEnabled ? 'Mute Score' : 'Play Score';
     button.title = currentMusicTrack ? currentMusicTrack.title : 'Game soundtrack';
   });
+  updateMusicControlBar();
 }
 
 function musicDomainForPhase(phase) {
@@ -341,22 +369,38 @@ function prepareMusicForPhase(phase = 'title', { forceTrack = false } = {}) {
   document.documentElement.dataset.musicDomain = domain;
   const nextTrack = chooseTrackForDomain(domain, forceTrack);
   if (!nextTrack) return;
-  const audio = introAudio;
   const shouldSwitch = forceTrack || currentMusicTrack?.id !== nextTrack.id;
-  currentMusicTrack = nextTrack;
-  if (audio && shouldSwitch) {
-    const wasPlaying = introMusicEnabled && !audio.paused;
-    audio.src = nextTrack.src;
-    audio.currentTime = 0;
-    audio.load();
-    audio.volume = getMusicVolume() * (MUSIC_DOMAIN_FILTERS[domain]?.gain ?? 0.72);
-    if (wasPlaying) {
-      const playAttempt = audio.play();
-      if (playAttempt?.catch) playAttempt.catch(() => {});
-    }
+  if (introAudio && shouldSwitch) {
+    loadTrack(nextTrack, { autoplay: introMusicEnabled && !introAudio.paused });
+  } else {
+    currentMusicTrack = nextTrack;
   }
+  applyMusicVolume();
   applyMusicDomainFilter(domain);
   syncIntroMusicButtons(document);
+}
+
+function loadTrack(track, { autoplay = false } = {}) {
+  currentMusicTrack = track;
+  const audio = ensureIntroAudio();
+  audio.src = track.src;
+  audio.currentTime = 0;
+  audio.load();
+  applyMusicVolume();
+  if (autoplay) {
+    const playAttempt = audio.play();
+    if (playAttempt?.catch) playAttempt.catch(() => {});
+  }
+  syncIntroMusicButtons(document);
+}
+
+function switchMusicTrack(direction) {
+  const domainTracks = tracksForDomain(currentMusicDomain);
+  const list = domainTracks.length ? domainTracks : SOUNDTRACK_TRACKS;
+  const index = list.findIndex(track => track.id === currentMusicTrack?.id);
+  const next = list[(index + direction + list.length) % list.length];
+  loadTrack(next, { autoplay: introMusicEnabled });
+  emitToast(`♪ ${next.title}`, 'info');
 }
 
 function chooseTrackForDomain(domain, forceTrack = false) {
@@ -423,10 +467,19 @@ function getMusicVolume() {
 
 function setMusicVolume(value) {
   const clamped = Math.max(0, Math.min(1, value));
-  localStorage.setItem('phyx-music-volume', String(clamped));
-  if (introAudio) introAudio.volume = clamped * (MUSIC_DOMAIN_FILTERS[currentMusicDomain]?.gain ?? 0.72);
+  try { localStorage.setItem('phyx-music-volume', String(clamped)); } catch {}
+  applyMusicVolume();
   document.documentElement.style.setProperty('--music-volume', clamped.toFixed(3));
   return clamped;
+}
+
+// Domain gain lives in the WebAudio output node once the analyser chain exists;
+// only multiply it into element volume when there is no WebAudio chain,
+// otherwise the gain is applied twice.
+function applyMusicVolume() {
+  if (!introAudio) return;
+  const domainGain = MUSIC_DOMAIN_FILTERS[currentMusicDomain]?.gain ?? 0.72;
+  introAudio.volume = getMusicVolume() * (musicNodes ? 1 : domainGain);
 }
 
 let musicCtrlBar = null;
@@ -439,20 +492,26 @@ function appendMusicControlBar() {
   bar.dataset.musicActive = introMusicEnabled ? 'true' : 'false';
 
   const trackName = el('span', 'music-ctrl-track-name');
-  trackName.innerHTML = introMusicEnabled
-    ? `<strong>♪</strong> ${currentMusicTrack?.title ?? 'No Track'}`
-    : `<strong>♪</strong> Paused`;
   bar.appendChild(trackName);
 
-  const toggleBtn = el('button', `music-ctrl-btn${introMusicEnabled ? '' : ' muted'}`);
+  const prevBtn = el('button', 'music-ctrl-btn music-ctrl-skip');
+  prevBtn.type = 'button';
+  prevBtn.textContent = '⏮';
+  prevBtn.title = 'Previous track (Shift+<)';
+  prevBtn.onclick = () => switchMusicTrack(-1);
+  bar.appendChild(prevBtn);
+
+  const toggleBtn = el('button', 'music-ctrl-btn music-ctrl-toggle');
   toggleBtn.type = 'button';
-  toggleBtn.textContent = introMusicEnabled ? '❚❚' : '▶';
-  toggleBtn.title = introMusicEnabled ? 'Pause music' : 'Play music';
-  toggleBtn.onclick = () => {
-    toggleIntroMusic();
-    render();
-  };
+  toggleBtn.onclick = () => toggleIntroMusic();
   bar.appendChild(toggleBtn);
+
+  const nextBtn = el('button', 'music-ctrl-btn music-ctrl-skip');
+  nextBtn.type = 'button';
+  nextBtn.textContent = '⏭';
+  nextBtn.title = 'Next track (Shift+>)';
+  nextBtn.onclick = () => switchMusicTrack(1);
+  bar.appendChild(nextBtn);
 
   const vol = el('span', 'music-ctrl-volume-icon');
   const volVal = getMusicVolume();
@@ -475,6 +534,26 @@ function appendMusicControlBar() {
 
   root.appendChild(bar);
   musicCtrlBar = bar;
+  updateMusicControlBar();
+}
+
+// In-place refresh so play/pause and track skips never trigger a full screen re-render.
+function updateMusicControlBar() {
+  if (!musicCtrlBar || !musicCtrlBar.isConnected) return;
+  musicCtrlBar.dataset.musicActive = introMusicEnabled ? 'true' : 'false';
+  const trackName = musicCtrlBar.querySelector('.music-ctrl-track-name');
+  if (trackName) {
+    trackName.replaceChildren(
+      Object.assign(document.createElement('strong'), { textContent: '♪ ' }),
+      document.createTextNode(introMusicEnabled ? (currentMusicTrack?.title ?? 'No Track') : 'Paused'),
+    );
+  }
+  const toggleBtn = musicCtrlBar.querySelector('.music-ctrl-toggle');
+  if (toggleBtn) {
+    toggleBtn.classList.toggle('muted', !introMusicEnabled);
+    toggleBtn.textContent = introMusicEnabled ? '❚❚' : '▶';
+    toggleBtn.title = introMusicEnabled ? 'Pause music (M)' : 'Play music (M)';
+  }
 }
 
 // Apply stored volume on init
@@ -495,7 +574,7 @@ function startTitleVisualizer(scope = document) {
     canvases.forEach((canvas, index) => {
       const ctx = contexts[index];
       const rect = canvas.getBoundingClientRect();
-      const dpr = window.devicePixelRatio || 1;
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.35);
       const width = Math.max(1, Math.floor(rect.width * dpr));
       const height = Math.max(1, Math.floor(rect.height * dpr));
       if (canvas.width !== width || canvas.height !== height) {
@@ -544,6 +623,7 @@ function drawTitleSpectrum(ctx, width, height, time, layer = 'back') {
   }
 
   drawTitleLemniscateField(ctx, cx, cy, loopX, loopY, time, bands, layer);
+  drawTitleModuleArcNet(ctx, cx, cy, loopX * 0.62, loopY * 0.7, time, layer);
   if (layer === 'front') drawTitleReverseNodes(ctx, cx, cy, loopX, loopY, time);
   if (layer === 'front') {
     drawTitleFoldCore(ctx, cx, cy, loopX, loopY, time);
@@ -562,72 +642,378 @@ function lemniscatePoint(cx, cy, loopX, loopY, t, rotation) {
 }
 
 function drawTitleLemniscateField(ctx, cx, cy, loopX, loopY, time, bands, layer = 'back') {
-  const rotation = 0;
-  const ribbonCount = 3;
+  const layers = layer === 'front' ? 14 : 8;
+  const nodeList = [];
+  const orbitScale = layer === 'front' ? 1.02 : 0.85;
+  const drift = time * (layer === 'front' ? 0.00052 : -0.00028);
 
-  for (let r = 0; r < ribbonCount; r += 1) {
-    drawLemniscateRibbonSegment(ctx, {
-      cx,
-      cy,
-      loopX: loopX + r * 18,
-      loopY: loopY + r * 8,
-      rotation,
-      layer,
-      lineWidth: r === 0
-        ? (layer === 'front' ? 5 + introBeatLevel * 6 : 4 + introBeatLevel * 4)
-        : (layer === 'front' ? 1.4 : 1),
-      strokeStyle: r === 0
-        ? `rgba(255, 51, 153, ${layer === 'front' ? 0.13 + introBeatLevel * 0.1 : 0.055 + introBeatLevel * 0.06})`
-        : r % 2 === 0
-          ? `rgba(255, 111, 31, ${layer === 'front' ? 0.1 + introBeatLevel * 0.08 : 0.035 + introBeatLevel * 0.04})`
-          : `rgba(255, 51, 153, ${layer === 'front' ? 0.1 + introBeatLevel * 0.08 : 0.035 + introBeatLevel * 0.04})`,
-      offset: r * 0.015,
-    });
-  }
-
-  for (let i = 0; i < bands; i += 1) {
-    const t = (i / bands) * Math.PI * 2 + time * 0.00072;
-    const foldDepth = Math.sin(t) * Math.cos(t);
-    const isFront = foldDepth > 0.035 || Math.abs(Math.sin(t)) < 0.14;
-    if ((layer === 'back' && isFront) || (layer === 'front' && !isFront)) continue;
-    const sampleIndex = introFrequencyData ? Math.floor((i / bands) * introFrequencyData.length) : 0;
+  for (let i = 0; i < layers; i += 1) {
+    const shape = TITLE_MODULE_SHAPES[i % TITLE_MODULE_SHAPES.length];
+    const shapeIndex = i + (layer === 'front' ? bands : 0);
+    const t = (i / layers) * Math.PI * 2 + drift + shapeIndex * 0.17;
+    const point = lemniscatePoint(cx, cy, loopX * orbitScale, loopY * orbitScale, t, 0);
+    const sampleIndex = introFrequencyData ? Math.floor((i / layers) * introFrequencyData.length) : 0;
     const raw = introMusicEnabled && introFrequencyData ? introFrequencyData[sampleIndex] / 255 : 0;
-    const idle = 0.1 + Math.sin(time * 0.0016 + i * 0.35) * 0.035;
-    const signal = Math.min(1, introMusicEnabled ? raw * 1.25 + introBeatLevel * 0.35 + idle : idle);
-    const center = lemniscatePoint(cx, cy, loopX, loopY, t, rotation);
-    const ahead = lemniscatePoint(cx, cy, loopX, loopY, t + 0.012, rotation);
-    const tangentX = ahead.x - center.x;
-    const tangentY = ahead.y - center.y;
-    const length = Math.hypot(tangentX, tangentY) || 1;
-    const normalX = -tangentY / length;
-    const normalY = tangentX / length;
-    const innerGap = 10 + signal * 8;
-    const barLength = 20 + Math.pow(signal, 1.18) * 80;
-    const hue = i % 3;
+    const bassBias = shapeIndex % 2 === 0 ? musicBassLevel : musicMidLevel;
+    const highBias = shapeIndex % 3 === 0 ? musicHighLevel : 0;
+    const oscillation = 0.12 + Math.sin(time * 0.0021 + shapeIndex * 0.34) * 0.04;
+    const signal = Math.min(1, introMusicEnabled
+      ? raw * 1.15 + introBeatLevel * 0.42 + bassBias * 0.2 + highBias * 0.2 + oscillation
+      : oscillation);
+    const foldDepth = Math.sin(t) * Math.cos(t);
+    const visible = layer === 'front'
+      ? (foldDepth < 0.08 || (i % 2 === 0))
+      : (foldDepth > -0.08 || (i % 2 === 1));
+    if (!visible) continue;
 
-    ctx.lineWidth = layer === 'front' ? 4 + signal * 6.2 : 2 + signal * 3;
-    ctx.globalAlpha = layer === 'front' ? 0.76 : 0.24;
-    ctx.strokeStyle = hue === 0
-      ? `rgba(255, 51, 153, ${0.16 + signal * 0.36})`
-      : hue === 1
-        ? `rgba(255, 111, 31, ${0.14 + signal * 0.34})`
-        : `rgba(0, 229, 255, ${0.08 + signal * 0.22})`;
+    const baseRadius = (layer === 'front' ? 16 : 11) + (signal * 24);
+    const spin = time * (layer === 'front' ? 0.00135 : -0.0011) * (i % 2 ? 1 : -1)
+      + shapeIndex * 0.17;
+    const jitter = (signal * 11) + introBeatLevel * 14;
+    const x = point.x + Math.cos(time * 0.0008 + i) * jitter * 0.28;
+    const y = point.y + Math.sin(time * 0.0009 + i * 1.2) * jitter * 0.28;
 
-    ctx.beginPath();
-    ctx.moveTo(center.x - normalX * (innerGap + barLength * 0.78), center.y - normalY * (innerGap + barLength * 0.78));
-    ctx.lineTo(center.x - normalX * innerGap, center.y - normalY * innerGap);
-    ctx.moveTo(center.x + normalX * innerGap, center.y + normalY * innerGap);
-    ctx.lineTo(center.x + normalX * (innerGap + barLength), center.y + normalY * (innerGap + barLength));
-    ctx.stroke();
+    const intensity = layer === 'front' ? 0.25 + signal * 0.68 : 0.11 + signal * 0.34;
+    drawTitleModuleGlyph(ctx, x, y, baseRadius * (0.74 + signal * 0.42), spin, signal, shape, layer, intensity);
+    nodeList.push({ x, y, signal: Math.min(1, signal), shape });
 
-    if (signal > 0.52) {
-      ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(0.42, (signal - 0.45) * 0.56)})`;
+    if (signal > 0.58 && layer === 'front') {
+      drawTitleModulePulse(ctx, x, y, baseRadius * 1.7, signal, time, i);
+    }
+  }
+  if (layer === 'front' && nodeList.length > 4) {
+    for (let i = 0; i < nodeList.length; i += 1) {
+      const current = nodeList[i];
+      const next = nodeList[(i + 3) % nodeList.length];
+      const pairSignal = (current.signal + next.signal) * 0.5;
+      if (pairSignal < 0.56) continue;
+      const orbit = 5 + pairSignal * 14;
+      const stroke = pairSignal * 0.22 + 0.04;
+      ctx.strokeStyle = `rgba(255, 255, 255, ${0.12 + pairSignal * 0.24})`;
+      ctx.lineWidth = 1 + stroke;
       ctx.beginPath();
-      ctx.arc(center.x + normalX * (innerGap + barLength), center.y + normalY * (innerGap + barLength), 1.4 + signal * 2.8, 0, Math.PI * 2);
-      ctx.fill();
+      const midX = (current.x + next.x) / 2;
+      const midY = (current.y + next.y) / 2;
+      ctx.moveTo(current.x, current.y);
+      ctx.quadraticCurveTo(midX + Math.sin(time * 0.001 + i) * orbit, midY + Math.cos(time * 0.0012 + i) * orbit, next.x, next.y);
+      ctx.stroke();
+      ctx.strokeStyle = `rgba(255, 111, 31, ${0.12 + pairSignal * 0.18})`;
+      ctx.lineWidth = Math.max(0.4, stroke * 0.62);
+      ctx.beginPath();
+      ctx.arc(midX, midY, orbit + 2 + pairSignal * 12, 0, Math.PI * 2);
+      ctx.stroke();
     }
   }
   ctx.globalAlpha = 1;
+}
+
+function drawTitleModuleArcNet(ctx, cx, cy, ringX, ringY, time, layer = 'back') {
+  const phase = time * (layer === 'front' ? 0.00035 : -0.0002);
+  const ringCount = layer === 'front' ? 3 : 2;
+  const drift = 1 + introBeatLevel * 0.5;
+  for (let i = 0; i < ringCount; i += 1) {
+    const spin = phase + i * Math.PI * 0.92;
+    const radiusX = ringX * (1 + i * 0.3 + introBeatLevel * 0.14) * drift;
+    const radiusY = ringY * (1 + i * 0.3 + introBeatLevel * 0.16) * (layer === 'front' ? 1 : 0.94);
+    const alpha = layer === 'front' ? 0.1 + introBeatLevel * 0.24 : 0.055 + introBeatLevel * 0.17;
+    const sweep = Math.PI * 0.98 + Math.sin(time * 0.0003 + i) * 0.28;
+
+    ctx.strokeStyle = `rgba(255, 51, 153, ${alpha})`;
+    ctx.lineWidth = layer === 'front' ? 1.4 : 1;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, radiusX, radiusY, spin, spin, spin + sweep);
+    ctx.stroke();
+
+    ctx.strokeStyle = `rgba(255, 111, 31, ${alpha * 0.68})`;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, radiusX * 0.86, radiusY * 0.86, -spin * 0.6, spin * 0.3, spin + sweep * 0.74);
+    ctx.stroke();
+
+    for (let j = 0; j < 2; j += 1) {
+      const cxOffset = cx + Math.cos(phase * 1.9 + i * 1.45 + j * 2.1) * radiusX;
+      const cyOffset = cy + Math.sin(phase * 1.7 + i * 1.22 + j * 2.3) * radiusY * 0.6;
+      ctx.fillStyle = `rgba(255, 255, 255, ${0.06 + alpha * 1.25})`;
+      ctx.beginPath();
+      ctx.arc(cxOffset, cyOffset, 1.2 + i * 0.45 + (layer === 'front' ? introBeatLevel * 1.9 : 0), 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+}
+
+function drawTitleModuleGlyph(ctx, x, y, radius, spin, signal, shape, layer, intensity = 0.45) {
+  const baseAlpha = layer === 'front' ? 1 : 0.76;
+  const glowRadius = radius * 1.8 + signal * 22;
+  const glow = ctx.createRadialGradient(x, y, radius * 0.18, x, y, glowRadius);
+  glow.addColorStop(0, `rgba(255, 255, 255, ${0.03 + intensity * 0.32 * baseAlpha})`);
+  glow.addColorStop(0.45, `rgba(255, 111, 31, ${0.05 + intensity * 0.18 * baseAlpha})`);
+  glow.addColorStop(1, 'rgba(255, 0, 0, 0)');
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc(x, y, glowRadius * 0.62, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(spin);
+
+  const drewSprite = drawTitleModuleSprite(ctx, radius, signal, shape, layer, intensity);
+  if (!drewSprite) {
+    switch (shape) {
+      case 'dodeca':
+        drawTitleDodecaGlyph(ctx, radius, signal, intensity);
+        break;
+      case 'tri':
+        drawTitleTriangleGlyph(ctx, radius, signal, intensity);
+        break;
+      case 'sigil':
+        drawTitleSigilGlyph(ctx, radius, signal, intensity);
+        break;
+      case 'spike':
+        drawTitleSpikeGlyph(ctx, radius, signal, intensity);
+        break;
+      case 'astra':
+        drawTitleAstroGlyph(ctx, radius, signal, intensity);
+        break;
+      case 'crown':
+        drawTitleSpikeGlyph(ctx, radius, signal, intensity);
+        break;
+      default:
+        drawTitleTriangleGlyph(ctx, radius, signal, intensity);
+    }
+  }
+
+  ctx.restore();
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.fillStyle = `rgba(255, 255, 255, ${0.25 + signal * 0.35})`;
+  ctx.arc(x, y, Math.max(1.2, radius * 0.06), 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawTitleModuleSprite(ctx, radius, signal, shape, layer, intensity) {
+  if (!audioModuleSpriteReady || !audioModuleSprite?.naturalWidth) return false;
+  const spriteIndex = AUDIO_MODULE_SPRITE.indexByShape[shape] ?? 0;
+  const cellSize = audioModuleSprite.naturalWidth / AUDIO_MODULE_SPRITE.count;
+  const drawSize = radius * (layer === 'front' ? 4.6 : 3.9) * (0.9 + signal * 0.22);
+
+  ctx.save();
+  ctx.globalAlpha = layer === 'front'
+    ? Math.min(0.92, 0.52 + signal * 0.36 + intensity * 0.12)
+    : Math.min(0.46, 0.24 + signal * 0.2 + intensity * 0.05);
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(
+    audioModuleSprite,
+    spriteIndex * cellSize,
+    0,
+    cellSize,
+    audioModuleSprite.naturalHeight,
+    -drawSize / 2,
+    -drawSize / 2,
+    drawSize,
+    drawSize,
+  );
+  ctx.restore();
+  return true;
+}
+
+function drawTitleDodecaGlyph(ctx, radius, signal, intensity) {
+  const outerRadius = radius * 0.95;
+  const innerRadius = radius * 0.56;
+  const innerShift = signal * 0.34;
+  const outer = [];
+  const inner = [];
+
+  for (let i = 0; i < 5; i += 1) {
+    const a = (i / 5) * Math.PI * 2;
+    outer.push({
+      x: Math.cos(a) * outerRadius,
+      y: Math.sin(a) * outerRadius,
+    });
+    inner.push({
+      x: Math.cos(a + Math.PI / 5) * innerRadius,
+      y: Math.sin(a + Math.PI / 5 + innerShift * 0.2) * innerRadius,
+    });
+  }
+
+  ctx.globalAlpha = 0.74 + intensity * 0.24;
+  ctx.lineWidth = 1.25 + signal * 1.3;
+  ctx.strokeStyle = `rgba(255, 51, 153, ${0.44 + signal * 0.46})`;
+  ctx.beginPath();
+  outer.forEach((point, i) => {
+    const next = outer[(i + 1) % outer.length];
+    const inPoint = inner[(i + 2) % inner.length];
+    const nextIn = inner[(i + 3) % inner.length];
+    ctx.moveTo(point.x, point.y);
+    ctx.lineTo(inPoint.x, inPoint.y);
+    ctx.lineTo(next.x, next.y);
+    ctx.lineTo(nextIn.x, nextIn.y);
+    ctx.closePath();
+  });
+  ctx.stroke();
+
+  ctx.beginPath();
+  outer.forEach((point, i) => {
+    const next = outer[(i + 1) % outer.length];
+    ctx.moveTo(point.x, point.y);
+    ctx.lineTo(next.x, next.y);
+  });
+  inner.forEach((point, i) => {
+    const next = inner[(i + 1) % inner.length];
+    ctx.moveTo(point.x, point.y);
+    ctx.lineTo(next.x, next.y);
+  });
+  ctx.strokeStyle = `rgba(226, 255, 255, ${0.18 + intensity * 0.2})`;
+  ctx.stroke();
+
+  outer.forEach((point) => {
+    ctx.fillStyle = `rgba(255, 191, 255, ${0.25 + intensity * 0.22})`;
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, 1 + signal * 1.6, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+function drawTitleTriangleGlyph(ctx, radius, signal, intensity) {
+  const w = radius * (0.8 + signal * 0.24);
+  const h = radius * (1.02 + signal * 0.35);
+  const ring = radius * 1.25;
+  const spin = signal * 1.4;
+  ctx.lineWidth = 1.1 + signal * 1.4;
+  ctx.globalAlpha = 0.8 + intensity * 0.2;
+  ctx.strokeStyle = `rgba(0, 229, 255, ${0.46 + intensity * 0.28})`;
+  ctx.fillStyle = `rgba(0, 229, 255, ${0.07 + signal * 0.05})`;
+  ctx.beginPath();
+  ctx.moveTo(0, -h);
+  ctx.lineTo(w, h * 0.64);
+  ctx.lineTo(-w, h * 0.64);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.fill();
+  for (let i = 0; i < 5; i += 1) {
+    const lineR = ring + (i * 2.5);
+    const a = spin + (i * Math.PI * 2 / 5);
+    const b = spin + ((i + 2) * Math.PI * 2 / 5);
+    ctx.strokeStyle = `rgba(0, 229, 255, ${0.11 + signal * 0.15})`;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * lineR, Math.sin(a) * lineR * 0.56);
+    ctx.lineTo(Math.cos(b) * (lineR + 1), Math.sin(b) * (lineR + 1) * 0.56);
+    ctx.stroke();
+  }
+}
+
+function drawTitleSigilGlyph(ctx, radius, signal, intensity) {
+  const spikes = 6;
+  const inner = radius * 0.45;
+  const outer = radius * 1.05;
+  ctx.lineWidth = 1 + signal * 1.4;
+  ctx.strokeStyle = `rgba(255, 111, 31, ${0.5 + intensity * 0.3})`;
+  ctx.fillStyle = `rgba(255, 111, 31, ${0.04 + signal * 0.06})`;
+  ctx.beginPath();
+  for (let i = 0; i < spikes * 2; i += 1) {
+    const step = Math.PI * 2 / (spikes * 2);
+    const rr = i % 2 === 0 ? outer : inner;
+    const px = Math.cos(i * step) * rr;
+    const py = Math.sin(i * step) * rr * 0.9;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.stroke();
+  ctx.fill();
+  for (let ring = 1; ring <= 3; ring += 1) {
+    const orbit = radius * (0.26 * ring + 0.5);
+    const alpha = 0.05 + intensity * 0.14 / ring;
+    ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+    ctx.beginPath();
+    ctx.arc(0, 0, orbit, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+}
+
+function drawTitleSpikeGlyph(ctx, radius, signal, intensity) {
+  const r = radius * 0.88;
+  const spikes = 7;
+  const tip = Math.PI * 2 / spikes;
+  ctx.lineWidth = 1 + signal * 1.2;
+  ctx.strokeStyle = `rgba(255, 255, 255, ${0.34 + intensity * 0.4})`;
+  ctx.beginPath();
+  for (let i = 0; i <= spikes; i += 1) {
+    const a = i * tip;
+    const rr = i % 2 === 0 ? r : r * 0.36;
+    const px = Math.cos(a) * rr;
+    const py = Math.sin(a) * rr * 0.87;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.stroke();
+
+  for (let i = 0; i < spikes; i += 1) {
+    const a = i * tip + tip * 0.5;
+    const bx = Math.cos(a) * (r * 0.52);
+    const by = Math.sin(a) * (r * 0.52 * 0.87);
+    ctx.beginPath();
+    ctx.fillStyle = `rgba(255, 51, 153, ${0.08 + signal * 0.15})`;
+    ctx.arc(bx, by, 1 + signal * 1.6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawTitleAstroGlyph(ctx, radius, signal, intensity) {
+  const arc = radius * 1.12;
+  const orbit = radius * 0.7;
+  ctx.lineWidth = 1.1 + signal * 1.6;
+  ctx.strokeStyle = `rgba(200, 255, 255, ${0.28 + intensity * 0.24})`;
+  for (let i = 0; i < 2; i += 1) {
+    const phase = i * Math.PI + (signal * 0.9);
+    ctx.beginPath();
+    ctx.arc(0, 0, arc + i * 2.4, phase, phase + Math.PI * 1.1);
+    ctx.stroke();
+  }
+  ctx.beginPath();
+  ctx.arc(0, 0, orbit * 0.74, 0, Math.PI * 2);
+  ctx.strokeStyle = `rgba(226, 210, 255, ${0.14 + signal * 0.22})`;
+  ctx.stroke();
+  for (let i = 0; i < 5; i += 1) {
+    const a = (i / 5) * Math.PI * 2 + signal * 0.8;
+    ctx.fillStyle = `rgba(226, 210, 255, ${0.24 + signal * 0.34})`;
+    ctx.beginPath();
+    ctx.arc(
+      Math.cos(a) * orbit * 0.9,
+      Math.sin(a) * orbit * 0.9 * 0.72,
+      0.9 + signal * 1.4,
+      0,
+      Math.PI * 2,
+    );
+    ctx.fill();
+  }
+}
+
+function drawTitleModulePulse(ctx, x, y, radius, signal, time, seed) {
+  const ring = Math.max(1, radius + signal * 16 + 2);
+  const sweep = Math.sin((time * 0.004) + seed) * 0.8;
+  const hue = (signal * 280 + seed * 23) % 360;
+  const c1 = `hsla(${hue}, 95%, 82%, ${0.12 + signal * 0.18})`;
+  const c2 = `hsla(${hue}, 90%, 64%, 0)`;
+  const burst = ctx.createRadialGradient(x, y, 0, x, y, ring * 1.35);
+  burst.addColorStop(0, c1);
+  burst.addColorStop(1, c2);
+  ctx.fillStyle = burst;
+  ctx.beginPath();
+  ctx.arc(x, y, ring * 0.82, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.save();
+  ctx.strokeStyle = `rgba(255, 255, 255, ${0.08 + signal * 0.2})`;
+  ctx.lineWidth = 1.15;
+  for (let i = 0; i < 4; i += 1) {
+    const rr = ring * (0.5 + i * 0.15 + sweep * 0.02);
+    ctx.beginPath();
+    ctx.arc(x, y, rr, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function drawLemniscateRibbonSegment(ctx, { cx, cy, loopX, loopY, rotation, layer, lineWidth, strokeStyle, offset }) {
@@ -962,8 +1348,9 @@ function renderHeroSelect() {
         </div>
         <div class="cait-module-stack">
           <span>STARTING CAIT MODULES</span>
-          ${cait.modules.map(module => `
-            <article class="cait-module-chip">
+          ${cait.modules.map((module, index) => `
+            <article class="cait-module-chip" style="--module-index:${moduleSpriteIndex(module, index)}">
+              <i class="cait-module-icon" aria-hidden="true"></i>
               <b>${escapeHtml(module.slot)} // ${escapeHtml(module.name)}</b>
               <small>${escapeHtml(module.text)}</small>
             </article>
@@ -1325,8 +1712,8 @@ function renderCombat() {
         </div>
       </div>
       <div class="console-cait-module-readout">
-        ${(cait?.modules ?? []).slice(0, 3).map(module => `
-          <span><b>${escapeHtml(module.slot)}</b>${escapeHtml(module.name)}</span>
+        ${(cait?.modules ?? []).slice(0, 3).map((module, index) => `
+          <span style="--module-index:${moduleSpriteIndex(module, index)}"><i class="cait-module-icon" aria-hidden="true"></i><b>${escapeHtml(module.slot)}</b>${escapeHtml(module.name)}</span>
         `).join('')}
       </div>
       
@@ -1855,6 +2242,16 @@ function escapeHtml(value) {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#039;');
+}
+
+function moduleSpriteIndex(module, fallbackIndex = 0) {
+  const bySlot = {
+    crown: 3,
+    heart: 0,
+    voice: 2,
+    glitch: 4,
+  };
+  return bySlot[String(module?.slot ?? '').toLowerCase()] ?? (fallbackIndex % AUDIO_MODULE_SPRITE.count);
 }
 
 function pct(cur, max) { return Math.max(1, Math.min(100, (cur / Math.max(1, max)) * 100)); }

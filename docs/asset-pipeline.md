@@ -39,6 +39,41 @@ npm run assets:variants -- --src ~/Downloads/Downloads/antigravv2.png --dest pub
 
 Use this for manual/icon drops first, then only use image generation for missing animation frames or backgrounds that do not exist yet.
 
+## Local ComfyUI sprite batch workflow
+
+Use ComfyUI for fully local sprite generation without external APIs.
+
+1. Run ComfyUI with the API enabled (default `http://127.0.0.1:8188`).
+2. Copy a working workflow into `comfy/workflows/` and replace placeholder tokens using the batch runner.
+3. Render a batch into your asset workspace.
+
+```bash
+# one-shot starter batch for Cait frames
+npm run assets:comfy \
+  -- --workflow comfy/workflows/pixel-sprite-workflow.json \
+  --prompts comfy/prompts/cait-sprite-batch.jsonl \
+  --out-dir tmp_asset_contact/cait_sprites_raw \
+  --checkpoint "YourModelName.safetensors" \
+  --width 512 \
+  --height 512 \
+  --steps 24 \
+  --cfg 6 \
+  --seed 42069
+```
+
+When you are ready, run `npm run assets:inspect -- tmp_asset_contact/cait_sprites_raw` and then
+`npm run assets:optimize -- --src tmp_asset_contact/cait_sprites_raw --dest public/assets/heroes --format png`.
+
+If you want a short command, use:
+
+```bash
+npm run assets:comfy:cait -- --checkpoint "YourModelName.safetensors"
+```
+
+Use `--dry-run` to print each rendered workflow before queueing, and `--continue-on-error` to keep going on failures.
+
+Tip for consistency: keep `--seed` constant across the batch if you want a coherent sprite family look across all Cait variants.
+
 ## Current Art Direction Notes
 
 - Cait should remain the star and global brand gravity.
