@@ -12,7 +12,7 @@ export const ENEMIES = {
     id: 'null_pointer',
     name: 'Null Pointer',
     emoji: '🐛',
-    sprite: '/assets/enemies/null_pointer.png',
+    sprite: '/assets/enemies/generated_pack/null_pointer.png',
     maxHp: 28,
     pattern: [
       { type: 'attack', value: 6, description: 'Dereference — Deal 6 damage.' },
@@ -26,7 +26,7 @@ export const ENEMIES = {
     id: 'todo_comment',
     name: 'TODO Comment',
     emoji: '📝',
-    sprite: '/assets/enemies/todo_comment.png',
+    sprite: '/assets/enemies/generated_pack/todo_comment.png',
     maxHp: 20,
     pattern: [
       { type: 'attack', value: 4, description: 'Nag — Deal 4 damage.' },
@@ -40,7 +40,7 @@ export const ENEMIES = {
     id: 'type_error',
     name: 'Type Error',
     emoji: '🔀',
-    sprite: '/assets/enemies/type_error.png',
+    sprite: '/assets/enemies/generated_pack/type_error.png',
     maxHp: 25,
     pattern: [
       { type: 'attack', value: 5, description: 'Coerce — Deal 5 damage.' },
@@ -55,7 +55,7 @@ export const ENEMIES = {
     id: 'spaghetti_code',
     name: 'Spaghetti Code',
     emoji: '🍝',
-    sprite: '/assets/enemies/spaghetti_code.png',
+    sprite: '/assets/enemies/generated_pack/spaghetti_code.png',
     maxHp: 18,
     pattern: [
       { type: 'attack', value: 3, description: 'Tangle — Deal 3 damage.' },
@@ -73,7 +73,7 @@ export const ENEMIES = {
     id: 'memory_leak',
     name: 'Memory Leak',
     emoji: '🕳️',
-    sprite: '/assets/enemies/memory_leak.png',
+    sprite: '/assets/enemies/generated_pack/memory_leak.png',
     maxHp: 35,
     pattern: [
       { type: 'attack', value: 7, description: 'Drip — Deal 7 damage.' },
@@ -88,7 +88,7 @@ export const ENEMIES = {
     id: 'merge_conflict',
     name: 'Merge Conflict',
     emoji: '🔀',
-    sprite: '/assets/enemies/merge_conflict.png',
+    sprite: '/assets/enemies/generated_pack/merge_conflict.png',
     maxHp: 40,
     pattern: [
       { type: 'attack', value: 8, description: 'Diverge — Deal 8 damage.' },
@@ -103,7 +103,7 @@ export const ENEMIES = {
     id: 'heisenbug',
     name: 'Heisenbug',
     emoji: '👻',
-    sprite: '/assets/enemies/heisenbug.png',
+    sprite: '/assets/enemies/generated_pack/heisenbug.png',
     maxHp: 30,
     pattern: [
       { type: 'attack', value: 10, description: 'Manifest — Deal 10 damage.' },
@@ -118,7 +118,7 @@ export const ENEMIES = {
     id: 'dependency_hell',
     name: 'Dependency Hell',
     emoji: '📦',
-    sprite: '/assets/enemies/dependency_hell.png',
+    sprite: '/assets/enemies/generated_pack/dependency_hell.png',
     maxHp: 32,
     pattern: [
       { type: 'summon', description: 'npm install — Summon a Null Pointer.' },
@@ -137,7 +137,7 @@ export const ENEMIES = {
     id: 'tech_debt',
     name: 'Tech Debt',
     emoji: '💳',
-    sprite: '/assets/enemies/tech_debt.png',
+    sprite: '/assets/enemies/generated_pack/tech_debt.png',
     maxHp: 55,
     pattern: [
       { type: 'attack', value: 10, description: 'Interest — Deal 10 damage.' },
@@ -153,7 +153,7 @@ export const ENEMIES = {
     id: 'race_condition',
     name: 'Race Condition',
     emoji: '⚡',
-    sprite: '/assets/enemies/race_condition.png',
+    sprite: '/assets/enemies/generated_pack/race_condition.png',
     maxHp: 45,
     pattern: [
       { type: 'attack', value: 12, description: 'Thread A — Deal 12 damage.' },
@@ -168,11 +168,30 @@ export const ENEMIES = {
   // BOSSES
   // ─────────────────────────────────────────────
 
+  budder_sphinx: {
+    id: 'budder_sphinx',
+    name: 'Budder Sphinx',
+    emoji: '🍞',
+    sprite: '/assets/enemies/budder_sphinx_fixed.png',
+    idleSprite: '/assets/enemies/budder_sphinx_roll_strip.png',
+    idleFrames: 4,
+    maxHp: 130,
+    pattern: [
+      { type: 'block', value: 18, description: 'Gold Wobble — Gain 18 block.' },
+      { type: 'attack', value: 14, description: 'Toast-Cat Pounce — Deal 14 damage.' },
+      { type: 'buff', value: 4, description: 'Corkscrew Aura — Gain 4 enrage (strength).' },
+      { type: 'debuff', value: 1, description: 'Biblical Head Roll — Reduce max energy by 1.' },
+      { type: 'attack', value: 22, description: 'Perpetual Motion Toast — Deal 22 damage.' },
+    ],
+    flavor: 'A biblically weird hairless sphinx cat floating on a corkscrew aura.',
+    tier: 'boss',
+  },
+
   production_outage: {
     id: 'production_outage',
     name: 'Production Outage',
     emoji: '🔥',
-    sprite: '/assets/enemies/production_outage.png',
+    sprite: '/assets/enemies/generated_pack/production_outage.png',
     maxHp: 80,
     pattern: [
       { type: 'attack', value: 12, description: 'Alert Storm — Deal 12 damage.' },
@@ -188,7 +207,7 @@ export const ENEMIES = {
     id: 'legacy_codebase',
     name: 'Legacy Codebase',
     emoji: '💀',
-    sprite: '/assets/enemies/legacy_codebase.png',
+    sprite: '/assets/enemies/generated_pack/legacy_codebase.png',
     maxHp: 120,
     pattern: [
       { type: 'attack', value: 8, description: 'Rot — Deal 8 damage.' },

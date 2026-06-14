@@ -9,6 +9,13 @@ export const RESERVED_SOUNDTRACK = {
 
 export const SOUNDTRACK_TRACKS = [
   {
+    id: RESERVED_SOUNDTRACK.demoBoss.id,
+    title: RESERVED_SOUNDTRACK.demoBoss.title,
+    src: RESERVED_SOUNDTRACK.demoBoss.src,
+    domains: ['boss'],
+    intensity: 0.94,
+  },
+  {
     id: 'cait-intro',
     title: 'C.A.I.T — Boot Signal',
     src: '/assets/audio/cait-intro.mp3',

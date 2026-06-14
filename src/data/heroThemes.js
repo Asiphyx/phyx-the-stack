@@ -9,6 +9,10 @@ export const HERO_THEMES = {
     danger: '#ff3344',
     shell: 'royal-idol-os',
     motto: 'Mistakes are content.',
+    spotlight: 'Queen.exe Broadcast',
+    lore: 'Cait is the required chaos engine: brilliant, spoiled, and dangerous when nobody gives her a clean lane. The run is about making her power land without letting her crown drive the whole bus.',
+    mechanic: 'Autoplay companion pressure, royal target calls, and high-value follow-ups after your turn.',
+    modes: ['Queen Circuit', 'Peon Trial', 'Royal Override'],
   },
   asiphyx: {
     id: 'asiphyx',
@@ -20,6 +24,10 @@ export const HERO_THEMES = {
     danger: '#ff3344',
     shell: 'dual-mask-survival',
     motto: 'Aloof mask. Survival machine.',
+    spotlight: 'Void Walker Bay',
+    lore: 'Asiphyx wins by turning absence into leverage. Empty piles, missing options, and weird timing become a controlled vacuum Cait can hide inside until the collapse is ready.',
+    mechanic: 'Deck-empty defense, delayed collapse turns, and backwards resource planning.',
+    modes: ['Null Trial', 'Void Draft', 'Absence Engine'],
   },
   codex: {
     id: 'codex',
@@ -31,6 +39,10 @@ export const HERO_THEMES = {
     danger: '#ff3344',
     shell: 'standards-architect',
     motto: 'Scope locked. Execution unblocked.',
+    spotlight: 'Compiler Clean Room',
+    lore: 'Codex is the stabilizer: no spectacle, no wasted flourish, just precise execution that makes Cait repeatable enough to trust under pressure.',
+    mechanic: 'Repeat-play scaling, cleaner Cait rolls, and low-risk run routing.',
+    modes: ['Clean Build', 'Linted Queen', 'Standards Route'],
   },
   xadnib: {
     id: 'xadnib',
@@ -42,6 +54,10 @@ export const HERO_THEMES = {
     danger: '#ff66cc',
     shell: 'cosmic-oracle',
     motto: 'The fight was already written.',
+    spotlight: 'Oracle Plane',
+    lore: 'Xadnib sees the room before the room admits what it is. Cait becomes a prophecy weapon: less random, more timed, and nastier when enemy intent is already decoded.',
+    mechanic: 'Intent foresight, draw bursts, and pre-emptive Cait defenses.',
+    modes: ['Pattern Throne', 'Star Trial', 'Oracle Draft'],
   },
   bindax: {
     id: 'bindax',
@@ -53,6 +69,10 @@ export const HERO_THEMES = {
     danger: '#00e5ff',
     shell: 'morale-confetti',
     motto: 'Emergency confetti is infrastructure.',
+    spotlight: 'Wild Card Studio',
+    lore: 'Bindax keeps the bit alive when the run gets cursed. Cait becomes louder, stranger, and more explosive, turning bad rolls into momentum if you can survive the joke.',
+    mechanic: 'Random hand gifts, morale saves, and high-variance payoff chains.',
+    modes: ['Chaos Idol', 'Confetti Route', 'Jackpot Room'],
   },
   antigrav: {
     id: 'antigrav',
@@ -64,6 +84,10 @@ export const HERO_THEMES = {
     danger: '#ff3344',
     shell: 'unstable-inversion',
     motto: 'Too fast to verify.',
+    spotlight: 'Inversion Track',
+    lore: 'Antigrav treats the stack like a runway and reads it from the wrong end first. Cait overclocks into a velocity queen: huge tempo, sharp recoil, no safe coasting.',
+    mechanic: 'Attack-defense alternation, tempo recoil, and block-as-damage reversals.',
+    modes: ['Velocity Chain', 'Turbo Trial', 'Unsafe Flag'],
   },
 };
 

@@ -2,22 +2,26 @@ import './index.css';
 import { GameState } from './engine/GameState.js';
 import { HEROES } from './data/heroes.js';
 import { getHeroTheme } from './data/heroThemes.js';
-import { CAIT_IDOL, buildCaitCompanion, getCaitLoadout } from './data/caitModules.js';
+import { CAIT_IDOL, buildCaitCompanion } from './data/caitModules.js';
 import { ENEMIES, ENCOUNTERS } from './data/enemies.js';
 import { CARDS } from './data/cards.js';
 import { SOUNDTRACK_TRACKS, tracksForDomain } from './data/soundtrack.js';
+import { TUTORIAL_GUIDE } from './data/tutorialGuide.js';
 import bus from './engine/EventBus.js';
+import { initPhaserGame, destroyPhaserGame } from './phaser/PhaserGame.js';
 
 const cardPool = Object.values(CARDS).filter(c => c.rarity !== 'starter');
 const game = new GameState();
 const SAVE_STORAGE_KEY = 'phyx-the-stack:saves:v1';
 const SAVE_SLOT_COUNT = 3;
+const CAIT_LABS_ICON = '/assets/brand/cait-labs-icon.png';
 const DEFAULT_TRACK = SOUNDTRACK_TRACKS.find(track => track.id === 'cait-intro') ?? SOUNDTRACK_TRACKS[0];
 const MUSIC_DOMAIN_FILTERS = {
   title: { lowpass: 6200, highpass: 24, peakFrequency: 880, peakGain: 1.8, gain: 0.72, threshold: -24, ratio: 4.5 },
   heroSelect: { lowpass: 7800, highpass: 32, peakFrequency: 1400, peakGain: 2.6, gain: 0.76, threshold: -26, ratio: 5.2 },
   map: { lowpass: 6800, highpass: 28, peakFrequency: 720, peakGain: 1.4, gain: 0.66, threshold: -22, ratio: 4 },
   combat: { lowpass: 10800, highpass: 46, peakFrequency: 2400, peakGain: 3.4, gain: 0.82, threshold: -31, ratio: 7.5 },
+  boss: { lowpass: 11800, highpass: 54, peakFrequency: 2600, peakGain: 3.8, gain: 0.86, threshold: -32, ratio: 8 },
   draft: { lowpass: 5200, highpass: 38, peakFrequency: 1100, peakGain: 2.1, gain: 0.7, threshold: -27, ratio: 5.8 },
   gameOver: { lowpass: 4200, highpass: 22, peakFrequency: 520, peakGain: -0.8, gain: 0.62, threshold: -25, ratio: 6 },
   victory: { lowpass: 9000, highpass: 26, peakFrequency: 1700, peakGain: 2.8, gain: 0.78, threshold: -24, ratio: 4.8 },
@@ -72,6 +76,23 @@ let caitCodecOffset = { x: 0, y: 0 };
 // via updateMusicControlBar, and `vite dev` enforces the TDZ that esbuild relaxes.
 let musicCtrlBar = null;
 
+let engineMode = localStorage.getItem('phyx-the-stack:engine-mode') || 'phaser';
+let persistentPhaserContainer = null;
+
+function getPhaserContainer() {
+  if (!persistentPhaserContainer) {
+    persistentPhaserContainer = document.createElement('div');
+    persistentPhaserContainer.id = 'phaser-game-container';
+    persistentPhaserContainer.style.width = '100%';
+    persistentPhaserContainer.style.height = '100%';
+    persistentPhaserContainer.style.position = 'absolute';
+    persistentPhaserContainer.style.top = '0';
+    persistentPhaserContainer.style.left = '0';
+    persistentPhaserContainer.style.zIndex = '2';
+  }
+  return persistentPhaserContainer;
+}
+
 root.addEventListener('pointerdown', (event) => {
   const interactive = event.target.closest('button, .game-card, .hero-card, .map-node, .terminal-opt-btn, .save-slot');
   if (!interactive) return;
@@ -96,6 +117,11 @@ window.addEventListener('keydown', (event) => {
   }
 });
 
+window.addEventListener('phaserSelectTarget', (event) => {
+  selectedTarget = event.detail.index;
+  render();
+});
+
 bus.on('stateChange', () => render());
 bus.on('combatUpdate', () => render());
 bus.on('draftOffered', ({ cards }) => {
@@ -115,6 +141,10 @@ function render() {
   const snapshot = game.getSnapshot();
   root.innerHTML = '';
   prepareMusicForPhase(snapshot.phase);
+
+  if (snapshot.phase !== 'combat') {
+    destroyPhaserGame();
+  }
 
   switch (snapshot.phase) {
     case 'title': renderTitle(); return;
@@ -153,6 +183,7 @@ function renderTitle() {
           <span class="title-window-grip">CaitOS://Controls</span>
         <span>READY</span>
       </div>
+        <img class="title-labs-medallion" src="${CAIT_LABS_ICON}" alt="Cait Labs seal" />
         <div class="title-cat-menu-title">Phyx Launch</div>
       <div class="title-actions">
         <button class="btn btn-primary" id="start-btn">New Run</button>
@@ -178,6 +209,8 @@ function renderTitle() {
   section.querySelector('#music-btn').onclick = () => toggleIntroMusic(section);
   section.querySelector('#title-save-menu-btn').onclick = () => openSystemMenu(false);
   appendSystemMenuOverlay(section, false);
+  applyTitleWindowOffset(section.querySelector('.title-cat-menu'));
+  wireTitleWindowDrag(section);
 }
 
 function applyTitleWindowOffset(windowEl) {
@@ -187,13 +220,14 @@ function applyTitleWindowOffset(windowEl) {
 }
 
 function wireTitleWindowDrag(section) {
-  const windowEl = section.querySelector('.title-fold-anchor');
+  const windowEl = section.querySelector('.title-cat-menu') ?? section.querySelector('.title-fold-anchor');
   const dragBar = section.querySelector('.title-terminal-top');
   if (!windowEl || !dragBar) return;
 
   let drag = null;
   dragBar.addEventListener('pointerdown', (event) => {
     if (event.target.closest('button')) return;
+    event.preventDefault();
     drag = {
       pointerId: event.pointerId,
       startX: event.clientX,
@@ -366,7 +400,13 @@ function syncIntroMusicButtons(scope = document) {
 }
 
 function musicDomainForPhase(phase) {
-  if (phase === 'boss') return 'combat';
+  if (phase === 'combat') {
+    const hasBossEnemy = game.state.enemies?.some((enemy) => {
+      const canonical = resolveEnemyTemplate(enemy);
+      return (enemy.tier ?? canonical?.tier) === 'boss';
+    });
+    return hasBossEnemy ? 'boss' : 'combat';
+  }
   return MUSIC_DOMAIN_FILTERS[phase] ? phase : 'map';
 }
 
@@ -603,8 +643,8 @@ function startTitleVisualizer(scope = document) {
 function drawTitleSpectrum(ctx, width, height, time, layer = 'back') {
   // Ring geometry hugs the cat head in cait-labs-title.png (stretched 100%/100%,
   // so fractions of the canvas track the artwork at any window size).
-  const cx = width * 0.478;
-  const cy = height * 0.43;
+  const cx = width * 0.499;
+  const cy = height * 0.435;
   const ringX = width * 0.165;
   const ringY = height * 0.3;
 
@@ -1108,6 +1148,7 @@ function renderHeroSelect() {
   const heroes = Object.values(HEROES).filter(hero => hero.id !== 'cait');
   const initialHero = heroes.find(hero => hero.id === 'asiphyx') ?? heroes[0];
   let selectedHero = initialHero;
+  let selectedIndex = Math.max(0, heroes.findIndex(hero => hero.id === initialHero.id));
   const setHeroSelectTheme = (hero) => {
     const theme = getHeroTheme(hero.id);
     section.dataset.selectedHero = hero.id;
@@ -1119,25 +1160,43 @@ function renderHeroSelect() {
   setHeroSelectTheme(initialHero);
 
   const heading = el('div', 'hero-select-title glitch-text');
-  heading.dataset.text = 'CHOOSE YOUR BOND';
-  heading.textContent = 'CHOOSE YOUR BOND';
+  heading.dataset.text = 'CHOOSE VOID BOND';
+  heading.textContent = 'CHOOSE VOID BOND';
   section.appendChild(heading);
 
   const showcase = el('div', 'hero-select-showcase');
+
   const renderShowcase = (hero) => {
     const theme = getHeroTheme(hero.id);
     const cait = buildCaitCompanion(hero.id);
     const portraitSrc = hero.portrait ?? hero.avatar;
+    const prevHero = heroes[(selectedIndex + heroes.length - 1) % heroes.length];
+    const nextHero = heroes[(selectedIndex + 1) % heroes.length];
+    const modeHooks = theme.modes ?? [theme.label, theme.duo, theme.shell];
+    const synthBars = Array.from({ length: 28 }, (_, index) => `<i style="--bar:${index}"></i>`).join('');
     showcase.innerHTML = `
+      <div class="hero-synth-border" aria-hidden="true">
+        <div class="hero-synth-line hero-synth-line-top">${synthBars}</div>
+        <div class="hero-synth-line hero-synth-line-bottom">${synthBars}</div>
+      </div>
       <div class="hero-feature-copy">
-        <span class="hero-select-kicker">Forced Duo Protocol</span>
+        <span class="hero-select-kicker">Forbidden Duo Pact</span>
         <h2 class="hero-feature-name">${escapeHtml(hero.name)}</h2>
-        <p class="hero-feature-title">${escapeHtml(hero.title)} + ${escapeHtml(CAIT_IDOL.title)}</p>
+        <p class="hero-feature-title">
+          ${escapeHtml(hero.title)}
+          ${hero.id === 'asiphyx' ? ' // <span style="color: #ff3399; text-shadow: 0 0 5px #ff3399; font-weight: bold;">CREATOR // SHADOW LEADER 🎭</span>' : ''}
+          // Cait bond: ${escapeHtml(cait.bondName)}
+        </p>
         <p class="hero-feature-quote">"${escapeHtml(hero.quote)}"</p>
         <div class="hero-feature-stats">
           <span>${hero.maxHp} HP</span>
           <span>Cait ${cait.maxHp} HP</span>
           <span>${escapeHtml(cait.bondName)}</span>
+        </div>
+        <div class="hero-page-controls" aria-label="Hero profile navigation">
+          <button class="btn hero-page-btn" type="button" data-prev-hero aria-label="Previous hero">${escapeHtml(prevHero.name)}</button>
+          <span>${String(selectedIndex + 1).padStart(2, '0')} / ${String(heroes.length).padStart(2, '0')} // Bond Page</span>
+          <button class="btn hero-page-btn" type="button" data-next-hero aria-label="Next hero">${escapeHtml(nextHero.name)}</button>
         </div>
         <div class="duo-balance-panel">
           <span>QUEEN VALUE RATIO</span>
@@ -1145,23 +1204,42 @@ function renderHeroSelect() {
           <div class="duo-meter"><i style="width:${Math.round(cait.reliability * 100)}%"></i></div>
           <p>${escapeHtml(cait.role)}</p>
         </div>
+        <div class="hero-lore-panel">
+          <span>${escapeHtml(theme.spotlight ?? theme.label)}</span>
+          <p>${escapeHtml(theme.lore ?? theme.motto)}</p>
+        </div>
         <button class="btn btn-primary hero-feature-start" data-start-hero="${hero.id}">Start Duo Run</button>
       </div>
-      <div class="duo-feature-stage">
-        <div class="duo-portrait-shell hero-duo-shell">
+      <div class="duo-feature-stage hero-spotlight-stage">
+        <button class="btn hero-stage-nav hero-stage-prev" type="button" data-prev-hero aria-label="Previous hero">${escapeHtml(prevHero.name)}</button>
+        <div class="duo-portrait-shell hero-duo-shell hero-spotlight-shell">
           <span>${escapeHtml(hero.name)}</span>
           <img class="duo-feature-art hero-feature-art" src="${portraitSrc}" alt="${escapeHtml(hero.name)} profile art" />
         </div>
-        <div class="duo-link-core">
-          <span>+</span>
+        ${hero.id === 'asiphyx' ? `
+          <div class="shadow-leader-asiphyx" title="Asiphyx: Cait's Creator / Shadow Leader" style="position: absolute; left: calc(50% - 180px); top: 22%; width: 68px; height: 98px; z-index: 10; opacity: 0.6; pointer-events: none; filter: drop-shadow(0 0 10px #9933ff) brightness(0.75); animation: shadowLeaderFloat 5s ease-in-out infinite;">
+            <div style="font-size: 5px; font-family: 'Press Start 2P', monospace; color: #ff3399; margin-bottom: 4px; text-align: center; text-shadow: 0 0 2px #000; background: rgba(0,0,0,0.85); padding: 2px; border: 1px solid #ff3399; border-radius: 2px; white-space: nowrap;">
+              CREATOR // SHADOW LEADER 🎭
+            </div>
+            <img src="/assets/heroes/avatars/asiphyx2.png" style="width: 100%; height: auto; border: 2px solid #9933ff; border-radius: 4px; background: rgba(0,0,0,0.7);" alt="" />
+          </div>
+        ` : ''}
+        <button class="btn hero-stage-nav hero-stage-next" type="button" data-next-hero aria-label="Next hero">${escapeHtml(nextHero.name)}</button>
+        <div class="hero-stage-caption">
+          <span>${String(selectedIndex + 1).padStart(2, '0')} / ${String(heroes.length).padStart(2, '0')} // Selected Bond</span>
           <strong>${escapeHtml(cait.bondName)}</strong>
-        </div>
-        <div class="duo-portrait-shell cait-duo-shell">
-          <span>CAIT // PEON QUEEN</span>
-          <img class="duo-feature-art cait-feature-art" src="${CAIT_IDOL.portrait}" alt="Cait Peon Queen profile art" />
+          <em>${escapeHtml(theme.spotlight ?? hero.title)}</em>
         </div>
       </div>
       <div class="hero-feature-kit">
+        <div class="tutorial-guide-card">
+          <span>TUTORIAL GUIDE RESERVED</span>
+          <div>
+            <img src="${TUTORIAL_GUIDE.avatar}" alt="${escapeHtml(TUTORIAL_GUIDE.name)} portrait" />
+            <p><strong>${escapeHtml(TUTORIAL_GUIDE.name)}</strong>${escapeHtml(TUTORIAL_GUIDE.directive)}</p>
+          </div>
+          <small>${escapeHtml(TUTORIAL_GUIDE.status)}</small>
+        </div>
         <div>
           <span>HERO PASSIVE</span>
           <strong>${escapeHtml(hero.passive.name)}</strong>
@@ -1171,6 +1249,24 @@ function renderHeroSelect() {
           <span>CAIT BOND</span>
           <strong>${escapeHtml(cait.bondName)}</strong>
           <p>${escapeHtml(cait.bondLine)}</p>
+        </div>
+        <div>
+          <span>MECHANIC HOOK</span>
+          <strong>${escapeHtml(theme.motto)}</strong>
+          <p>${escapeHtml(theme.mechanic ?? hero.ultimate.description)}</p>
+        </div>
+        <div class="hero-mode-hooks">
+          <span>MODE POTENTIAL</span>
+          <div>
+            ${modeHooks.map(mode => `<b>${escapeHtml(mode)}</b>`).join('')}
+          </div>
+        </div>
+        <div class="cait-presence-card">
+          <span>CAIT COMPANION SIGNAL</span>
+          <div>
+            <img src="${CAIT_LABS_ICON}" alt="Cait Labs companion seal" />
+            <p><strong>${escapeHtml(cait.bondName)}</strong>${escapeHtml(cait.bondLine)}</p>
+          </div>
         </div>
         <div class="cait-module-stack">
           <span>STARTING CAIT MODULES</span>
@@ -1184,50 +1280,31 @@ function renderHeroSelect() {
         </div>
       </div>
     `;
+    showcase.scrollLeft = 0;
+    showcase.scrollTop = 0;
     showcase.querySelector('[data-start-hero]').onclick = () => {
       game.selectHero(hero);
       game.startRun(15, cardPool, enemyCatalogue);
     };
+    showcase.querySelector('[data-prev-hero]').onclick = () => selectHeroByIndex(selectedIndex - 1);
+    showcase.querySelector('[data-next-hero]').onclick = () => selectHeroByIndex(selectedIndex + 1);
   };
-  renderShowcase(initialHero);
-  section.appendChild(showcase);
 
-  const grid = el('div', 'hero-grid');
-  for (const hero of heroes) {
-    const card = el('button', 'hero-card');
-    const avatarSrc = hero.portrait ?? hero.avatar;
-    card.type = 'button';
-    card.dataset.heroId = hero.id;
-    card.style.setProperty('--hero-color', hero.color);
-    card.style.setProperty('--hero-glow', `${hero.color}55`);
-    if (hero.id === initialHero.id) card.classList.add('selected');
-    card.innerHTML = `
-      <img class="hero-portrait" src="${avatarSrc}" alt="${hero.name}" />
-      <div class="hero-card-copy">
-        <div class="hero-name">${hero.name}</div>
-        <div class="hero-title-text">${hero.title}</div>
-        <div class="hero-passive"><strong>${getCaitLoadout(hero.id).bondName}</strong><br/>${getCaitLoadout(hero.id).role}</div>
-        <div class="hero-hp">${hero.maxHp} HP · Cait ${CAIT_IDOL.maxHp} HP</div>
-      </div>
-    `;
-    const previewHero = () => {
-      selectedHero = hero;
-      setHeroSelectTheme(hero);
-      renderShowcase(hero);
-      grid.querySelectorAll('.hero-card').forEach(candidate => {
-        candidate.classList.toggle('selected', candidate === card);
-      });
-    };
-    card.onmouseenter = previewHero;
-    card.onfocus = previewHero;
-    card.onclick = () => {
-      selectedHero = hero;
-      previewHero();
-    };
-    grid.appendChild(card);
-  }
-  section.appendChild(grid);
+  const selectHero = (hero) => {
+    selectedHero = hero;
+    selectedIndex = Math.max(0, heroes.findIndex(candidate => candidate.id === hero.id));
+    setHeroSelectTheme(hero);
+    renderShowcase(hero);
+  };
+
+  const selectHeroByIndex = (index) => {
+    const nextIndex = (index + heroes.length) % heroes.length;
+    selectHero(heroes[nextIndex]);
+  };
+
+  section.appendChild(showcase);
   root.appendChild(section);
+  selectHero(initialHero);
 }
 
 // ──────────────────────────────────────────────────────────
@@ -1352,14 +1429,6 @@ function renderCombat() {
         </div>
         <span class="top-stat-val">${snap.hp}/${snap.maxHp}</span>
       </div>
-      <div class="top-stat-item cait-stat">
-        <span class="top-stat-icon">👑</span>
-        <div class="top-stat-bar-outer">
-          <div class="top-stat-bar-fill cait" style="width:${cait ? pct(cait.hp, cait.maxHp) : 0}%"></div>
-        </div>
-        <span class="top-stat-val">Cait ${cait ? `${cait.hp}/${cait.maxHp}` : '--'}</span>
-      </div>
-      
       <!-- Block Stat -->
       <div class="top-stat-item block-stat ${snap.block > 0 ? 'has-block' : 'no-block'}">
         <span class="top-stat-icon">🛡️</span>
@@ -1377,60 +1446,86 @@ function renderCombat() {
       <span class="top-run-val">💰 ${snap.gold} Gold</span>
       <span class="top-run-divider">|</span>
       <span class="top-run-val">Floor ${snap.floor}/${snap.maxFloor}</span>
+      <span class="top-run-divider">|</span>
+      <button class="btn engine-toggle-btn" id="engine-toggle-btn" type="button" style="margin-left: 10px; padding: 2px 6px; font-size: 8px; font-family: 'Press Start 2P', monospace; border: 1px solid var(--hero-color); background: rgba(0,0,0,0.6); color: #fff; cursor: pointer; text-shadow: 0 0 4px var(--hero-color); box-shadow: 0 0 5px rgba(0,0,0,0.5);">
+        ENGINE: ${engineMode.toUpperCase()}
+      </button>
     </div>
   `;
   section.appendChild(topBar);
+
+  const toggleBtn = topBar.querySelector('#engine-toggle-btn');
+  if (toggleBtn) {
+    toggleBtn.onclick = (e) => {
+      e.stopPropagation();
+      engineMode = engineMode === 'phaser' ? 'html5' : 'phaser';
+      localStorage.setItem('phyx-the-stack:engine-mode', engineMode);
+      if (engineMode === 'html5') {
+        destroyPhaserGame();
+      }
+      render();
+    };
+  }
 
   // ─── 2. MIDDLE BATTLEFIELD ───
   const battlefield = el('div', 'combat-battlefield');
   battlefield.style.setProperty('--battlefield-bg', `url('${theme.background}')`);
   
-  // High-fidelity low-opacity terminal background diagnostic logs
-  const matrixBg = el('div', 'battlefield-matrix-bg');
-  const terminalLogs = [
-    `SYS_CORE_INIT // RESOLVED`,
-    `STACK_POINTER // PTR: 0x7FFA8F`,
-    `MEMORY_LIMIT // CAP: 2048MB`,
-    `REF_COUNT_GC // ACTIVE`,
-    `VITE_COMPILER_V8 // RUNNING`,
-    `HEAP_POOL_ALLOC // 142KB`,
-    `DAEMON_THREAD // ACTIVE`,
-    `DEBUG_LEVEL_LOG // VERBOSE`,
-    `ERR_TRACE // EXITED_CODE_0`,
-    `CACHE_SECTOR // SYNCED`,
-    `PORT_LISTENER_8080 // OK`,
-    `STACK_FRAME_COUNT // CLN`
-  ];
-  matrixBg.innerHTML = terminalLogs.map(log => `<div>&gt; ${log}</div>`).join('');
-  battlefield.appendChild(matrixBg);
+  if (engineMode === 'phaser') {
+    battlefield.classList.add('phaser-active');
+    const phaserContainer = getPhaserContainer();
+    if (phaserContainer.parentNode) {
+      phaserContainer.parentNode.removeChild(phaserContainer);
+    }
+    battlefield.appendChild(phaserContainer);
+  } else {
+    // High-fidelity low-opacity terminal background diagnostic logs
+    const matrixBg = el('div', 'battlefield-matrix-bg');
+    const terminalLogs = [
+      `SYS_CORE_INIT // RESOLVED`,
+      `STACK_POINTER // PTR: 0x7FFA8F`,
+      `MEMORY_LIMIT // CAP: 2048MB`,
+      `REF_COUNT_GC // ACTIVE`,
+      `VITE_COMPILER_V8 // RUNNING`,
+      `HEAP_POOL_ALLOC // 142KB`,
+      `DAEMON_THREAD // ACTIVE`,
+      `DEBUG_LEVEL_LOG // VERBOSE`,
+      `ERR_TRACE // EXITED_CODE_0`,
+      `CACHE_SECTOR // SYNCED`,
+      `PORT_LISTENER_8080 // OK`,
+      `STACK_FRAME_COUNT // CLN`
+    ];
+    matrixBg.innerHTML = terminalLogs.map(log => `<div>&gt; ${log}</div>`).join('');
+    battlefield.appendChild(matrixBg);
 
-  // Neon territorial divider between hero and enemy columns
-  const divider = el('div', 'battlefield-divider');
-  battlefield.appendChild(divider);
-  
-  // Left Side: Hero Sprite Platform
-  const heroSpriteContainer = el('div', 'hero-sprite-container');
-  heroSpriteContainer.style.setProperty('--hero-color', hero?.color ?? '#9933ff');
-  heroSpriteContainer.innerHTML = `
-    <div class="hero-sprite-platform">
-      <div class="hero-sprite-glow"></div>
-      <div class="hero-sprite-matrix">
-        <div class="holo-sprite-avatar">
-          <img class="holo-avatar-image" src="${heroBattlePortrait}" alt="${hero?.name ?? ''}" />
-          <div class="holo-glitch-overlay"></div>
+    // Neon territorial divider between hero and enemy columns
+    const divider = el('div', 'battlefield-divider');
+    battlefield.appendChild(divider);
+    
+    // Left Side: Hero Sprite Platform
+    const heroSpriteContainer = el('div', 'hero-sprite-container');
+    heroSpriteContainer.style.setProperty('--hero-color', hero?.color ?? '#9933ff');
+    heroSpriteContainer.innerHTML = `
+      <div class="hero-sprite-platform">
+        <div class="hero-sprite-glow"></div>
+        <div class="hero-sprite-matrix">
+          <div class="holo-sprite-avatar">
+            <img class="holo-avatar-image" src="${heroBattlePortrait}" alt="${hero?.name ?? ''}" />
+            <div class="holo-glitch-overlay"></div>
+          </div>
+        </div>
+        <div class="hero-sprite-tag" style="background-color: rgba(0,0,0,0.6); border-color: ${hero?.color}">
+          <span class="hero-tag-indicator" style="background-color: ${hero?.color ?? 'var(--neon-purple)'}"></span>
+          ${hero?.name?.toUpperCase() ?? 'SYS'} : READY
+        </div>
+        <div class="assistant-motto">${theme.motto}</div>
+        <div class="hero-sprite-stats">
+          ${snap.block > 0 ? `<div class="hero-battle-block">🛡️ ${snap.block}</div>` : ''}
         </div>
       </div>
-      <div class="hero-sprite-tag" style="background-color: rgba(0,0,0,0.6); border-color: ${hero?.color}">
-        <span class="hero-tag-indicator" style="background-color: ${hero?.color ?? 'var(--neon-purple)'}"></span>
-        ${hero?.name?.toUpperCase() ?? 'SYS'} : READY
-      </div>
-      <div class="assistant-motto">${theme.motto}</div>
-      <div class="hero-sprite-stats">
-        ${snap.block > 0 ? `<div class="hero-battle-block">🛡️ ${snap.block}</div>` : ''}
-      </div>
-    </div>
-  `;
-  battlefield.appendChild(heroSpriteContainer);
+    `;
+    battlefield.appendChild(heroSpriteContainer);
+  }
 
   const caitCodecWindow = el('div', 'cait-codec-window');
   caitCodecWindow.innerHTML = `
@@ -1441,50 +1536,69 @@ function renderCombat() {
     <div class="cait-codec-body">
       <img class="cait-codec-image" src="${cait?.battlePortrait ?? CAIT_IDOL.battlePortrait}" alt="Cait companion" />
       <div class="cait-codec-copy">
-        <span>CAIT AUTOPLAY</span>
+        <span>CAIT BROADCAST ONLINE</span>
         <strong>${escapeHtml(caitIntent.name)}</strong>
         <p>${escapeHtml(caitIntent.description)}</p>
-        <small>${escapeHtml(cait?.bondName ?? theme.duo)} // ${cait ? `${cait.hp}/${cait.maxHp} HP` : 'SYNCING'}</small>
+        <div class="cait-codec-health" aria-label="Cait health">
+          <b>Cait HP</b>
+          <i><em style="width:${cait ? pct(cait.hp, cait.maxHp) : 0}%"></em></i>
+          <strong>${cait ? `${cait.hp}/${cait.maxHp}` : '--/--'}</strong>
+        </div>
+        <small>${escapeHtml(cait?.bondName ?? theme.duo)} // ${cait ? 'SYNCED' : 'SYNCING'}</small>
       </div>
     </div>
   `;
   applyCaitCodecOffset(caitCodecWindow);
   battlefield.appendChild(caitCodecWindow);
 
-  // Right Side: Enemy Area
-  const enemyArea = el('div', 'combat-enemy-area');
-  const arenaHeader = el('div', 'arena-header');
-  arenaHeader.innerHTML = `
-    <span class="arena-cait">CAIT BROADCAST ONLINE</span>
-    <span class="arena-theme">${theme.label}</span>
-  `;
-  battlefield.appendChild(arenaHeader);
-  for (const [i, rawEnemy] of state.enemies.entries()) {
-    const enemy = hydrateEnemyDisplay(rawEnemy);
-    const intent = enemy.pattern?.[enemy.patternIndex] ?? { type: 'none', description: '...' };
-    const nextIntent = enemy.pattern?.[(enemy.patternIndex + 1) % Math.max(1, enemy.pattern.length)];
-    const isSelected = selectedTarget === i;
-    const enemySprite = enemy.sprite ?? '';
-
-    const slot = el('div', `enemy-slot type-${enemy.tier || enemy.type || 'normal'} enemy-${enemy.id}`);
-    slot.innerHTML = `
-      <div class="enemy-intent ${intent.type}">
-        ${intentIcon(intent.type)} ${intentLabel(intent)}
-        ${hero?.id === 'xadnib' && nextIntent ? `<span class="intent-next">→ ${intentLabel(nextIntent)}</span>` : ''}
-      </div>
-      <div class="enemy-body ${isSelected ? 'targeted' : ''}" data-enemy="${i}">
-        ${enemy.block > 0 ? `<div class="enemy-block-badge">${enemy.block}</div>` : ''}
-        ${enemySprite ? `<img class="enemy-sprite" src="${enemySprite}" alt="${enemy.name}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />` : ''}
-        <div class="enemy-emoji ${enemySprite ? 'enemy-emoji-fallback' : ''}">${enemy.emoji ?? '👾'}</div>
-        <div class="enemy-name">${enemy.name}</div>
-        <div class="enemy-hp-bar"><div class="enemy-hp-fill" style="width:${pct(enemy.hp, enemy.maxHp)}%"></div></div>
-        <div class="enemy-hp-text">${enemy.hp} / ${enemy.maxHp}</div>
-      </div>
+  if (engineMode === 'phaser') {
+    // Stage Header overlay in Phaser mode
+    const arenaHeader = el('div', 'arena-header');
+    arenaHeader.innerHTML = `
+      <span class="arena-cait">BATTLE STAGE</span>
+      <span class="arena-theme">${escapeHtml(theme.spotlight ?? theme.label)}</span>
     `;
-    slot.querySelector('.enemy-body').onclick = () => { selectedTarget = i; render(); };
-    enemyArea.appendChild(slot);
+    battlefield.appendChild(arenaHeader);
+  } else {
+    // Right Side: Enemy Area
+    const enemyArea = el('div', 'combat-enemy-area');
+    const arenaHeader = el('div', 'arena-header');
+    arenaHeader.innerHTML = `
+      <span class="arena-cait">BATTLE STAGE</span>
+      <span class="arena-theme">${escapeHtml(theme.spotlight ?? theme.label)}</span>
+    `;
+    enemyArea.appendChild(arenaHeader);
+    for (const [i, rawEnemy] of state.enemies.entries()) {
+      const enemy = hydrateEnemyDisplay(rawEnemy);
+      const intent = enemy.pattern?.[enemy.patternIndex] ?? { type: 'none', description: '...' };
+      const nextIntent = enemy.pattern?.[(enemy.patternIndex + 1) % Math.max(1, enemy.pattern.length)];
+      const isSelected = selectedTarget === i;
+      const enemySprite = enemy.sprite ?? '';
+      const enemySpriteMarkup = enemy.idleSprite
+        ? `<div class="enemy-sprite enemy-sprite-animated enemy-sprite-animated-${enemy.idleFrames ?? 4}" role="img" aria-label="${escapeHtml(enemy.name)}" style="--enemy-idle-sprite: url(${escapeHtml(enemy.idleSprite)});"></div>`
+        : `${enemySprite ? `<img class="enemy-sprite" src="${enemySprite}" alt="${escapeHtml(enemy.name)}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />` : ''}`;
+
+      const slot = el('div', `enemy-slot type-${enemy.tier || enemy.type || 'normal'} enemy-${enemy.id}`);
+      slot.innerHTML = `
+        <div class="enemy-intent ${intent.type}">
+          <span class="enemy-intent-kicker">Next enemy action</span>
+          <strong>${intentIcon(intent.type)} ${intentLabel(intent)}</strong>
+          ${hero?.id === 'xadnib' && nextIntent ? `<span class="intent-next">→ ${intentLabel(nextIntent)}</span>` : ''}
+        </div>
+        <div class="enemy-body ${isSelected ? 'targeted' : ''}" data-enemy="${i}">
+          ${enemy.block > 0 ? `<div class="enemy-block-badge">${enemy.block}</div>` : ''}
+          ${enemySpriteMarkup}
+          <div class="enemy-emoji ${enemySprite || enemy.idleSprite ? 'enemy-emoji-fallback' : ''}">${enemy.emoji ?? '👾'}</div>
+          <div class="enemy-name">${enemy.name}</div>
+          <div class="enemy-hp-bar"><div class="enemy-hp-fill" style="width:${pct(enemy.hp, enemy.maxHp)}%"></div></div>
+          <div class="enemy-hp-text">${enemy.hp} / ${enemy.maxHp}</div>
+        </div>
+      `;
+      slot.querySelector('.enemy-body').onclick = () => { selectedTarget = i; render(); };
+      enemyArea.appendChild(slot);
+    }
+    battlefield.appendChild(enemyArea);
   }
-  battlefield.appendChild(enemyArea);
   section.appendChild(battlefield);
 
   // ─── 3. BOTTOM PANEL (DASHBOARD CONSOLE) ───
@@ -1649,6 +1763,12 @@ function renderCombat() {
         if (state.hp <= 0) return;
         game.combat.endPlayerTurn();
       };
+    }
+
+    if (engineMode === 'phaser') {
+      initPhaserGame('phaser-game-container', game, selectedTarget);
+      bus.emit('targetChanged', selectedTarget);
+      bus.emit('combatUpdate');
     }
   }, 0);
 }
@@ -2126,7 +2246,7 @@ function nodeLabel(type) {
 function buildEnemyCatalogue() {
   const normalIds = new Set([...ENCOUNTERS.easy.flat(), ...ENCOUNTERS.medium.flat(), ...ENCOUNTERS.hard.flat()]);
   const eliteIds = ['tech_debt', 'race_condition'];
-  const bossIds = ['production_outage', 'legacy_codebase', 'the_product_manager'];
+  const bossIds = ['budder_sphinx', 'production_outage', 'legacy_codebase', 'the_product_manager'];
   return {
     normal: [...normalIds].map(id => ENEMIES[id]).filter(Boolean),
     elite: eliteIds.map(id => ENEMIES[id]).filter(Boolean),
@@ -2174,8 +2294,8 @@ function resolveEnemyTemplate(enemy) {
 function renderGameToText() {
   const snap = game.getSnapshot();
   const state = game.state;
-  const selectedCard = root.querySelector('.hero-card.selected');
-  const selectedHeroId = selectedCard?.dataset?.heroId ?? state.hero?.id ?? 'asiphyx';
+  const heroSelectScreen = root.querySelector('.hero-select-screen');
+  const selectedHeroId = heroSelectScreen?.dataset?.selectedHero ?? state.hero?.id ?? 'asiphyx';
   const selectedHero = HEROES[selectedHeroId] ?? HEROES.asiphyx;
   const cait = state.cait ?? buildCaitCompanion(selectedHeroId);
   const payload = {
@@ -2228,6 +2348,7 @@ function renderGameToText() {
 }
 
 window.render_game_to_text = renderGameToText;
+window.game = game;
 window.advanceTime = () => {
   render();
 };

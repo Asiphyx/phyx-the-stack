@@ -11,11 +11,15 @@
     "assets:contact": "node scripts/asset-pipeline.mjs contact",
     "assets:optimize": "node scripts/asset-pipeline.mjs optimize",
     "assets:variants": "node scripts/asset-pipeline.mjs variants",
+    "assets:budder": "node scripts/process-budder-sphinx.mjs",
     "assets:comfy": "node scripts/comfy-generate.mjs",
     "assets:comfy:cait": "node scripts/comfy-generate.mjs --workflow comfy/workflows/pixel-sprite-workflow.json --prompts comfy/prompts/cait-sprite-batch.jsonl --out-dir tmp_asset_contact/cait_sprites_raw"
   },
   "devDependencies": {
     "sharp": "^0.34.5",
     "vite": "^8.0.12"
+  },
+  "dependencies": {
+    "phaser": "^4.1.0"
   }
 }
