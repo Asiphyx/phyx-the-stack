@@ -9514,8 +9514,8 @@ body::after {
 .hero-preview-panel img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  object-position: center 47%;
+  object-fit: contain;
+  object-position: center center;
   filter: saturate(1.05) contrast(1.03);
 }
 
@@ -9549,7 +9549,7 @@ body::after {
 .cait-regent-preview img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   object-position: center center;
   image-rendering: auto;
   filter: saturate(1.12) contrast(1.04) drop-shadow(0 0 14px rgba(255, 51, 153, 0.45));
@@ -9685,26 +9685,32 @@ body::after {
   border-color: var(--slot-color);
   box-shadow: 0 0 18px color-mix(in srgb, var(--slot-color) 70%, transparent),
     inset 0 0 12px color-mix(in srgb, var(--slot-color) 30%, transparent);
-  transform: translateX(-50%) translateY(-2px) scale(1.03);
+  transform: translateY(-2px) scale(1.03);
 }
 
 .hero-select-slot.is-focused::after {
   border-color: color-mix(in srgb, var(--slot-color) 80%, #ffffff 10%);
 }
 
+/* Portrait + overlays fill the slot via a pure-% inset box (top/bottom are %
+   of slot height, left/right of slot width) so they track the painted frame at
+   ANY viewport aspect ratio. A width-driven aspect-ratio:1/1 here spilled out
+   the frame bottom on wide screens (agent-patterns #1). */
+/* Portrait + overlays fill the slot with explicit % width/height (NOT inset +
+   auto — an absolutely-positioned <img> ignores inset and uses its intrinsic
+   size). % maps to slot dims → viewport, so it tracks the painted frame at any
+   aspect ratio. A width-driven aspect-ratio:1/1 spilled the frame on wide
+   screens (agent-patterns #1). */
 .hero-select-slot img {
   position: absolute;
-  left: 50%;
-  top: 5%;
+  left: 6%;
+  top: 3%;
+  width: 88%;
+  height: 94%;
   z-index: 0;
-  width: 76%;
-  height: auto !important;
-  max-height: none !important;
-  aspect-ratio: 1 / 1;
   display: block;
   object-fit: cover;
   object-position: center;
-  transform: translateX(-50%);
   border: 1px solid color-mix(in srgb, var(--slot-color) 62%, rgba(255,255,255,0.12));
   background:
     radial-gradient(circle at 50% 48%, rgba(255,255,255,0.06), transparent 45%),
@@ -9716,12 +9722,10 @@ body::after {
 .hero-select-slot::after {
   content: "";
   position: absolute;
-  left: 50%;
-  top: 5%;
-  width: 76%;
-  height: auto;
-  aspect-ratio: 1 / 1;
-  transform: translateX(-50%);
+  left: 6%;
+  top: 3%;
+  width: 88%;
+  height: 94%;
   z-index: 2;
   pointer-events: none;
   border: 1px solid rgba(0, 229, 255, 0.22);
@@ -9733,15 +9737,13 @@ body::after {
 
 .mystery-portrait {
   position: absolute;
-  left: 50%;
-  top: 5%;
+  left: 6%;
+  top: 3%;
+  width: 88%;
+  height: 94%;
   z-index: 0;
-  width: 76%;
-  height: auto;
   display: grid;
   place-items: center;
-  aspect-ratio: 1 / 1;
-  transform: translateX(-50%);
   border: 1px solid rgba(255,255,255,0.14);
   background:
     radial-gradient(circle at 50% 42%, rgba(255,255,255,0.16), transparent 32%),
@@ -9757,12 +9759,10 @@ body::after {
 .hero-select-slot.is-locked::before {
   content: "";
   position: absolute;
-  left: 50%;
-  top: 5%;
-  width: 76%;
-  height: auto;
-  aspect-ratio: 1 / 1;
-  transform: translateX(-50%);
+  left: 6%;
+  top: 3%;
+  width: 88%;
+  height: 94%;
   z-index: 1;
   pointer-events: none;
   background: rgba(0, 0, 0, 0.34);
@@ -9843,7 +9843,7 @@ body::after {
 
 .hero-select-slot:hover img,
 .hero-select-slot:focus-visible img {
-  transform: translateX(-50%) translateY(-3px) scale(1.04);
+  transform: translateY(-3px) scale(1.04);
   opacity: 1;
   filter: saturate(1.15) contrast(1.08);
 }
