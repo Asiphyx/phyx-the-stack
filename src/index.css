@@ -9471,6 +9471,7 @@ body::after {
   width: min(100vw, calc(100svh * 1672 / 941));
   aspect-ratio: 1672 / 941;
   max-height: 100svh;
+  margin: auto;
   overflow: hidden;
   background:
     linear-gradient(rgba(0,0,0,0.02), rgba(0,0,0,0.02)),
@@ -9668,15 +9669,21 @@ body::after {
 }
 
 .hero-select-slot img {
-  width: 74%;
-  height: 68% !important;
-  max-height: 68% !important;
+  position: absolute;
+  left: 9%;
+  top: 10%;
+  z-index: 0;
+  width: 82%;
+  height: 72% !important;
+  max-height: 72% !important;
   aspect-ratio: 1 / 1;
   display: block;
   object-fit: contain;
   object-position: center;
   border: 1px solid color-mix(in srgb, var(--slot-color) 62%, rgba(255,255,255,0.12));
-  background: rgba(0,0,0,0.62);
+  background:
+    radial-gradient(circle at 50% 48%, rgba(255,255,255,0.06), transparent 45%),
+    rgba(0,0,0,0.86);
   box-shadow: 0 0 14px color-mix(in srgb, var(--slot-color) 28%, transparent);
   transition: transform 0.16s ease, filter 0.16s ease, opacity 0.16s ease;
 }
@@ -9688,6 +9695,7 @@ body::after {
   top: 10%;
   width: 82%;
   height: 72%;
+  z-index: 2;
   pointer-events: none;
   border: 1px solid rgba(0, 229, 255, 0.22);
   background:
@@ -9697,8 +9705,12 @@ body::after {
 }
 
 .mystery-portrait {
-  width: 74%;
-  height: 68%;
+  position: absolute;
+  left: 9%;
+  top: 10%;
+  z-index: 0;
+  width: 82%;
+  height: 72%;
   display: grid;
   place-items: center;
   aspect-ratio: 1 / 1;
@@ -9731,7 +9743,7 @@ body::after {
 .hero-select-slot i,
 .hero-lock-mark {
   position: absolute;
-  z-index: 2;
+  z-index: 3;
   max-width: 88%;
   overflow: hidden;
   text-align: center;
@@ -9787,7 +9799,7 @@ body::after {
 }
 
 .hero-select-slot.is-open img {
-  object-position: center 48%;
+  object-position: center;
   filter: saturate(1.1) contrast(1.05);
 }
 

@@ -1363,7 +1363,7 @@ function renderHeroSelect() {
       ${roster.map((hero, index) => {
         const isPlayable = PLAYABLE_HERO_IDS.has(hero.id);
         const heroTheme = getHeroTheme(hero.id);
-        const previewSrc = hero.avatar ?? hero.portrait ?? hero.selectionPortrait;
+        const previewSrc = hero.portrait ?? hero.battlePortrait ?? hero.avatar ?? hero.selectionPortrait;
         const slot = slots[index] ?? slots[slots.length - 1];
         return `
           <button
