@@ -21,12 +21,25 @@ export class CombatScene extends Phaser.Scene {
     this.enemySprites = [];
     this.eventListeners = [];
     this.budderCat = null;
+    this.fxQueueAt = 0;
   }
 
   init(data) {
     this.gameRef = data.game;
     this.selectedTargetIndex = data.selectedTarget ?? 0;
     this.enemySprites = [];
+    this.fxQueueAt = 0;
+  }
+
+  queueFx(callback, duration = 420) {
+    const now = this.time?.now ?? 0;
+    this.fxQueueAt = Math.max(this.fxQueueAt, now);
+    const delay = Math.max(0, this.fxQueueAt - now);
+    this.fxQueueAt += duration;
+    this.time.delayedCall(delay, () => {
+      if (!this.scene.isActive()) return;
+      callback();
+    });
   }
 
   preload() {
@@ -992,6 +1005,8 @@ export class CombatScene extends Phaser.Scene {
     
     // 1. Damage event listener (projectiles + floating texts)
     const onDamage = (event) => {
+      const queueDuration = event.source === 'cait' ? 720 : 430;
+      this.queueFx(() => {
       const isPlayer = event.target === 'player';
       const isCaitStrike = event.source === 'cait';
       const amount = Math.round(event.amount);
@@ -1006,7 +1021,7 @@ export class CombatScene extends Phaser.Scene {
           targetX = sprite.x;
           targetY = sprite.y;
           if (isCaitStrike) {
-            const delay = 600 + Math.max(0, Number(event.actionIndex ?? 0)) * 180;
+            const delay = 90 + Math.max(0, Number(event.actionIndex ?? 0)) * 140;
             this.time.delayedCall(delay, () => {
               if (sprite.active) {
                 this.tweens.add({
@@ -1051,7 +1066,8 @@ export class CombatScene extends Phaser.Scene {
         this.spawnLaserBeam(180, 150, targetX, targetY, 0x00e5ff);
       } else {
         // Enemy attack
-        const sprite = this.enemySprites.find(s => s.getData('enemyId') === lastActingEnemyId) || this.enemySprites[0];
+        const attackerId = event.sourceId ?? lastActingEnemyId;
+        const sprite = this.enemySprites.find(s => s.getData('enemyId') === attackerId) || this.enemySprites[0];
         if (sprite?.getData('isBudder')) {
           this.spawnBudderAttackVortex(sprite.x, sprite.y, 180, 150);
         } else if (sprite) {
@@ -1064,10 +1080,13 @@ export class CombatScene extends Phaser.Scene {
       
       // Flash screen red/cyan
       this.cameras.main.flash(80, isPlayer ? 100 : 0, isPlayer ? 0 : 100, isPlayer ? 0 : 100, 0.15);
+      }, queueDuration);
     };
 
     const onCaitAttackWindup = (event) => {
-      this.spawnCaitMomentumBlackHole(event);
+      this.queueFx(() => {
+        this.spawnCaitMomentumBlackHole(event);
+      }, 520);
     };
 
     // 2. Combat update listener
@@ -1095,6 +1114,7 @@ export class CombatScene extends Phaser.Scene {
 
     // 3. Enemy Action FX
     const onEnemyAction = ({ enemy, action }) => {
+      this.queueFx(() => {
       lastActingEnemyId = enemy.id;
       // Find matching enemy container
       const sprite = this.enemySprites.find(s => s.getData('enemyId') === enemy.id);
@@ -1111,18 +1131,23 @@ export class CombatScene extends Phaser.Scene {
         });
 
       }
+      }, action?.type === 'attack' || action?.type === 'attackAll' ? 440 : 300);
     };
 
     const onCardPlayed = ({ card, targetIndex }) => {
       if (this.isAsiphyxGravityCard(card)) {
-        this.spawnAsiphyxGravityPull(targetIndex);
+        this.queueFx(() => {
+          this.spawnAsiphyxGravityPull(targetIndex);
+        }, 380);
       }
     };
 
     const onToast = ({ text }) => {
       const message = String(text ?? '');
       if (message.includes('Cait momentum') || message.includes('Center of Gravity')) {
-        this.spawnAsiphyxGravityPull(this.selectedTargetIndex ?? 0);
+        this.queueFx(() => {
+          this.spawnAsiphyxGravityPull(this.selectedTargetIndex ?? 0);
+        }, 320);
       }
     };
 

@@ -1307,13 +1307,23 @@ function renderHeroSelect() {
   const section = el('section', 'hero-select-screen');
   const heroes = Object.values(HEROES);
   const asiphyx = heroes.find(hero => hero.id === 'asiphyx') ?? heroes[0];
+  const mysteryHero = {
+    id: 'mystery',
+    name: '???',
+    title: 'Unknown Bond',
+    avatar: null,
+    color: '#111111',
+    passive: { name: 'Signal Hidden' },
+    mystery: true,
+  };
   const roster = [
     asiphyx,
     ...heroes.filter(hero => hero.id !== asiphyx.id && hero.id !== 'cait'),
-    ...heroes.filter(hero => hero.id === 'cait'),
+    mysteryHero,
   ].slice(0, 6);
   const theme = getHeroTheme(asiphyx.id);
   const cait = buildCaitCompanion(asiphyx.id);
+  const caitRegentSprite = cait.sprite?.portrait ?? '/assets/heroes/kinetic-regent-cait/cait_kinetic_regent_from_idle.png';
   const slots = [
     { left: 18.8, top: 74.0 },
     { left: 29.9, top: 74.0 },
@@ -1334,6 +1344,10 @@ function renderHeroSelect() {
     <div class="hero-preview-panel" aria-label="Selected hero preview">
       <img src="${asiphyx.selectionPortrait ?? asiphyx.portrait}" alt="${escapeHtml(asiphyx.name)} hero select card" />
     </div>
+    <div class="cait-regent-preview" aria-label="Kinetic Regent Cait preview">
+      <img src="${escapeHtml(caitRegentSprite)}" alt="Kinetic Regent Cait pixel art" />
+      <span>${escapeHtml(cait.bondName)}</span>
+    </div>
     <aside class="cait-variant-summary" aria-label="Selected Cait variant summary">
       <span>Cait Variant</span>
       <strong>${escapeHtml(cait.bondName)}</strong>
@@ -1349,27 +1363,27 @@ function renderHeroSelect() {
       ${roster.map((hero, index) => {
         const isPlayable = PLAYABLE_HERO_IDS.has(hero.id);
         const heroTheme = getHeroTheme(hero.id);
-        const previewSrc = hero.id === 'asiphyx'
-          ? (hero.selectionPortrait ?? hero.portrait ?? hero.avatar)
-          : (hero.avatar ?? hero.portrait ?? hero.selectionPortrait);
+        const previewSrc = hero.avatar ?? hero.portrait ?? hero.selectionPortrait;
         const slot = slots[index] ?? slots[slots.length - 1];
         return `
           <button
-            class="hero-select-slot ${isPlayable ? 'is-open' : 'is-locked'}"
+            class="hero-select-slot ${isPlayable ? 'is-open' : 'is-locked'} ${hero.mystery ? 'is-mystery' : ''}"
             type="button"
             data-start-hero="${escapeHtml(hero.id)}"
             style="--slot-left:${slot.left}%; --slot-top:${slot.top}%; --slot-color:${heroTheme.accent ?? hero.color ?? '#9933ff'};"
             aria-disabled="${isPlayable ? 'false' : 'true'}"
             aria-label="${escapeHtml(hero.name)} ${isPlayable ? 'available' : 'locked'}"
           >
-            <img src="${previewSrc}" alt="" />
+            ${hero.mystery
+              ? '<span class="mystery-portrait" aria-hidden="true">??</span>'
+              : `<img src="${previewSrc}" alt="" />`}
             <b>${escapeHtml(hero.name)}</b>
             <i>${isPlayable ? 'OPEN' : 'LOCKED'}</i>
             <span class="hero-lock-mark">${isPlayable ? 'RUN' : 'LOCK'}</span>
             <span class="hero-hover-panel">
               <strong>${escapeHtml(hero.name)}</strong>
               <small>${escapeHtml(hero.title)}</small>
-              <em>${isPlayable ? escapeHtml(cait.bondName) : 'Locked for jam build'}</em>
+              <em>${isPlayable ? escapeHtml(cait.bondName) : (hero.mystery ? 'Hidden route' : 'Locked for jam build')}</em>
               <span>${escapeHtml(hero.passive?.name ?? 'Variant pending')}</span>
             </span>
           </button>
@@ -1896,7 +1910,7 @@ function renderCombat() {
       endTurnBtn.onclick = () => {
         if (state.hp <= 0) return;
         clearStagedCommands();
-        game.combat.endPlayerTurn();
+        game.combat.endPlayerTurn({ allowCait: false, reason: 'wait' });
       };
     }
 

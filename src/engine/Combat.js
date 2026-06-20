@@ -1086,7 +1086,8 @@ export class Combat {
   // ────────────────────────────────────────────────────────
 
   /** Player ends their turn voluntarily. */
-  endPlayerTurn() {
+  endPlayerTurn(options = {}) {
+    const { allowCait = true, reason = 'end_turn' } = options;
     const s = this.gs.state;
     const handToExhaust = [];
     const handToDiscard = [];
@@ -1110,8 +1111,12 @@ export class Combat {
 
     bus.emit('combatUpdate', this._snapshot());
 
-    // Cait acts autonomously between player and enemy turns
-    this._executeCaitTurn();
+    if (allowCait) {
+      // Cait acts autonomously between player and enemy turns only after a committed stack.
+      this._executeCaitTurn();
+    } else if (reason === 'wait') {
+      bus.emit('toast', { text: 'WAIT // no routed modules, Cait holds fire.', type: 'enemy' });
+    }
 
     this._executeEnemyTurn();
   }
@@ -1256,6 +1261,8 @@ export class Combat {
       return;
     }
 
+    bus.emit('enemyAction', { enemy: { ...enemy }, action: intent });
+
     switch (intent.type) {
       case 'attack': {
         const amount = toDisplayInt((intent.value ?? 0) * (1 + (enemy.strength ?? 0) / 100));
@@ -1334,8 +1341,6 @@ export class Combat {
       default:
         console.warn(`[Combat] Unknown enemy intent: "${intent.type}"`);
     }
-
-    bus.emit('enemyAction', { enemy: { ...enemy }, action: intent });
   }
 
   /** Each enemy performs its current intent, then advances the pattern. */
