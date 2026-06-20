@@ -1,5 +1,6 @@
 import './index.css';
 import { inject } from '@vercel/analytics';
+import { injectSpeedInsights } from '@vercel/speed-insights';
 import { GameState } from './engine/GameState.js';
 import { HEROES } from './data/heroes.js';
 import { getHeroTheme } from './data/heroThemes.js';
@@ -13,6 +14,9 @@ import { initPhaserGame, destroyPhaserGame } from './phaser/PhaserGame.js';
 
 // Initialize Vercel Web Analytics
 inject();
+
+// Initialize Vercel Speed Insights
+injectSpeedInsights();
 
 const cardPool = Object.values(CARDS).filter(c => c.rarity !== 'starter');
 const game = new GameState();
