@@ -241,13 +241,12 @@ export const ENEMIES = {
 /**
  * Encounter tables mapping floor difficulty tiers to possible enemy groups.
  *
- * Floor structure (15 floors total):
+ * The current jam route is 11 floors:
  *   Floors 1–4:  easy encounters
- *   Floor 5:     Boss 1 — Production Outage
+ *   Floor 5:     elite encounter
  *   Floors 6–9:  medium encounters
- *   Floor 10:    Boss 2 — Legacy Codebase
- *   Floors 11–14: hard encounters
- *   Floor 15:    Final Boss — The Product Manager
+ *   Floor 10:    elite encounter
+ *   Floor 11:    final boss — Budder Sphinx
  *
  * Between combat floors, some nodes are rest sites
  * (heal 30% HP or remove a card from deck).

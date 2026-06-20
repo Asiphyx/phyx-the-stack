@@ -1,11 +1,11 @@
 /**
- * Phyx the Stack — Card Definitions
- * All cards keyed by card ID. Includes starter, common, uncommon, rare, and hero signature cards.
+ * Phyx the Stack — Module Definitions
+ * Historical engine identifiers still use "card" for compatibility, but these are command modules in the game vocabulary.
  */
 
 export const CARDS = {
   // ─────────────────────────────────────────────
-  // STARTER CARDS
+  // STARTER MODULES
   // ─────────────────────────────────────────────
 
   git_push: {
@@ -42,28 +42,28 @@ export const CARDS = {
 
   null_check: {
     id: 'null_check',
-    name: 'Null Check',
-    description: 'Gain 3 block.',
-    flavor: 'Defensive programming.',
+    name: 'Null Anchor',
+    description: 'Gain 4 block.',
+    flavor: 'A name pinned to the edge of the void.',
     cost: 0,
     rarity: 'starter',
     type: 'skill',
     effects: [
-      { type: 'block', value: 3, target: 'self' },
+      { type: 'block', value: 4, target: 'self' },
     ],
     heroOnly: 'asiphyx',
-    emoji: '✓',
-    tags: ['defensive'],
+    emoji: '□',
+    tags: ['defensive', 'gravity'],
   },
 
   // ─────────────────────────────────────────────
-  // TECHNICAL DEBT CARDS (Legacy Code)
+  // TECHNICAL DEBT MODULES (Legacy Code)
   // ─────────────────────────────────────────────
 
   spaghetti_code: {
     id: 'spaghetti_code',
     name: 'Spaghetti Code',
-    description: 'Deal 3 damage. Draw 1 card.',
+    description: 'Deal 3 damage. Draw 1 module.',
     flavor: 'It works, but nobody knows why.',
     cost: 1,
     rarity: 'debt',
@@ -97,7 +97,7 @@ export const CARDS = {
   merge_conflict: {
     id: 'merge_conflict',
     name: 'Merge Conflict',
-    description: 'Deal 5 damage. Discard 1 card.',
+    description: 'Deal 5 damage. Discard 1 module.',
     flavor: '<<<<<<< HEAD',
     cost: 1,
     rarity: 'debt',
@@ -126,7 +126,7 @@ export const CARDS = {
   },
 
   // ─────────────────────────────────────────────
-  // COMMON CARDS
+  // COMMON MODULES
   // ─────────────────────────────────────────────
 
   code_review: {
@@ -182,7 +182,7 @@ export const CARDS = {
   coffee_break: {
     id: 'coffee_break',
     name: 'Coffee Break',
-    description: 'Draw 2 cards.',
+    description: 'Draw 2 modules.',
     flavor: 'Fuel.',
     cost: 1,
     rarity: 'common',
@@ -198,7 +198,7 @@ export const CARDS = {
   rubber_duck: {
     id: 'rubber_duck',
     name: 'Rubber Duck',
-    description: 'Deal 3 damage and draw 1 card.',
+    description: 'Deal 3 damage and draw 1 module.',
     flavor: 'Explaining it helps.',
     cost: 1,
     rarity: 'common',
@@ -215,7 +215,7 @@ export const CARDS = {
   console_log: {
     id: 'console_log',
     name: 'Console.log',
-    description: 'Draw 1 card.',
+    description: 'Draw 1 module.',
     flavor: 'The OG debugger.',
     cost: 0,
     rarity: 'common',
@@ -247,7 +247,7 @@ export const CARDS = {
   linter: {
     id: 'linter',
     name: 'Linter',
-    description: 'Gain 6 block. Draw 1 card if you have block.',
+    description: 'Gain 6 block. Draw 1 module if you have block.',
     flavor: 'Auto-format.',
     cost: 1,
     rarity: 'common',
@@ -262,7 +262,7 @@ export const CARDS = {
   },
 
   // ─────────────────────────────────────────────
-  // UNCOMMON CARDS
+  // UNCOMMON MODULES
   // ─────────────────────────────────────────────
 
   stack_overflow: {
@@ -301,7 +301,7 @@ export const CARDS = {
   pair_programming: {
     id: 'pair_programming',
     name: 'Pair Programming',
-    description: 'Your next card is played twice.',
+    description: 'Your next module is played twice.',
     flavor: 'Two heads.',
     cost: 1,
     rarity: 'uncommon',
@@ -317,7 +317,7 @@ export const CARDS = {
   refactor: {
     id: 'refactor',
     name: 'Refactor',
-    description: 'Remove a card from your deck permanently. Exhaust.',
+    description: 'Remove a module from your stack permanently. Exhaust.',
     flavor: 'Clean it up.',
     cost: 1,
     rarity: 'uncommon',
@@ -367,7 +367,7 @@ export const CARDS = {
   open_source: {
     id: 'open_source',
     name: 'Open Source',
-    description: 'Add a random common card to your hand. Draw 1.',
+    description: 'Add a random common module to your hand. Draw 1.',
     flavor: 'Community effort.',
     cost: 1,
     rarity: 'uncommon',
@@ -382,7 +382,7 @@ export const CARDS = {
   },
 
   // ─────────────────────────────────────────────
-  // RARE CARDS
+  // RARE MODULES
   // ─────────────────────────────────────────────
 
   it_works_on_my_machine: {
@@ -412,7 +412,7 @@ export const CARDS = {
   microservices: {
     id: 'microservices',
     name: 'Microservices',
-    description: 'All cards cost 1 less for the rest of combat.',
+    description: 'All modules cost 1 less for the rest of combat.',
     flavor: 'Distributed everything.',
     cost: 3,
     rarity: 'rare',
@@ -475,7 +475,7 @@ export const CARDS = {
   },
 
   // ─────────────────────────────────────────────
-  // HERO SIGNATURE CARDS
+  // ASSISTANT SIGNATURE MODULES
   // ─────────────────────────────────────────────
 
   royal_decree: {
@@ -494,27 +494,146 @@ export const CARDS = {
     tags: ['offensive', 'aoe'],
   },
 
-  void_collapse: {
-    id: 'void_collapse',
-    name: 'Void Collapse',
-    description: 'Deal 5 damage + 3 per card removed from deck this run.',
-    flavor: 'The void remembers.',
-    cost: 2,
-    rarity: 'rare',
-    type: 'attack',
+  null_pointer_exception: {
+    id: 'null_pointer_exception',
+    name: 'Null Pointer Exception',
+    description: 'Gain 5 block. Set Counter to 4. Enemies that hit you take 4 damage until your next turn.',
+    flavor: 'The battlefield dereferences itself.',
+    cost: 1,
+    rarity: 'uncommon',
+    type: 'skill',
     effects: [
-      { type: 'damage', value: 5, target: 'enemy' },
-      { type: 'damage_per_removed_card', value: 3, target: 'enemy' },
+      { type: 'block', value: 5, target: 'self' },
+      { type: 'counter', value: 4 },
     ],
     heroOnly: 'asiphyx',
-    emoji: '🕳️',
-    tags: ['offensive'],
+    emoji: '↩',
+    tags: ['defensive', 'control'],
+  },
+
+  redirect: {
+    id: 'redirect',
+    name: 'Vector Redirect',
+    description: 'Swap the target enemy\'s intent. Gain 3 block.',
+    flavor: 'That was never pointed at you.',
+    cost: 0,
+    rarity: 'uncommon',
+    type: 'skill',
+    effects: [
+      { type: 'swap_intent', target: 'enemy' },
+      { type: 'block', value: 3, target: 'self' },
+    ],
+    heroOnly: 'asiphyx',
+    emoji: '⤴',
+    tags: ['utility', 'control', 'gravity'],
+  },
+
+  transmute: {
+    id: 'transmute',
+    name: 'Kinetic Transmutation',
+    description: 'Convert all your block into Cait damage. Cait strikes for damage equal to your block, then your block resets to 0.',
+    flavor: 'Defense is just stored gravity.',
+    cost: 1,
+    rarity: 'uncommon',
+    type: 'skill',
+    effects: [
+      { type: 'transmute_block_to_cait' },
+    ],
+    heroOnly: 'asiphyx',
+    emoji: '⇄',
+    tags: ['control', 'gravity', 'cait'],
+  },
+
+  gravity_mirror: {
+    id: 'gravity_mirror',
+    name: 'Gravity Mirror',
+    description: 'Gain 4 block. For 1 turn, reflect 40% of incoming damage back at the attacker.',
+    flavor: 'The void has a spine.',
+    cost: 1,
+    rarity: 'rare',
+    type: 'skill',
+    effects: [
+      { type: 'block', value: 4, target: 'self' },
+      { type: 'damage_reflect', value: 0.4 },
+    ],
+    heroOnly: 'asiphyx',
+    emoji: '◈',
+    tags: ['defensive', 'control', 'gravity'],
+  },
+
+  mass_increase: {
+    id: 'mass_increase',
+    name: 'Mass Increase',
+    description: 'Gain 9 block. Activate Gravity Well: redirect all enemy attacks to you this turn. Cait gains 4 block.',
+    flavor: 'Bend the field around yourself.',
+    cost: 1,
+    rarity: 'uncommon',
+    type: 'skill',
+    effects: [
+      { type: 'block', value: 9, target: 'self' },
+      { type: 'gravity_well' },
+      { type: 'cait_block', value: 4 },
+    ],
+    heroOnly: 'asiphyx',
+    emoji: '⬢',
+    tags: ['defensive', 'gravity'],
+  },
+
+  singularity_target: {
+    id: 'singularity_target',
+    name: 'Center of Gravity',
+    description: 'Mark an enemy. Cait\'s next attack is forced onto that target and crits for 175%. Gain 3 block.',
+    flavor: 'The target falls toward her blade.',
+    cost: 1,
+    rarity: 'uncommon',
+    type: 'skill',
+    effects: [
+      { type: 'mark_target_crit', target: 'enemy', value: 1.75 },
+      { type: 'block', value: 3, target: 'self' },
+    ],
+    heroOnly: 'asiphyx',
+    emoji: '◎',
+    tags: ['utility', 'gravity', 'cait'],
+  },
+
+  cait_momentum: {
+    id: 'cait_momentum',
+    name: 'Cait Momentum',
+    description: 'Cait attacks one extra time on her next turn. Gain 4 block.',
+    flavor: 'Asiphyx does not swing. He changes the fall.',
+    cost: 1,
+    rarity: 'uncommon',
+    type: 'skill',
+    effects: [
+      { type: 'cait_extra_action', value: 1 },
+      { type: 'block', value: 4, target: 'self' },
+    ],
+    heroOnly: 'asiphyx',
+    emoji: '⇉',
+    tags: ['utility', 'gravity', 'cait'],
+  },
+
+  void_sacrifice: {
+    id: 'void_sacrifice',
+    name: 'Event Vector',
+    description: 'Mark an enemy. Cait\'s next attack is forced onto that target and crits for 200%. If it connects, heal for 40% of the damage dealt.',
+    flavor: 'Pull the center out of the enemy and hand it to Cait.',
+    cost: 2,
+    rarity: 'rare',
+    type: 'skill',
+    effects: [
+      { type: 'mark_target_crit', target: 'enemy', value: 2.0 },
+      { type: 'siphon_boost', value: 0.4 },
+    ],
+    heroOnly: 'asiphyx',
+    emoji: '✦',
+    tags: ['gravity', 'cait'],
   },
 
   clean_architecture: {
     id: 'clean_architecture',
     name: 'Clean Architecture',
-    description: 'All cards with 3+ plays gain +4 damage/block this combat.',
+    description: 'All modules with 3+ plays gain +4 damage/block this combat.',
     flavor: 'Design patterns.',
     cost: 1,
     rarity: 'rare',

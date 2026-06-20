@@ -9,15 +9,17 @@ let phaserInstance = null;
  * @param {object} gameEngine - reference to GameState orchestrator
  */
 export function initPhaserGame(parentContainerId, gameEngine) {
-  // If an instance already exists, return it
-  if (phaserInstance) {
-    return phaserInstance;
-  }
-
   const parent = document.getElementById(parentContainerId);
   if (!parent) {
     console.error(`[PhaserGame] Parent container #${parentContainerId} not found`);
     return null;
+  }
+
+  // If an instance already exists, restart the scene with fresh data so preload re-runs
+  if (phaserInstance) {
+    phaserInstance.scene.stop('CombatScene');
+    phaserInstance.scene.start('CombatScene', { game: gameEngine });
+    return phaserInstance;
   }
 
   const config = {

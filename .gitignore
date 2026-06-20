@@ -1,5 +1,6 @@
 node_modules/
 dist/
+tmp/
 .DS_Store
 *.log
 *.local
@@ -7,3 +8,4 @@ dist/
 .env*
 tmp_asset_contact/
 .serena/
+.superpowers/

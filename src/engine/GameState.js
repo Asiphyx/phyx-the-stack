@@ -24,6 +24,7 @@ const SAVE_VERSION = 1;
 // ── Valid phases ─────────────────────────────────────────────
 export const PHASES = Object.freeze([
   'title',
+  'caitdex',
   'heroSelect',
   'map',
   'combat',
@@ -31,6 +32,25 @@ export const PHASES = Object.freeze([
   'gameOver',
   'victory',
 ]);
+
+const DIRECT_DAMAGE_EFFECTS = new Set([
+  'damage',
+  'damageAll',
+  'damage_equal_to_block',
+  'damage_per_removed_card',
+  'damageAllEqualBlock',
+]);
+
+function isDirectDamageCard(card) {
+  return card?.type === 'attack' || (card?.effects ?? []).some(effect => DIRECT_DAMAGE_EFFECTS.has(effect.type));
+}
+
+function isCardAllowedForHero(card, heroId) {
+  if (!card) return false;
+  if (card.heroOnly && card.heroOnly !== heroId) return false;
+  if (heroId === 'asiphyx' && isDirectDamageCard(card)) return false;
+  return true;
+}
 
 // ── Default state factory ───────────────────────────────────
 
@@ -52,9 +72,9 @@ function createDefaultState() {
     energy: 3,
     maxEnergy: 3,
 
-    // Card piles
-    deck: [],         // master list — persists across combats
-    drawPile: [],     // shuffled at combat start
+    // Module piles. Historical property names stay card/deck-shaped for save compatibility.
+    deck: [],         // master module list — persists across combats
+    drawPile: [],     // shuffled into the active stack at combat start
     discardPile: [],
     hand: [],
     exhaustPile: [],  // removed for THIS combat only
@@ -148,8 +168,8 @@ export class GameState {
     s.cardPool = [];
     s.enemyCatalogue = null;
 
-    // Deep-copy the starter deck so each card has its own identity.
-    // Hero definitions use card IDs, so map to full card defs here.
+    // Deep-copy the starter stack so each module has its own identity.
+    // Definitions still use card IDs internally for compatibility.
     s.deck = (heroDef.startingDeck ?? [])
       .map((cardId, i) => {
         const card = CARDS[cardId];
@@ -165,8 +185,9 @@ export class GameState {
       })
       .filter(Boolean);
 
-    // Add technical debt cards to bloat starting deck (Legacy Code Reversal mechanic)
-    const debtCards = ['spaghetti_code', 'deprecated_api', 'merge_conflict', 'memory_leak'];
+    // Add technical debt modules to bloat starting stack.
+    const debtCards = ['spaghetti_code', 'deprecated_api', 'merge_conflict', 'memory_leak']
+      .filter(debtId => isCardAllowedForHero(CARDS[debtId], heroDef.id));
     debtCards.forEach((debtId, i) => {
       const card = CARDS[debtId];
       if (card) {
@@ -198,7 +219,8 @@ export class GameState {
    */
   startRun(totalFloors = 15, cardPool = [], enemyCatalogue = null) {
     const s = this.state;
-    s.cardPool = [...cardPool];
+    const heroId = s.hero?.id ?? null;
+    s.cardPool = cardPool.filter(card => isCardAllowedForHero(card, heroId));
     s.enemyCatalogue = enemyCatalogue;
     s.cardPlayCounts = {};
     s.floor = 1;
@@ -261,7 +283,8 @@ export class GameState {
           console.error('[GameState] Missing enemy catalogue for this run');
           return;
         }
-        this.state.cardPool = [...activeCardPool];
+        const heroId = this.state.hero?.id ?? null;
+        this.state.cardPool = activeCardPool.filter(card => isCardAllowedForHero(card, heroId));
         const enemies = this.floors.generateEncounter(effectiveCatalogue);
         this.combat.startCombat(enemies);
         break;
@@ -278,10 +301,11 @@ export class GameState {
 
   /**
    * Start the draft after combat ends.
-   * @param {object[]} cardPool — full reward card pool
+   * @param {object[]} cardPool — full reward module pool
    */
   startDraft(cardPool) {
-    this.draft.generateDraft(cardPool ?? this.state.cardPool);
+    const heroId = this.state.hero?.id ?? null;
+    this.draft.generateDraft((cardPool ?? this.state.cardPool).filter(card => isCardAllowedForHero(card, heroId)));
   }
 
   /**

@@ -1,0 +1,33 @@
+{
+  "name": "Kinetic Regent Cait slash-to-wink",
+  "source": "/tmp/codex-clipboard-LP5f2b.png",
+  "strip": "/assets/heroes/kinetic-regent-cait/animations/from-sheet/kinetic-regent-slash-to-wink-strip.png",
+  "preview": "/assets/heroes/kinetic-regent-cait/animations/from-sheet/kinetic-regent-slash-to-wink-preview.gif",
+  "frameWidth": 640,
+  "frameHeight": 760,
+  "frames": [
+    {
+      "index": 0,
+      "name": "slash-left",
+      "file": "/assets/heroes/kinetic-regent-cait/animations/from-sheet/frame_00_slash_left.png",
+      "durationMs": 80
+    },
+    {
+      "index": 1,
+      "name": "slash-mid",
+      "file": "/assets/heroes/kinetic-regent-cait/animations/from-sheet/frame_01_slash_mid.png",
+      "durationMs": 80
+    },
+    {
+      "index": 2,
+      "name": "wink-back",
+      "file": "/assets/heroes/kinetic-regent-cait/animations/from-sheet/frame_02_wink_back.png",
+      "durationMs": 450
+    }
+  ],
+  "notes": [
+    "Built directly from the user-provided Kinetic Regent Cait sheet.",
+    "Do not treat these as PixelLab generated rotations.",
+    "Blade cores are still source-art imperfect: orange blade should carry blue core, blue blade should carry orange core."
+  ]
+}

@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>WIZARD_HUD_v1.0 // NEON_ARCANA_OS</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Anybody:wght@800;900&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "tertiary": "#ecfdff",
+                    "surface-bright": "#3a3939",
+                    "surface": "#131313",
+                    "surface-variant": "#353534",
+                    "on-tertiary-container": "#006c73",
+                    "warning-amber": "#BC7F2C",
+                    "secondary-container": "#fe00fe",
+                    "secondary-fixed-dim": "#ffabf3",
+                    "tertiary-container": "#55f2ff",
+                    "on-secondary-container": "#500050",
+                    "secondary-fixed": "#ffd7f5",
+                    "on-primary-container": "#107100",
+                    "surface-dim": "#131313",
+                    "primary-container": "#39ff14",
+                    "inverse-on-surface": "#313030",
+                    "background": "#131313",
+                    "outline-variant": "#3c4b35",
+                    "on-secondary-fixed-variant": "#810081",
+                    "primary-fixed-dim": "#2ae500",
+                    "toxic-green": "#39FF14",
+                    "outline": "#85967c",
+                    "on-primary-fixed": "#022100",
+                    "on-surface": "#e5e2e1",
+                    "on-tertiary-fixed-variant": "#004f54",
+                    "error-container": "#93000a",
+                    "on-error-container": "#ffdad6",
+                    "on-error": "#690005",
+                    "on-secondary": "#5b005b",
+                    "on-primary-fixed-variant": "#095300",
+                    "inverse-surface": "#e5e2e1",
+                    "on-surface-variant": "#baccb0",
+                    "surface-container": "#201f1f",
+                    "surface-tint": "#2ae500",
+                    "on-background": "#e5e2e1",
+                    "on-primary": "#053900",
+                    "arcane-purple": "#8E1E55",
+                    "primary-fixed": "#79ff5b",
+                    "error": "#ffb4ab",
+                    "inverse-primary": "#106e00",
+                    "on-tertiary-fixed": "#002022",
+                    "primary": "#efffe3",
+                    "data-blue": "#00F0FF",
+                    "on-tertiary": "#00363a",
+                    "on-secondary-fixed": "#380038",
+                    "tertiary-fixed": "#7df4ff",
+                    "void-black": "#050505",
+                    "surface-container-low": "#1c1b1b",
+                    "surface-container-highest": "#353534",
+                    "secondary": "#ffabf3",
+                    "surface-container-lowest": "#0e0e0e",
+                    "ethereal-magenta": "#FF00FF",
+                    "tertiary-fixed-dim": "#00dbe9",
+                    "surface-container-high": "#2a2a2a"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "pixel-unit": "4px",
+                    "margin-md": "32px",
+                    "margin-lg": "64px",
+                    "gutter": "24px",
+                    "margin-sm": "16px"
+            },
+            "fontFamily": {
+                    "headline-lg-mobile": ["anybody"],
+                    "headline-xl": ["anybody"],
+                    "body-md": ["JetBrains Mono"],
+                    "code-snippet": ["JetBrains Mono"],
+                    "headline-lg": ["anybody"],
+                    "label-sm": ["JetBrains Mono"]
+            },
+            "fontSize": {
+                    "headline-lg-mobile": ["24px", {"lineHeight": "1.2", "fontWeight": "800"}],
+                    "headline-xl": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.05em", "fontWeight": "900"}],
+                    "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "code-snippet": ["14px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                    "headline-lg": ["32px", {"lineHeight": "1.2", "fontWeight": "800"}],
+                    "label-sm": ["12px", {"lineHeight": "1.4", "letterSpacing": "0.1em", "fontWeight": "500"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+        @keyframes scanline { 0% { transform: translateY(-100%); } 100% { transform: translateY(1000%); } }
+        @keyframes flicker { 0% { opacity: 0.97; } 5% { opacity: 0.95; } 10% { opacity: 0.9; } 15% { opacity: 1; } 70% { opacity: 0.98; } 80% { opacity: 0.95; } 100% { opacity: 1; } }
+        
+        .crt-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+            background-size: 100% 4px, 3px 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .scanline {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100px;
+            background: linear-gradient(to bottom, transparent, rgba(57, 255, 20, 0.05), transparent);
+            animation: scanline 8s linear infinite;
+            pointer-events: none;
+            z-index: 101;
+        }
+
+        .dither-bg {
+            background-image: radial-gradient(#39ff14 0.5px, transparent 0.5px);
+            background-size: 4px 4px;
+        }
+
+        .pixel-border {
+            box-shadow: 
+                0 0 0 1px #050505,
+                0 0 0 2px currentColor;
+        }
+
+        .flicker-text { animation: flicker 0.1s infinite alternate; }
+        .cursor-blink { animation: blink 1s infinite; }
+        
+        .pixel-bar-segment {
+            width: 8px;
+            height: 100%;
+            margin-right: 2px;
+        }
+
+        .pixelated {
+            image-rendering: pixelated;
+        }
+
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #050505; }
+        ::-webkit-scrollbar-thumb { background: #39ff14; }
+    </style>
+</head>
+<body class="bg-void-black text-on-surface font-body-md overflow-hidden selection:bg-toxic-green selection:text-void-black"><div class="crt-overlay"></div><div class="scanline"></div><header class="fixed top-0 w-full border-b-2 border-toxic-green bg-void-black shadow-[0_0_10px_#39FF14] flex justify-between items-center px-margin-sm h-12 z-50"><div class="flex items-center gap-4"><h1 class="font-headline-lg text-headline-lg text-toxic-green uppercase tracking-tighter">WIZARD_HUD_v1.0</h1><div class="hidden md:flex gap-4 font-code-snippet text-label-sm text-toxic-green border-l border-toxic-green pl-4"><span class="flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">bolt</span> MP: 99/99</span><span class="flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">settings_ethernet</span> LATENCY: 2ms</span><span class="flex items-center gap-1 text-data-blue"><span class="material-symbols-outlined text-[14px]">shield</span> SESSION: ACTIVE</span></div></div><div class="flex items-center gap-2"><button class="p-1 hover:bg-toxic-green hover:text-void-black transition-all duration-75"><span class="material-symbols-outlined">bolt</span></button><button class="p-1 hover:bg-toxic-green hover:text-void-black transition-all duration-75"><span class="material-symbols-outlined">settings_ethernet</span></button><button class="p-1 hover:bg-toxic-green hover:text-void-black transition-all duration-75"><span class="material-symbols-outlined">shield</span></button></div></header><main class="flex h-screen pt-12 pb-8"><nav class="hidden md:flex flex-col h-full w-64 border-r-2 border-ethereal-magenta bg-surface-container-lowest z-40 fixed left-0 top-0 pt-12"><div class="p-margin-sm border-b border-ethereal-magenta/30 flex flex-col items-center"><div class="w-24 h-24 border-2 border-ethereal-magenta mb-2 relative group cursor-crosshair"><img class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBJhod-_zc69B1msYSkIzRFIPWOjdOGmruPiQVA961rm0jfDkf3w0VNxlzPw0Ovt3zSROiGcmHfH2gFTsAqY3lcTsWq8R2bejWFSJ2krmo1xzh2vM9qof7psIqHUwcQCBkF9BdZGSJgB7MTZHTKXAF9m6ciJ0HrqFrFX9ea2eAtopjAwQGDm5v76skSbmjVmLYbRFmS4LvSru6ZlN-7Ey3-MgGt1IMcHpeV7Z8uY85MlYZ-J1Vcx4ud9di3bItmZtgYUtRrneVmiFwA"/><div class="absolute inset-0 bg-ethereal-magenta/20 group-hover:bg-transparent transition-colors"></div></div><h2 class="font-headline-lg text-headline-lg text-ethereal-magenta text-center">ARCHMAGE_01</h2><p class="font-code-snippet text-label-sm text-ethereal-magenta opacity-70">LVL_99_NEOCROMANCER</p></div><div class="flex-1 py-4"><a class="flex items-center gap-3 px-6 py-3 bg-ethereal-magenta text-void-black font-bold uppercase transition-transform hover:skew-x-1" href="#"><span class="material-symbols-outlined">menu_book</span><span class="font-code-snippet">SPELLBOOK</span></a><a class="flex items-center gap-3 px-6 py-3 text-ethereal-magenta opacity-70 hover:opacity-100 hover:bg-secondary-container hover:text-on-secondary-container transition-all" href="#"><span class="material-symbols-outlined">auto_awesome</span><span class="font-code-snippet">ORACLE</span></a><a class="flex items-center gap-3 px-6 py-3 text-ethereal-magenta opacity-70 hover:opacity-100 hover:bg-secondary-container hover:text-on-secondary-container transition-all" href="#"><span class="material-symbols-outlined">lan</span><span class="font-code-snippet">VOID_NET</span></a><a class="flex items-center gap-3 px-6 py-3 text-ethereal-magenta opacity-70 hover:opacity-100 hover:bg-secondary-container hover:text-on-secondary-container transition-all" href="#"><span class="material-symbols-outlined">terminal</span><span class="font-code-snippet">SYSTEM</span></a></div><div class="p-margin-sm"><button class="w-full py-3 border-2 border-ethereal-magenta text-ethereal-magenta font-code-snippet uppercase hover:bg-ethereal-magenta hover:text-void-black transition-all active:animate-pulse">CAST_SPELL</button></div></nav><div class="flex-1 ml-0 md:ml-64 mr-0 lg:mr-80 flex flex-col relative p-margin-sm gap-margin-sm h-full"><section class="flex-1 border-2 border-ethereal-magenta bg-void-black relative overflow-hidden flex flex-col shadow-[0_0_20px_rgba(255,0,255,0.15)]"><div class="absolute left-4 top-1/2 -translate-y-1/2 flex flex-col gap-4 z-30"><div class="relative w-20 h-20 group cursor-pointer"><div class="absolute inset-0 bg-toxic-green/20" style="clip-path: polygon(50% 0%, 100% 100%, 0% 100%);"></div><div class="absolute inset-[2px] bg-void-black overflow-hidden" style="clip-path: polygon(50% 0%, 100% 100%, 0% 100%);"><img class="w-full h-full object-cover pixelated opacity-70 group-hover:opacity-100 transition-opacity" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAumuPHSMzCf7Jrb447URFa2ud-GfCXBpzHKb53JhQ69cdvUTMBqd99s2MtwCXV98YbZPyfCnr3uXpABpwXwSwQRNUNWFIDe2neI6udmZ-iMkU_TabRRDCxQhkdcj6o_Hr14JP1Ap4J1OOcssNaE_ENTuZfQWtbjejocG5QSQXivQp4u1owiiUHuPwjvzaVsXePPGIKsgXE7Nf9xVx4DLTFf1S0gsgEqNoqnPda5aEsnc6mdSDDZ3jYmGzMTpAetB0Glf_p5ocqQZvp"/></div><div class="absolute -bottom-2 left-1/2 -translate-x-1/2 text-[8px] font-code-snippet text-toxic-green bg-void-black px-1 border border-toxic-green/30">CAIT_V</div></div><div class="relative w-20 h-20 group cursor-pointer"><div class="absolute inset-0 bg-ethereal-magenta/20" style="clip-path: polygon(50% 0%, 100% 100%, 0% 100%);"></div><div class="absolute inset-[2px] bg-void-black overflow-hidden" style="clip-path: polygon(50% 0%, 100% 100%, 0% 100%);"><div class="w-full h-full flex items-center justify-center bg-ethereal-magenta/5"><span class="material-symbols-outlined text-ethereal-magenta text-[24px]">person</span></div></div><div class="absolute -bottom-2 left-1/2 -translate-x-1/2 text-[8px] font-code-snippet text-ethereal-magenta bg-void-black px-1 border border-ethereal-magenta/30">HERO_D</div></div></div><canvas class="absolute inset-0 w-full h-full z-0" id="bg-shader"></canvas><div class="absolute inset-0 z-10 pointer-events-none opacity-30" style="background-image: linear-gradient(rgba(57, 255, 20, 0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(57, 255, 20, 0.4) 1px, transparent 1px); background-size: 40px 40px;"></div><div class="relative z-20 w-full border-b-2 border-ethereal-magenta bg-void-black/90 backdrop-blur-md p-2 flex gap-3 items-center justify-center shadow-lg"><span class="text-ethereal-magenta font-code-snippet text-label-sm mr-4 flicker-text">INITIATIVE_QUEUE:</span><div class="w-10 h-10 border-2 border-toxic-green bg-toxic-green/10 flex items-center justify-center hover:bg-toxic-green/30 transition-colors cursor-pointer group relative"><span class="material-symbols-outlined text-[20px] text-toxic-green group-hover:scale-110 transition-transform">bolt</span><div class="absolute -top-1 -right-1 w-3 h-3 bg-toxic-green rounded-full animate-ping"></div></div><div class="w-10 h-10 border border-warning-amber bg-warning-amber/10 flex items-center justify-center hover:bg-warning-amber/30 transition-colors cursor-pointer group"><span class="material-symbols-outlined text-[20px] text-warning-amber group-hover:scale-110 transition-transform">warning</span></div><div class="w-10 h-10 border border-error bg-error/10 flex items-center justify-center hover:bg-error/30 transition-colors cursor-pointer group"><span class="material-symbols-outlined text-[20px] text-error group-hover:scale-110 transition-transform">skull</span></div><div class="w-10 h-10 border border-data-blue bg-data-blue/10 flex items-center justify-center hover:bg-data-blue/30 transition-colors cursor-pointer group"><span class="material-symbols-outlined text-[20px] text-data-blue group-hover:scale-110 transition-transform">shield</span></div></div><div class="flex-1 relative z-20 flex items-center justify-around p-8"><div class="flex flex-col gap-8"><div class="flex flex-col items-center gap-2 relative"><div class="absolute -top-8 text-toxic-green font-code-snippet text-[10px] bg-void-black/80 px-2 py-1 border border-toxic-green/50">HP: 999/999</div><div class="w-32 h-32 border-2 border-toxic-green p-1 bg-void-black/80 relative group shadow-[0_0_15px_rgba(57,255,20,0.4)] transition-transform hover:-translate-y-1 cursor-pointer"><img alt="Cait Archmage" class="w-full h-full object-cover pixelated" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAumuPHSMzCf7Jrb447URFa2ud-GfCXBpzHKb53JhQ69cdvUTMBqd99s2MtwCXV98YbZPyfCnr3uXpABpwXwSwQRNUNWFIDe2neI6udmZ-iMkU_TabRRDCxQhkdcj6o_Hr14JP1Ap4J1OOcssNaE_ENTuZfQWtbjejocG5QSQXivQp4u1owiiUHuPwjvzaVsXePPGIKsgXE7Nf9xVx4DLTFf1S0gsgEqNoqnPda5aEsnc6mdSDDZ3jYmGzMTpAetB0Glf_p5ocqQZvp"/><div class="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-void-black border border-toxic-green px-2 py-0.5 text-[10px] text-toxic-green font-code-snippet whitespace-nowrap">CAIT_V4</div></div></div><div class="flex flex-col items-center gap-2 relative"><div class="absolute -top-8 text-toxic-green font-code-snippet text-[10px] bg-void-black/80 px-2 py-1 border border-toxic-green/50">HP: 750/750</div><div class="w-32 h-32 border-2 border-ethereal-magenta p-1 bg-void-black/80 relative group shadow-[0_0_15px_rgba(255,0,255,0.2)] transition-transform hover:-translate-y-1 cursor-pointer"><div class="w-full h-full bg-ethereal-magenta/10 flex items-center justify-center"><span class="material-symbols-outlined text-ethereal-magenta opacity-50">person</span></div><div class="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-void-black border border-ethereal-magenta px-2 py-0.5 text-[10px] text-ethereal-magenta font-code-snippet whitespace-nowrap">HERO_DUO</div></div></div></div><div class="text-ethereal-magenta font-headline-xl tracking-widest animate-pulse opacity-80 mix-blend-screen drop-shadow-[0_0_10px_rgba(255,0,255,0.8)]">VS</div><div class="flex flex-col items-center gap-4 relative"><div class="absolute -top-8 text-error font-code-snippet text-label-sm bg-void-black/80 px-2 py-1 border border-error/50">HP: ???/???</div><div class="w-64 h-48 border-2 border-error p-1 bg-void-black/80 relative group shadow-[0_0_15px_rgba(255,180,171,0.4)] transition-transform hover:-translate-y-2 cursor-pointer"><img alt="Boss Entity" class="w-full h-full object-cover pixelated" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC6czKdclcb88WLTbGMFc6MHLhiNQbRLI-YNNySMN0oaEj0XcbfDqIy_UGODhmVvS1WjiZZK6pa_QLP5KjTeMZkXwbb47Tf5Vix5tlYvTsB_K1kJ371u5ab_llFzrTJ00LlyogHL-cSVjmWfJEl2p4I3HIvdpmvqhLu89B3TWtJCciYvUJiB5gnzSDa2SgksmeRRD8hckRGnrW9AS7AbeZ31BQ-WVpumhsJnYrO2dPTDFdEknVeTPuoulf01w_pg0GasJ-uDD3J0kWM"/><div class="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-void-black border-2 border-error px-3 py-1 text-[12px] text-error font-code-snippet whitespace-nowrap shadow-lg">BOSS_ENTITY: POC-27</div></div></div></div><div class="absolute bottom-4 right-4 w-64 h-24 border border-data-blue bg-void-black/90 backdrop-blur-sm p-2 flex flex-col z-30 shadow-[0_0_15px_rgba(0,240,255,0.2)]"><div class="flex justify-between items-center mb-1 border-b border-data-blue/30 pb-1"><span class="text-[10px] text-data-blue font-bold tracking-widest">TACTICAL_RADAR</span><span class="material-symbols-outlined text-[12px] text-data-blue">monitoring</span></div><div class="flex-1 relative flex items-end gap-1 px-1"><div class="w-2 bg-data-blue h-1/2 opacity-20"></div><div class="w-2 bg-data-blue h-3/4 opacity-40"></div><div class="w-2 bg-data-blue h-2/3 opacity-60"></div><div class="w-2 bg-data-blue h-full opacity-80 shadow-[0_0_5px_#00F0FF]"></div><div class="w-2 bg-data-blue h-4/5 opacity-60"></div><div class="w-2 bg-data-blue h-1/2 opacity-40"></div><div class="w-2 bg-data-blue h-1/3 opacity-20"></div><div class="w-2 bg-data-blue h-1/2 opacity-40"></div><div class="w-2 bg-data-blue h-2/3 opacity-60"></div><div class="w-2 bg-data-blue h-full opacity-80 shadow-[0_0_5px_#00F0FF]"></div><div class="w-2 bg-data-blue h-4/5 opacity-60"></div><div class="w-2 bg-data-blue h-1/2 opacity-40"></div><div class="w-2 bg-data-blue h-1/3 opacity-20"></div></div></div><div class="absolute bottom-4 left-1/2 -translate-x-1/2 w-80 z-30 flex flex-col items-center gap-1"><div class="flex justify-between w-full px-2"><span class="text-[10px] font-bold text-toxic-green tracking-widest">ULTIMATE_CHARGE</span><span class="text-[10px] font-bold text-toxic-green animate-pulse">READY</span></div><div class="w-full h-3 bg-void-black border border-toxic-green p-[1px] flex gap-[1px]"><div class="flex-1 bg-toxic-green shadow-[0_0_10px_#39FF14]"></div><div class="flex-1 bg-toxic-green shadow-[0_0_10px_#39FF14]"></div><div class="flex-1 bg-toxic-green shadow-[0_0_10px_#39FF14]"></div><div class="flex-1 bg-toxic-green shadow-[0_0_10px_#39FF14]"></div><div class="flex-1 bg-toxic-green/20"></div></div><button class="mt-2 px-4 py-1 bg-toxic-green text-void-black font-code-snippet text-[10px] font-bold uppercase hover:scale-105 transition-transform active:bg-white">RELEASE_ARCANE_BURST</button></div></section><section class="h-48 border-2 border-toxic-green bg-void-black p-margin-sm font-code-snippet text-toxic-green relative overflow-hidden flex flex-col shrink-0 shadow-[0_0_15px_rgba(57,255,20,0.1)] mb-2"><div class="absolute top-0 right-0 p-2 text-label-sm opacity-50 select-none">ID: CMN-LOG-1138</div><div class="mb-2 flex items-center gap-2 border-b border-toxic-green/30 pb-2"><span class="material-symbols-outlined text-[16px]">list_alt</span><span class="font-bold">COMBAT_LOG_v4.2</span></div><div class="flex-1 overflow-y-auto space-y-1 text-[13px] terminal-scroll pr-2"><p class="text-data-blue">[SYSTEM] Initializing void-bridge...</p><p class="">[SYSTEM] Synchronizing mana pools with Ethereum mainnet...</p><p class="text-warning-amber">[WARN] Entropy levels at 14%. Arcane decay detected in sector 7.</p><p class="flicker-text">&gt; Running: <span class="bg-toxic-green text-void-black px-1 font-bold">arcane_protocol.sh</span></p><div class="mt-2 border-l-2 border-toxic-green/20 pl-3 py-1 space-y-1 opacity-80"><p class="text-on-surface-variant">// Loading grimoire fragments...</p><p class="">fragment_01: fireball.hex [SUCCESS]</p><p class="">fragment_02: blink_step.src [SUCCESS]</p><p class="">fragment_03: void_echo.bin [SUCCESS]</p><p class="">fragment_04: soul_leech.dmg <span class="text-error">[ERROR: PERMISSION_DENIED]</span></p></div><p class="text-ethereal-magenta mt-2">&gt;&gt; COMBAT INITIATED: ENCOUNTER #404</p><p class="text-toxic-green">&gt;&gt; Waiting for input...</p><div class="mt-4 flex gap-2"><span class="text-ethereal-magenta font-bold">wizard@voidnet:~$</span><span class="cursor-blink">█</span></div></div></section></div><aside class="hidden lg:flex flex-col w-80 fixed right-0 top-12 h-full border-l-2 border-toxic-green bg-surface-container-low p-margin-sm z-40 overflow-y-auto"><div class="flex items-center justify-between mb-margin-sm border-b border-toxic-green pb-2"><span class="text-toxic-green font-headline-lg text-headline-lg tracking-tighter">STATUS_REPORT</span><span class="material-symbols-outlined text-toxic-green">analytics</span></div><div class="bg-void-black border border-toxic-green/50 p-4 mb-margin-md relative overflow-hidden"><div class="absolute top-0 left-0 w-2 h-2 bg-toxic-green"></div><div class="absolute top-0 right-0 w-2 h-2 bg-toxic-green"></div><div class="absolute bottom-0 left-0 w-2 h-2 bg-toxic-green"></div><div class="absolute bottom-0 right-0 w-2 h-2 bg-toxic-green"></div><div class="flex items-center gap-4 mb-4"><div class="w-16 h-16 border border-toxic-green flex items-center justify-center bg-toxic-green/10"><span class="material-symbols-outlined text-[40px] text-toxic-green" style="font-variation-settings: 'FILL' 1;">person_filled</span></div><div><div class="text-toxic-green font-bold">NEOCROMANCER_X</div><div class="text-label-sm text-on-surface-variant">Uptime: 24h 12m 04s</div><div class="text-label-sm text-data-blue">Role: SysAdmin / VoidWeaver</div></div></div><div class="grid grid-cols-2 gap-2 text-label-sm"><div class="bg-toxic-green/5 border border-toxic-green/20 p-1 flex justify-between"><span class="opacity-60">STR</span><span class="text-toxic-green">12</span></div><div class="bg-toxic-green/5 border border-toxic-green/20 p-1 flex justify-between"><span class="opacity-60">INT</span><span class="text-toxic-green">99</span></div><div class="bg-toxic-green/5 border border-toxic-green/20 p-1 flex justify-between"><span class="opacity-60">DEX</span><span class="text-toxic-green">45</span></div><div class="bg-toxic-green/5 border border-toxic-green/20 p-1 flex justify-between"><span class="opacity-60">LUK</span><span class="text-toxic-green">01</span></div></div></div><div class="space-y-6"><div><div class="flex justify-between text-label-sm mb-1 text-on-surface"><span>SOUL_INTEGRITY</span><span class="text-toxic-green">82%</span></div><div class="h-4 bg-surface-container-highest border border-toxic-green flex p-[2px]"><div class="bg-toxic-green pixel-bar-segment"></div><div class="bg-toxic-green pixel-bar-segment"></div><div class="bg-toxic-green pixel-bar-segment"></div><div class="bg-toxic-green pixel-bar-segment"></div><div class="bg-toxic-green pixel-bar-segment"></div><div class="bg-toxic-green pixel-bar-segment"></div><div class="bg-toxic-green pixel-bar-segment"></div><div class="bg-toxic-green pixel-bar-segment"></div><div class="bg-toxic-green/30 pixel-bar-segment"></div><div class="bg-toxic-green/30 pixel-bar-segment"></div></div></div><div><div class="flex justify-between text-label-sm mb-1 text-on-surface"><span>MANA_DENSITY</span><span class="text-ethereal-magenta">100%</span></div><div class="h-4 bg-surface-container-highest border border-ethereal-magenta flex p-[2px]"><div class="bg-ethereal-magenta pixel-bar-segment"></div><div class="bg-ethereal-magenta pixel-bar-segment"></div><div class="bg-ethereal-magenta pixel-bar-segment"></div><div class="bg-ethereal-magenta pixel-bar-segment"></div><div class="bg-ethereal-magenta pixel-bar-segment"></div><div class="bg-ethereal-magenta pixel-bar-segment"></div><div class="bg-ethereal-magenta pixel-bar-segment"></div><div class="bg-ethereal-magenta pixel-bar-segment"></div><div class="bg-ethereal-magenta pixel-bar-segment"></div><div class="bg-ethereal-magenta pixel-bar-segment"></div></div></div><div><div class="flex justify-between text-label-sm mb-1 text-on-surface"><span>VOID_CORRUPTION</span><span class="text-warning-amber">14%</span></div><div class="h-4 bg-surface-container-highest border border-warning-amber flex p-[2px]"><div class="bg-warning-amber pixel-bar-segment"></div><div class="bg-warning-amber/10 pixel-bar-segment"></div><div class="bg-warning-amber/10 pixel-bar-segment"></div><div class="bg-warning-amber/10 pixel-bar-segment"></div><div class="bg-warning-amber/10 pixel-bar-segment"></div><div class="bg-warning-amber/10 pixel-bar-segment"></div><div class="bg-warning-amber/10 pixel-bar-segment"></div><div class="bg-warning-amber/10 pixel-bar-segment"></div><div class="bg-warning-amber/10 pixel-bar-segment"></div><div class="bg-warning-amber/10 pixel-bar-segment"></div></div></div></div><div class="mt-margin-md border-t-2 border-toxic-green/30 pt-4"><h3 class="font-code-snippet text-label-sm text-toxic-green mb-2">LAST_EVENTS:</h3><div class="space-y-1 font-code-snippet text-[10px] opacity-70"><p class="flex justify-between"><span>LOGIN_ATTEMPT</span><span class="text-toxic-green">FAIL</span></p><p class="flex justify-between"><span>FIREWALL_BREACH</span><span class="text-error">CRITICAL</span></p><p class="flex justify-between"><span>VOID_SYNC_OK</span><span class="text-data-blue">DONE</span></p></div></div></aside></main><footer class="fixed bottom-0 w-full border-t border-data-blue bg-void-black bg-opacity-90 backdrop-blur-sm h-8 flex justify-between items-center px-4 z-50"><div class="flex gap-4"><span class="font-headline-lg text-label-sm text-data-blue">© 20XX NEON_ARCANA_OS</span><div class="flex gap-4 font-label-sm text-data-blue uppercase"><a class="hover:text-toxic-green transition-colors duration-100 font-bold" href="#">DOCS</a><a class="hover:text-toxic-green transition-colors duration-100" href="#">TERMINAL</a></div></div><div class="flex gap-4 items-center"><span class="text-[10px] text-data-blue font-code-snippet">CPU_TEMP: 42°C</span><a class="hover:text-toxic-green transition-colors duration-100 font-label-sm font-bold text-data-blue" href="#">LOGOUT</a></div></footer></body></html>

@@ -1,13 +1,12 @@
 // ============================================================
 // FloorManager.js — Floor progression & map generation
 // ============================================================
-// Manages the 15-floor run structure:
-//   Floors  1-4   — normal encounters (easy)
+// Manages the run structure. The jam demo uses an 11-floor linear map:
+//   Floors  1-4   — normal encounters
 //   Floor   5     — elite encounter
-//   Floors  6-9   — normal encounters (medium)
+//   Floors  6-9   — normal encounters
 //   Floor  10     — elite encounter
-//   Floors 11-14  — normal encounters (hard) + rest/shop nodes
-//   Floor  15     — boss encounter
+//   Floor  11     — boss encounter
 //
 // For the MVP the map is linear: one node per floor.
 // A future version can branch into Slay-the-Spire-style paths.
@@ -70,6 +69,13 @@ export class FloorManager {
   _nodeTypeForFloor(floor, total) {
     // Final floor is always the boss
     if (floor === total) return NODE_TYPE.BOSS;
+
+    // Jam-demo runs use ten fight rounds, then the boss. Keep this direct
+    // and readable instead of spending demo time on rest/shop filler.
+    if (total <= 11) {
+      if (floor === 5 || floor === 10) return NODE_TYPE.ELITE;
+      return NODE_TYPE.COMBAT;
+    }
 
     // Elites at floors 5 and 10
     if (floor === 5 || floor === 10) return NODE_TYPE.ELITE;
@@ -166,9 +172,12 @@ export class FloorManager {
     const templateId = template.id ?? template.name.toLowerCase().replace(/\s+/g, '_');
     return {
       id: `${templateId}_${index}`,
+      templateId,
       name: template.name,
       emoji: template.emoji,
       sprite: template.sprite,
+      idleSprite: template.idleSprite,
+      idleFrames: template.idleFrames,
       tier: template.tier,
       flavor: template.flavor,
       hp: scaledHp,

@@ -73,6 +73,9 @@ export class Combat {
       // Turn flags
       isFirstCardThisTurn: true,
       asiphyxShuffleThisTurn: false,
+      asiphyxStunned: false,
+      playerSpeedDelta: 0,
+      enemySpeedDelta: 0,
       endTurnExhaustIds: new Set(),
 
       // Combo tracking
@@ -84,6 +87,28 @@ export class Combat {
 
       // Last attack copy/paste
       lastAttackCard: null,
+
+      // Gravity Well system (Asiphyx tank mechanic)
+      gravityWellActive: false,       // when true, all enemy damage hits player instead of Cait
+      markedTargetIndex: null,        // forces Cait to target a specific enemy
+      markedTargetCritMult: 1.0,      // one-shot Cait crit multiplier against the marked target
+      caitDamageMult: 1.0,            // multiplier for Cait's next attack
+      caitExtraActions: 0,            // extra Cait attacks queued by duo-control cards
+      siphonRate: 0.0,                // 0.0 = no siphon. 0.3 = heal 30% of Cait's damage
+      siphonBoostNextHit: 0.0,        // one-shot siphon rate for next Cait hit only
+      caitBlockBonus: 0,              // block granted to Cait this turn
+
+      // Kinetic Regent (Asiphyx duo system)
+      kineticComboStacks: 0,          // per-combat — max 5, boosts Cait damage, decays slowly
+      latentKineticPotential: 0,      // stored defensive energy consumed by Cait strikes
+      kineticRegentFirstStrike: true, // Cait strikes before speed lanes unless Asiphyx is stunned
+
+      // Control/Redirect system (Asiphyx control mage mechanic)
+      counterDamage: 0,               // thorns — enemies take this much when they hit you
+      reflectPercent: 0.0,            // reflect this fraction of incoming damage back
+      passiveRedirectsLeft: 0,        // Gravitational Lens passive — first attack reduced
+      passiveCaitBonus: 0,            // Cait damage bonus accumulated from passive redirects
+      redirectEnemiesToEnemy: false,  // ultimate — enemies attack each other this turn
     };
   }
 
@@ -100,6 +125,14 @@ export class Combat {
       endTurnExhaustIds: [...this.combatState.endTurnExhaustIds],
       combatPlayCounts: Object.fromEntries(this.combatState.combatPlayCounts),
       lastAttackCard: this.combatState.lastAttackCard ? { ...this.combatState.lastAttackCard } : null,
+      gravityWellActive: this.combatState.gravityWellActive,
+      markedTargetIndex: this.combatState.markedTargetIndex,
+      markedTargetCritMult: this.combatState.markedTargetCritMult,
+      caitDamageMult: this.combatState.caitDamageMult,
+      caitExtraActions: this.combatState.caitExtraActions,
+      siphonRate: this.combatState.siphonRate,
+      siphonBoostNextHit: this.combatState.siphonBoostNextHit,
+      caitBlockBonus: this.combatState.caitBlockBonus,
     };
   }
 
@@ -127,9 +160,12 @@ export class Combat {
     // Copy enemies so encounter data is not mutated.
     s.enemies = enemies.map((e, i) => ({
       id: e.id ?? `enemy_${i}`,
+      templateId: e.templateId ?? e.id,
       name: e.name,
       emoji: e.emoji,
       sprite: e.sprite,
+      idleSprite: e.idleSprite,
+      idleFrames: e.idleFrames,
       tier: e.tier,
       flavor: e.flavor,
       hp: e.hp ?? e.maxHp,
@@ -174,6 +210,24 @@ export class Combat {
     this.combatState.asiphyxShuffleThisTurn = false;
     this.combatState.lastParadoxCategory = null;
     this.combatState.paradoxChain = 0;
+
+    // Reset gravity well flags (one-turn duration)
+    this.combatState.gravityWellActive = false;
+    this.combatState.markedTargetIndex = null;
+    this.combatState.markedTargetCritMult = 1.0;
+    this.combatState.caitDamageMult = 1.0;
+    this.combatState.caitExtraActions = 0;
+    this.combatState.siphonBoostNextHit = 0.0;
+
+    // Reset control flags (one-turn duration)
+    this.combatState.counterDamage = 0;
+    this.combatState.reflectPercent = 0.0;
+    this.combatState.redirectEnemiesToEnemy = false;
+
+    // Gravitational Lens passive: first attack each turn reduced
+    if (s.hero?.id === 'asiphyx') {
+      this.combatState.passiveRedirectsLeft = 1;
+    }
 
     // Apply start-of-turn bonuses
     if (this.combatState.startOfTurnBlock > 0) {
@@ -277,6 +331,30 @@ export class Combat {
       resolveState = this._applyCardEffects(card, targetIndex, { depth: 1, source: 'double' });
     }
 
+    // Kinetic Regent: gravity modules build combo + queue Cait follow-ups
+    const effects = card.effects ?? [];
+    const hasGravityTarget = effects.some(e =>
+      ['mark_target', 'mark_target_crit', 'swap_intent', 'redirectEnemiesToEnemy'].includes(e.type)
+    );
+    const hasDefense = effects.some(e =>
+      ['block', 'cait_block'].includes(e.type)
+    );
+
+    if (hasGravityTarget) {
+      this.combatState.kineticComboStacks = Math.min(5, this.combatState.kineticComboStacks + 1);
+      this.combatState.caitExtraActions += 1;
+      bus.emit('toast', { text: `Kinetic Combo ${this.combatState.kineticComboStacks}/5 — Cait follow-up queued.`, type: 'passive' });
+    }
+
+    if (hasDefense) {
+      const blockVal = effects.filter(e => e.type === 'block').reduce((sum, e) => sum + (e.value ?? 0), 0);
+      if (blockVal > 0) {
+        const stored = Math.floor(blockVal * 0.5);
+        this.combatState.latentKineticPotential += stored;
+        bus.emit('toast', { text: `Latent Potential stored: +${stored}.`, type: 'passive' });
+      }
+    }
+
     // Resolve destination pile
     this._finalizeCard(card, resolveState);
 
@@ -299,6 +377,116 @@ export class Combat {
     s.ultCharge = Math.min(s.ultMaxCharge, (s.ultCharge ?? 0) + 1);
 
     return true;
+  }
+
+  /**
+   * Resolve plugged module sockets as a simultaneous exchange with speed lanes.
+   * @param {{instanceId:string,targetIndex?:number,side?:string,slotIndex?:number,order?:number}[]} commands
+   */
+  resolveModuleStack(commands = []) {
+    const s = this.gs.state;
+    if (s.phase !== 'combat' || s.hp <= 0 || s.enemies.length === 0) return false;
+
+    for (const enemy of s.enemies) {
+      enemy.block = 0;
+    }
+
+    const timeline = [];
+    const heroIsKineticRegent = s.hero?.id === 'asiphyx' && this.combatState.kineticRegentFirstStrike;
+    if (heroIsKineticRegent && !this.combatState.asiphyxStunned && s.cait) {
+      timeline.push({ kind: 'cait', lane: 'first', priority: -999, order: -999 });
+    }
+
+    for (const command of commands) {
+      const card = s.hand.find(c => c.instanceId === command.instanceId);
+      if (!card) continue;
+      const lane = this._speedLaneForModule(card);
+      timeline.push({
+        kind: 'module',
+        lane,
+        priority: this._speedPriority(lane, this.combatState.playerSpeedDelta),
+        order: command.order ?? command.slotIndex ?? 0,
+        command,
+      });
+    }
+
+    for (const [enemyIndex, enemy] of s.enemies.entries()) {
+      const intent = enemy.pattern[enemy.patternIndex];
+      if (!intent) continue;
+      const lane = this._speedLaneForEnemyIntent(intent);
+      timeline.push({
+        kind: 'enemy',
+        lane,
+        priority: this._speedPriority(lane, this.combatState.enemySpeedDelta),
+        order: 100 + enemyIndex,
+        enemy,
+        intent,
+      });
+    }
+
+    timeline.sort((a, b) => (a.priority - b.priority) || (a.order - b.order));
+    bus.emit('toast', { text: `STACK EXCHANGE // ${timeline.map(a => a.lane.toUpperCase()).join(' > ')}`, type: 'command' });
+
+    for (const action of timeline) {
+      if (s.hp <= 0 || s.enemies.length === 0) break;
+      if (action.kind === 'cait') {
+        this._executeCaitTurn({ decayCombo: false, resetExtraActions: false });
+        continue;
+      }
+      if (action.kind === 'module') {
+        const handIndex = s.hand.findIndex(card => card.instanceId === action.command.instanceId);
+        if (handIndex >= 0) this.playCard(handIndex, action.command.targetIndex ?? 0);
+        continue;
+      }
+      if (action.kind === 'enemy') {
+        if (!s.enemies.includes(action.enemy) || action.enemy.hp <= 0) continue;
+        this._executeEnemyIntent(action.enemy, action.intent);
+        action.enemy.patternIndex = (action.enemy.patternIndex + 1) % Math.max(1, action.enemy.pattern.length);
+      }
+    }
+
+    s.enemies = s.enemies.filter(e => e.hp > 0);
+    if (s.enemies.length === 0) {
+      this._combatWon();
+      return true;
+    }
+    if (s.hp <= 0) {
+      this.gs.setPhase('gameOver');
+      return true;
+    }
+
+    this.combatState.redirectEnemiesToEnemy = false;
+    this.combatState.reflectPercent = 0.0;
+    this.combatState.counterDamage = 0;
+    this.combatState.playerSpeedDelta = 0;
+    this.combatState.enemySpeedDelta = 0;
+    this.combatState.asiphyxStunned = false;
+    this.combatState.caitExtraActions = 0;
+    this.combatState.kineticComboStacks = Math.max(0, this.combatState.kineticComboStacks - 1);
+    bus.emit('combatUpdate', this._snapshot());
+    this.startPlayerTurn();
+    return true;
+  }
+
+  _speedLaneForModule(card) {
+    if (card.speed) return card.speed;
+    if (card.tags?.includes('speed') || card.tags?.includes('interrupt')) return 'fast';
+    if (card.tags?.includes('slow') || card.tags?.includes('heavy')) return 'slow';
+    if (card.effects?.some(e => ['block', 'cait_block', 'mark_target', 'mark_target_crit', 'swap_intent'].includes(e.type))) return 'fast';
+    if (card.type === 'attack') return 'normal';
+    return 'normal';
+  }
+
+  _speedLaneForEnemyIntent(intent) {
+    if (intent.speed) return intent.speed;
+    if (intent.type === 'block' || intent.type === 'debuff') return 'fast';
+    if (intent.type === 'buff' || intent.type === 'summon') return 'slow';
+    return 'normal';
+  }
+
+  _speedPriority(lane, delta = 0) {
+    const base = lane === 'first' ? -100 : lane === 'fast' ? 0 : lane === 'normal' ? 10 : 20;
+    return base - delta;
   }
 
   /**
@@ -556,6 +744,127 @@ export class Combat {
           s.energy = Math.max(0, s.energy - val);
           break;
         }
+        case 'gravity_well': {
+          this.combatState.gravityWellActive = true;
+          bus.emit('toast', { text: 'Gravity Well active — all attacks redirect to you.', type: 'passive' });
+          break;
+        }
+        case 'cait_block': {
+          const val = toDisplayInt(effect.value ?? 0);
+          if (s.cait) {
+            s.cait.block = (s.cait.block ?? 0) + val;
+          }
+          this.combatState.caitBlockBonus += val;
+          break;
+        }
+        case 'mark_target': {
+          this.combatState.markedTargetIndex = targetIndex;
+          const enemy = s.enemies[targetIndex];
+          if (enemy) {
+            bus.emit('toast', { text: `${enemy.name} marked for Cait.`, type: 'passive' });
+          }
+          break;
+        }
+        case 'mark_target_crit': {
+          this.combatState.markedTargetIndex = targetIndex;
+          this.combatState.markedTargetCritMult = Math.max(1, effect.value ?? 1.75);
+          const enemy = s.enemies[targetIndex];
+          if (enemy) {
+            const crit = Math.round(this.combatState.markedTargetCritMult * 100);
+            bus.emit('toast', { text: `${enemy.name}'s center of gravity marked. Cait crit ${crit}%.`, type: 'passive' });
+          }
+          break;
+        }
+        case 'cait_damage_mult': {
+          this.combatState.caitDamageMult = effect.value ?? 2.0;
+          break;
+        }
+        case 'cait_extra_action': {
+          const val = Math.max(0, toDisplayInt(effect.value ?? 1));
+          this.combatState.caitExtraActions += val;
+          bus.emit('toast', { text: `Cait momentum +${val}: extra strike queued.`, type: 'passive' });
+          break;
+        }
+        case 'siphon_boost': {
+          this.combatState.siphonBoostNextHit = effect.value ?? 0.5;
+          break;
+        }
+        case 'counter': {
+          this.combatState.counterDamage = toDisplayInt(effect.value ?? 3);
+          bus.emit('toast', { text: `Counter set to ${this.combatState.counterDamage}.`, type: 'passive' });
+          break;
+        }
+        case 'damage_reflect': {
+          this.combatState.reflectPercent = effect.value ?? 0.5;
+          bus.emit('toast', { text: `Gravity Mirror: reflecting ${Math.round((effect.value ?? 0.5) * 100)}% of damage.`, type: 'passive' });
+          break;
+        }
+        case 'swap_intent': {
+          const enemy = s.enemies[targetIndex];
+          if (enemy) {
+            const intent = enemy.pattern[enemy.patternIndex];
+            if (intent) {
+              switch (intent.type) {
+                case 'attack':
+                case 'attackAll':
+                  enemy.pattern[enemy.patternIndex] = { ...intent, type: 'block' };
+                  break;
+                case 'buff':
+                  enemy.pattern[enemy.patternIndex] = { ...intent, type: 'debuff' };
+                  break;
+                case 'debuff':
+                  enemy.pattern[enemy.patternIndex] = { ...intent, type: 'block', value: 0 };
+                  break;
+                default:
+                  break;
+              }
+              bus.emit('toast', { text: `${enemy.name}'s intent redirected.`, type: 'passive' });
+            }
+          }
+          break;
+        }
+        case 'transmute_block_to_cait': {
+          const blockVal = s.block;
+          if (blockVal > 0) {
+            s.block = 0;
+            // Fire Cait damage immediately for the block amount
+            const target = this.combatState.markedTargetIndex !== null
+              ? s.enemies[this.combatState.markedTargetIndex]
+              : pickRandom(s.enemies);
+            if (target) {
+              this._dealDamageToEnemy(target, blockVal);
+              bus.emit('toast', { text: `Transmute: Cait strikes for ${blockVal}!`, type: 'passive' });
+            }
+          }
+          break;
+        }
+        case 'redirectEnemiesToEnemy': {
+          this.combatState.redirectEnemiesToEnemy = true;
+          bus.emit('toast', { text: 'Event Horizon: enemies turn on each other!', type: 'passive' });
+          break;
+        }
+        case 'speed':
+        case 'speed_self': {
+          const value = toDisplayInt(effect.value ?? 1);
+          this.combatState.playerSpeedDelta += value;
+          bus.emit('toast', { text: `Speed +${value}: Asiphyx modules move earlier.`, type: 'passive' });
+          break;
+        }
+        case 'slow':
+        case 'slow_enemy': {
+          const value = toDisplayInt(effect.value ?? 1);
+          this.combatState.enemySpeedDelta -= value;
+          bus.emit('toast', { text: `Slow ${value}: enemy intents move later.`, type: 'passive' });
+          break;
+        }
+        case 'stun': {
+          const enemy = s.enemies[targetIndex] ?? s.enemies[0];
+          if (enemy) {
+            enemy.skipNextIntent = true;
+            bus.emit('toast', { text: `${enemy.name} stunned.`, type: 'passive' });
+          }
+          break;
+        }
         default: {
           console.warn(`[Combat] Unknown effect type: "${effect.type}"`);
         }
@@ -794,82 +1103,235 @@ export class Combat {
     this.combatState.endTurnExhaustIds.clear();
 
     bus.emit('combatUpdate', this._snapshot());
+
+    // Cait acts autonomously between player and enemy turns
+    this._executeCaitTurn();
+
     this._executeEnemyTurn();
+  }
+
+  // ────────────────────────────────────────────────────────
+  //  Cait companion turn
+  // ────────────────────────────────────────────────────────
+
+  /**
+   * Cait auto-pilots after the player ends their turn.
+   * Reliability determines whether she lands her full hit or a partial one.
+   * Siphon heals Asiphyx based on damage dealt.
+   */
+  _executeCaitTurn(options = {}) {
+    const { decayCombo = true, resetExtraActions = true } = options;
+    const s = this.gs.state;
+    if (!s.cait || s.enemies.length === 0) return;
+
+    const reliability = s.cait.reliability ?? 0.6;
+    const baseDamage = 6 + Math.floor(s.floor * 0.5);
+    const attackCount = 1 + Math.max(0, this.combatState.caitExtraActions);
+    let landedAny = false;
+
+    for (let action = 0; action < attackCount && s.enemies.length > 0; action++) {
+      const hitRoll = Math.random();
+
+      // Kinetic Regent bonuses: combo stacks + stacked potential
+      const kineticBonus = this.combatState.kineticComboStacks * 2;
+      const potentialDrain = Math.min(this.combatState.latentKineticPotential, Math.round(baseDamage * 0.8));
+
+      // Full hit, partial hit, or miss
+      let damageDealt = 0;
+      let fullHit = false;
+      if (hitRoll < reliability) {
+        fullHit = true;
+        damageDealt = Math.round(baseDamage * this.combatState.caitDamageMult) + kineticBonus + potentialDrain;
+      } else if (hitRoll < reliability + 0.3) {
+        damageDealt = Math.round(baseDamage * 0.5) + Math.round(kineticBonus * 0.5);
+      }
+
+      if (damageDealt > 0 && (kineticBonus > 0 || potentialDrain > 0)) {
+        this.combatState.latentKineticPotential -= potentialDrain;
+        bus.emit('toast', { text: `Kinetic Regent: +${kineticBonus + potentialDrain} from combo (${this.combatState.kineticComboStacks}) & potential (${potentialDrain}).`, type: 'passive' });
+      }
+
+      if (damageDealt <= 0) {
+        bus.emit('toast', { text: action === 0 ? 'Cait hesitated...' : 'Cait momentum slipped...', type: 'info' });
+        continue;
+      }
+
+      // Pick target: marked target first, else random
+      let target;
+      const markedIndex = this.combatState.markedTargetIndex;
+      const markedTarget = markedIndex !== null ? s.enemies[markedIndex] : null;
+      if (markedTarget) {
+        target = markedTarget;
+      } else {
+        target = pickRandom(s.enemies);
+      }
+
+      if (!target) continue;
+
+      const critActive = fullHit && target === markedTarget && this.combatState.markedTargetCritMult > 1;
+      if (critActive) {
+        damageDealt = Math.round(damageDealt * this.combatState.markedTargetCritMult);
+        bus.emit('toast', { text: `Center of Gravity: Cait crits for ${damageDealt}.`, type: 'passive' });
+      }
+
+      this._dealDamageToEnemy(target, damageDealt);
+      landedAny = true;
+
+      // Determine siphon rate (one-shot boost overrides persistent)
+      const siphonRate = this.combatState.siphonBoostNextHit > 0
+        ? this.combatState.siphonBoostNextHit
+        : this.combatState.siphonRate;
+
+      if (siphonRate > 0) {
+        const heal = Math.max(1, Math.floor(damageDealt * siphonRate));
+        s.hp = Math.min(s.maxHp, s.hp + heal);
+        bus.emit('damageDealt', { target: 'siphon_heal', amount: heal, hpAfter: s.hp });
+        bus.emit('toast', { text: `Siphon: +${heal} HP from Cait's strike.`, type: 'passive' });
+      }
+
+      // Cait's one-shot targeting and boost effects are consumed by her first landing strike.
+      this.combatState.caitDamageMult = 1.0;
+      this.combatState.siphonBoostNextHit = 0.0;
+      this.combatState.markedTargetIndex = null;
+      this.combatState.markedTargetCritMult = 1.0;
+
+      s.enemies = s.enemies.filter(e => e.hp > 0);
+    }
+
+    if (resetExtraActions) {
+      this.combatState.caitExtraActions = 0;
+    }
+
+    // Kinetic Regent: decay combo by 1 per Cait turn, don't reset potential (it drains on use)
+    if (decayCombo) {
+      this.combatState.kineticComboStacks = Math.max(0, this.combatState.kineticComboStacks - 1);
+    }
+
+    // Cait's own block from cait_block effects
+    this.combatState.caitBlockBonus = 0;
+
+    bus.emit('combatUpdate', this._snapshot());
+
+    // Purge dead enemies from Cait's attack
+    s.enemies = s.enemies.filter(e => e.hp > 0);
+    if (s.enemies.length === 0) {
+      this._combatWon();
+      return;
+    }
+
+    if (!landedAny && attackCount > 1) {
+      bus.emit('toast', { text: 'Cait burned the extra vector but found no opening.', type: 'info' });
+    }
   }
 
   // ────────────────────────────────────────────────────────
   //  Enemy turn logic
   // ────────────────────────────────────────────────────────
 
+  _executeEnemyIntent(enemy, intent) {
+    const s = this.gs.state;
+    if (!intent) return;
+    if (enemy.skipNextIntent) {
+      enemy.skipNextIntent = false;
+      bus.emit('enemyAction', { enemy: { ...enemy }, action: { type: 'stunned', description: `${enemy.name} is stunned.` } });
+      bus.emit('toast', { text: `${enemy.name} loses its action.`, type: 'passive' });
+      return;
+    }
+
+    switch (intent.type) {
+      case 'attack': {
+        const amount = toDisplayInt((intent.value ?? 0) * (1 + (enemy.strength ?? 0) / 100));
+        if (this.combatState.redirectEnemiesToEnemy) {
+          const targets = s.enemies.filter(e => e !== enemy && e.hp > 0);
+          if (targets.length > 0) {
+            const victim = targets.reduce((a, b) => (b.hp > a.hp ? b : a));
+            this._dealDamageToEnemy(victim, amount);
+            break;
+          }
+        }
+        this._dealDamageToPlayer(amount, enemy);
+        break;
+      }
+      case 'attackAll': {
+        const amount = toDisplayInt(intent.value ?? 0);
+        if (this.combatState.redirectEnemiesToEnemy) {
+          const targets = s.enemies.filter(e => enemy !== e && e.hp > 0);
+          if (targets.length > 0) {
+            targets.forEach(t => this._dealDamageToEnemy(t, amount));
+            break;
+          }
+        }
+        this._dealDamageToPlayer(amount, enemy);
+        break;
+      }
+      case 'block': {
+        enemy.block += toDisplayInt(intent.value ?? 0);
+        break;
+      }
+      case 'buff': {
+        enemy.strength = (enemy.strength ?? 0) + toDisplayInt(intent.value ?? 0);
+        break;
+      }
+      case 'debuff': {
+        if (intent.value) {
+          s.maxEnergy = Math.max(0, s.maxEnergy - toDisplayInt(intent.value));
+          s.energy = Math.min(s.energy, s.maxEnergy);
+        }
+        if (intent.status === 'stun' || intent.stun) {
+          this.combatState.asiphyxStunned = true;
+        }
+        if (intent.status === 'slow' || intent.slow) {
+          this.combatState.playerSpeedDelta -= toDisplayInt(intent.value ?? 1);
+        }
+        break;
+      }
+      case 'summon': {
+        const summonName = intent.summonId ?? this._summonIdFromIntent(intent);
+        if (summonName) {
+          const template = this._resolveEnemyTemplate(summonName);
+          if (template) {
+            s.enemies.push({
+              id: `${template.id ?? summonName}_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+              templateId: template.templateId ?? template.id,
+              name: template.name ?? summonName,
+              emoji: template.emoji,
+              sprite: template.sprite,
+              idleSprite: template.idleSprite,
+              idleFrames: template.idleFrames,
+              tier: template.tier,
+              flavor: template.flavor,
+              hp: Math.max(1, template.maxHp ?? template.baseHp ?? 1),
+              maxHp: Math.max(1, template.maxHp ?? template.baseHp ?? 1),
+              block: 0,
+              pattern: (template.pattern ?? [{ type: 'attack', value: 0 }]).map(p => ({ ...p })),
+              patternIndex: 0,
+              summon: true,
+            });
+          } else {
+            bus.emit('toast', { text: `Summon failed: ${summonName} is missing`, type: 'danger' });
+          }
+        }
+        break;
+      }
+      default:
+        console.warn(`[Combat] Unknown enemy intent: "${intent.type}"`);
+    }
+
+    bus.emit('enemyAction', { enemy: { ...enemy }, action: intent });
+  }
+
   /** Each enemy performs its current intent, then advances the pattern. */
   _executeEnemyTurn() {
     const s = this.gs.state;
 
     for (const enemy of s.enemies) {
+      enemy.block = 0;
+    }
+
+    for (const enemy of s.enemies) {
       const intent = enemy.pattern[enemy.patternIndex];
       if (!intent) continue;
-
-      switch (intent.type) {
-        case 'attack': {
-          const amount = toDisplayInt((intent.value ?? 0) * (1 + (enemy.strength ?? 0) / 100));
-          this._dealDamageToPlayer(amount, enemy);
-          break;
-        }
-        case 'attackAll': {
-          const amount = toDisplayInt(intent.value ?? 0);
-          this._dealDamageToPlayer(amount, enemy);
-          break;
-        }
-        case 'block': {
-          enemy.block += toDisplayInt(intent.value ?? 0);
-          break;
-        }
-        case 'buff': {
-          // Current data uses this as basic self-scaling.
-          enemy.strength = (enemy.strength ?? 0) + toDisplayInt(intent.value ?? 0);
-          break;
-        }
-        case 'debuff': {
-          // Simple fallback: mild energy suppression to represent a debuff to the player.
-          if (intent.value) {
-            s.maxEnergy = Math.max(0, s.maxEnergy - toDisplayInt(intent.value));
-            s.energy = Math.min(s.energy, s.maxEnergy);
-          }
-          break;
-        }
-        case 'summon': {
-          const summonName = intent.summonId ?? this._summonIdFromIntent(intent);
-          if (summonName) {
-            const template = this._resolveEnemyTemplate(summonName);
-            if (template) {
-              s.enemies.push({
-                id: `${template.id ?? summonName}_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-                name: template.name ?? summonName,
-                emoji: template.emoji,
-                sprite: template.sprite,
-                tier: template.tier,
-                flavor: template.flavor,
-                hp: Math.max(1, template.maxHp ?? template.baseHp ?? 1),
-                maxHp: Math.max(1, template.maxHp ?? template.baseHp ?? 1),
-                block: 0,
-                pattern: (template.pattern ?? [{ type: 'attack', value: 0 }]).map(p => ({ ...p })),
-                patternIndex: 0,
-                summon: true,
-              });
-            } else {
-              bus.emit('toast', {
-                text: `Summon failed: ${summonName} is missing`,
-                type: 'danger',
-              });
-            }
-          }
-          break;
-        }
-        default:
-          console.warn(`[Combat] Unknown enemy intent: "${intent.type}"`);
-      }
-
-      bus.emit('enemyAction', { enemy: { ...enemy }, action: intent });
+      this._executeEnemyIntent(enemy, intent);
       enemy.patternIndex = (enemy.patternIndex + 1) % Math.max(1, enemy.pattern.length);
     }
 
@@ -936,17 +1398,46 @@ export class Combat {
     const s = this.gs.state;
     let remaining = toDisplayInt(rawDamage);
 
+    // Gravitational Lens passive: reduce first attack each turn by 3
+    if (this.combatState.passiveRedirectsLeft > 0 && remaining > 0) {
+      const reduction = Math.min(3, remaining);
+      remaining -= reduction;
+      this.combatState.passiveRedirectsLeft -= 1;
+      this.combatState.passiveCaitBonus += 2;
+      bus.emit('toast', { text: `Gravitational Lens: -${reduction} damage. Cait +${this.combatState.passiveCaitBonus} next strike.`, type: 'passive' });
+    }
+
     const absorbed = Math.min(s.block, remaining);
     s.block -= absorbed;
     remaining -= absorbed;
+
+    // Calculate actual HP damage for counter/reflect (after block)
+    const hpDamage = remaining;
 
     if (remaining > 0) {
       s.hp = Math.max(0, s.hp - remaining);
     }
 
+    // Counter: deal flat damage back to the attacker
+    if (this.combatState.counterDamage > 0 && source && hpDamage >= 0) {
+      const counterDmg = this.combatState.counterDamage;
+      // Source is an enemy object
+      if (source && source.hp !== undefined) {
+        this._dealDamageToEnemy(source, counterDmg);
+        bus.emit('toast', { text: `Counter: ${counterDmg} damage back!`, type: 'passive' });
+      }
+    }
+
+    // Reflect: bounce percentage of raw damage back to attacker
+    if (this.combatState.reflectPercent > 0 && source && source.hp !== undefined && rawDamage > 0) {
+      const reflectDmg = Math.max(1, Math.floor(rawDamage * this.combatState.reflectPercent));
+      this._dealDamageToEnemy(source, reflectDmg);
+      bus.emit('toast', { text: `Gravity Mirror: ${reflectDmg} reflected!`, type: 'passive' });
+    }
+
     bus.emit('damageDealt', {
       target: 'player',
-      sourceId: source.id,
+      sourceId: source?.id,
       amount: rawDamage,
       blocked: absorbed,
       hpAfter: s.hp,
@@ -1014,7 +1505,19 @@ export class Combat {
       floor: s.floor,
       gold: s.gold,
       hero: s.hero,
+      cait: s.cait ? {
+        name: s.cait.name,
+        hp: s.cait.hp,
+        maxHp: s.cait.maxHp,
+        block: s.cait.block ?? 0,
+        bondName: s.cait.bondName,
+      } : null,
       paradoxChain: this.combatState.paradoxChain,
+      gravityWellActive: this.combatState.gravityWellActive,
+      markedTargetIndex: this.combatState.markedTargetIndex,
+      markedTargetCritMult: this.combatState.markedTargetCritMult,
+      caitDamageMult: this.combatState.caitDamageMult,
+      caitExtraActions: this.combatState.caitExtraActions,
     };
   }
 }

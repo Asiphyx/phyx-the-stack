@@ -1,24 +1,25 @@
 # Phyx the Stack
 
-Dev-bug roguelike inspired by Slay the Spire, built as a fast-hands, high-feedback prototype.
+Dev-bug module tactics prototype built around Cait's locked duo protocols.
 
-Play as one of six Phyxian heroes and clear 15 floors of bug encounters.  
-Core loop: **Draft → Fight → Draft → Fight → ...**, with concise visible stats and big, readable combat feedback.
+For the jam slice, Cait is the main character and every selectable assistant is a duo-locked variant. Asiphyx is the playable lock: stage modules, preview the command stack, then send it.
+
+Core loop: **Build stack → Lock in → Resolve → Refactor → Fight → ...**, with concise visible stats and big, readable combat feedback.
 
 ## Features (Prototype)
 
-- 6 heroes with unique passives and signature cards
-- Enemy encounters with bosses, elites, and normal floors
-- Hand/energy/block/HP flow with visible numbers
-- Drafts between fights with permanent deck growth
+- Cait locked duo protocol with Asiphyx as the playable jam variant
+- 11-floor jam route with fights, elites, and Budder Sphinx as final boss
+- Module/energy/block/HP flow with visible numbers
+- Refactoring between fights with permanent stack growth
 - Summons and reactive enemy intents
-- Paradox hero: alternating attack/defense combos with visible bonus toasting
-- Mobile-friendly card layout and compact HUD
+- Command stack staging with `SEND STACK` execution
+- Mobile-friendly module layout and compact HUD
 
 ## Quick start
 
 ```bash
-cd /home/asiphyx/phyx-the-stack
+cd /home/asiphyx/CaitLabs/phyx-the-stack
 npm install
 npm run dev
 ```
@@ -34,8 +35,8 @@ npm run build
 ## Project structure
 
 - `src/main.js` – UI rendering and game flow wiring
-- `src/engine/*` – combat, draft, floors, and global state management
-- `src/data/*` – hero, card, and enemy definitions
+- `src/engine/*` – combat, refactor, floors, and global state management
+- `src/data/*` – duo, module, and enemy definitions
 - `public/assets/heroes/` – portrait assets
 
 ## Vercel deploy (as a static site)
@@ -52,4 +53,3 @@ This project is SPA-compatible and can be deployed as a static Vite build.
 ## Suggested project name
 
 Current working name in this repo: `phyx-the-stack`.
-

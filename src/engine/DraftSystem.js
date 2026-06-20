@@ -1,5 +1,5 @@
 // ============================================================
-// DraftSystem.js — Card draft / reward system after combat
+// DraftSystem.js — Module refactor / reward system after combat
 // ============================================================
 // Modified for Phyx the Stack: Legacy Refactoring Terminal
 // ============================================================
@@ -17,10 +17,10 @@ export class DraftSystem {
     /** Current phase type: 'choice', 'deprecate_select', 'refactor_select', 'compile_select' */
     this.draftType = 'choice';
 
-    /** Cards currently offered to the player for drafting (Option 3: Compile) */
+    /** Modules currently offered to the player for compiling. */
     this.offeredCards = [];
     
-    /** Saved full card pool for feature compiling */
+    /** Saved full module pool for feature compiling. */
     this.cardPool = [];
   }
 
@@ -32,7 +32,7 @@ export class DraftSystem {
    * Enter the refactoring terminal after combat.
    * Called by GameState when entering the 'draft' phase.
    *
-   * @param {object[]} cardPool — full array of possible reward cards
+   * @param {object[]} cardPool — full array of possible reward modules
    */
   generateDraft(cardPool) {
     this.cardPool = cardPool;
@@ -71,7 +71,7 @@ export class DraftSystem {
       this.draftType = 'refactor_select';
     } else if (mode === 'compile') {
       this.draftType = 'compile_select';
-      // Pick 3 random cards to show
+      // Pick 3 random modules to show.
       const owned = new Set(this.gs.state.deck.map(c => c.id));
       const eligible = this.cardPool.filter(c => !c.unique || !owned.has(c.id));
       const shuffled = [...eligible].sort(() => Math.random() - 0.5);
@@ -90,7 +90,7 @@ export class DraftSystem {
   // ──────────────────────────────────────────────────────────
 
   /**
-   * Deprecate: Delete a card by instance ID.
+   * Deprecate: delete a module by instance ID.
    */
   deprecateCard(instanceId) {
     const s = this.gs.state;
@@ -104,7 +104,7 @@ export class DraftSystem {
   }
 
   /**
-   * Refactor: Upgrade a card's parameters.
+   * Refactor: upgrade a module's parameters.
    */
   refactorCard(instanceId) {
     const s = this.gs.state;
@@ -141,7 +141,7 @@ export class DraftSystem {
   }
 
   /**
-   * Compile Feature: Add a card to the deck.
+   * Compile Feature: add a module to the run stack.
    */
   pickCard(index) {
     const card = this.offeredCards[index];

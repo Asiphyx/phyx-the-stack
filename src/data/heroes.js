@@ -1,6 +1,6 @@
 /**
- * Phyx the Stack — Hero Definitions
- * Each hero has a unique passive, signature card, ultimate ability, and starting deck.
+ * Phyx the Stack — Assistant Definitions
+ * Cait is the main character. These assistants define locked duo variants.
  */
 
 export const HEROES = {
@@ -36,31 +36,35 @@ export const HEROES = {
   asiphyx: {
     id: 'asiphyx',
     name: 'Asiphyx',
-    title: 'The Void Walker',
+    title: 'The Void Architect',
     portrait: '/assets/heroes/asiphyx2.png',
+    selectionPortrait: '/assets/heroes/asiphyxheroselect.png',
+    selectionPortraitLabel: 'Asiphyx + Cait',
     avatar: '/assets/heroes/avatars/asiphyx2.png',
     battlePortrait: '/assets/heroes/battle/asiphyx2.png',
     maxHp: 70,
     startingDeck: [
-      'git_push', 'git_push', 'git_push',
       'try_catch', 'try_catch', 'try_catch',
-      'null_check',
-      'void_collapse',
+      'null_check', 'null_check',
+      'mass_increase',
+      'redirect',
+      'singularity_target',
+      'cait_momentum',
     ],
     passive: {
-      name: 'Null is Origin',
-      description: 'When deck is empty, gain 8 block before reshuffling.',
+      name: 'Locked Duo: Kinetic Regent',
+      description: 'Asiphyx cannot deal direct damage. Gravity modules bend threats into Cait follow-up windows and stored kinetic pressure.',
     },
     ultimate: {
       name: 'Event Horizon',
-      description: 'Gain 25 block. Remove 2 random starter cards from deck.',
+      description: 'This turn, all enemy attacks redirect to the highest-HP enemy. Gain 15 block.',
       emoji: '🕳️',
       chargeCost: 6,
-      effects: [{ type: 'block', value: 25 }, { type: 'removeRandomStarters', value: 2 }],
+      effects: [{ type: 'redirectEnemiesToEnemy' }, { type: 'block', value: 15 }],
     },
-    signatureCardId: 'void_collapse',
+    signatureCardId: 'null_pointer_exception',
     color: '#9933ff',
-    quote: 'Null is origin.',
+    quote: 'Bend the battlefield. Let Cait finish it.',
   },
 
   codex: {

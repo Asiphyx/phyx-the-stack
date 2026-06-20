@@ -16,6 +16,8 @@ const SAVE_STORAGE_KEY = 'phyx-the-stack:saves:v1';
 const SAVE_SLOT_COUNT = 3;
 const CAIT_LABS_ICON = '/assets/brand/cait-labs-icon.png';
 const DEFAULT_TRACK = SOUNDTRACK_TRACKS.find(track => track.id === 'cait-intro') ?? SOUNDTRACK_TRACKS[0];
+const JAM_RUN_FLOORS = 11;
+const PLAYABLE_HERO_IDS = new Set(['asiphyx']);
 const MUSIC_DOMAIN_FILTERS = {
   title: { lowpass: 6200, highpass: 24, peakFrequency: 880, peakGain: 1.8, gain: 0.72, threshold: -24, ratio: 4.5 },
   heroSelect: { lowpass: 7800, highpass: 32, peakFrequency: 1400, peakGain: 2.6, gain: 0.76, threshold: -26, ratio: 5.2 },
@@ -46,6 +48,9 @@ const toastLayer = document.querySelector('#toast-layer');
 const enemyCatalogue = buildEnemyCatalogue();
 let activeDraft = [];
 let selectedTarget = 0;
+let stagedCommands = [];
+let stagedCommandSequence = 0;
+let battleLog = [];
 let introAudio = null;
 let introMusicEnabled = false;
 // Set when the user explicitly pauses. The pointerdown autoplay-unlock below
@@ -76,15 +81,16 @@ let caitCodecOffset = { x: 0, y: 0 };
 // via updateMusicControlBar, and `vite dev` enforces the TDZ that esbuild relaxes.
 let musicCtrlBar = null;
 
-let engineMode = localStorage.getItem('phyx-the-stack:engine-mode') || 'phaser';
+const engineMode = 'phaser';
 let persistentPhaserContainer = null;
+let phaserCombatBooted = false;
 
 function getPhaserContainer() {
   if (!persistentPhaserContainer) {
     persistentPhaserContainer = document.createElement('div');
     persistentPhaserContainer.id = 'phaser-game-container';
     persistentPhaserContainer.style.width = '100%';
-    persistentPhaserContainer.style.height = '100%';
+    persistentPhaserContainer.style.height = '300px';
     persistentPhaserContainer.style.position = 'absolute';
     persistentPhaserContainer.style.top = '0';
     persistentPhaserContainer.style.left = '0';
@@ -130,7 +136,12 @@ bus.on('draftOffered', ({ cards }) => {
 });
 bus.on('damageDealt', onDamageEvent);
 bus.on('toast', ({ text, type = 'info' }) => emitToast(text, type));
+bus.on('cardPlayed', ({ card, targetIndex, energy }) => {
+  const target = game.state.enemies[targetIndex];
+  logBattleEvent(`SENT ${card.name} ${target ? `-> ${target.name}` : ''} // energy ${energy}`, 'command');
+});
 bus.on('enemyAction', ({ enemy, action }) => {
+  logBattleEvent(`${enemy?.name ?? 'Enemy'} :: ${action?.description ?? action?.type ?? 'action'}`, 'enemy');
   root.classList.add('screen-shake');
   setTimeout(() => root.classList.remove('screen-shake'), 300);
 });
@@ -144,11 +155,14 @@ function render() {
 
   if (snapshot.phase !== 'combat') {
     destroyPhaserGame();
+    phaserCombatBooted = false;
+    stagedCommands = [];
   }
 
   switch (snapshot.phase) {
     case 'title': renderTitle(); return;
     case 'heroSelect': renderHeroSelect(); break;
+    case 'caitdex': renderCaitdex(); return;
     case 'map': renderMap(); break;
     case 'combat': renderCombat(); break;
     case 'draft': renderDraft(); break;
@@ -159,6 +173,123 @@ function render() {
 
   // Attach persistent music controls for non-title phases
   appendMusicControlBar();
+}
+
+function stagedEnergyCost() {
+  return stagedCommands.reduce((total, command) => {
+    const card = game.state.hand.find(c => c.instanceId === command.instanceId);
+    return total + (card ? game.combat.getCardCost(card) : 0);
+  }, 0);
+}
+
+function pruneStagedCommands() {
+  const handIds = new Set(game.state.hand.map(card => card.instanceId));
+  stagedCommands = stagedCommands.filter(command => handIds.has(command.instanceId));
+}
+
+function commandTargetName(command) {
+  const target = game.state.enemies[command.targetIndex];
+  return target?.name ?? 'Auto Target';
+}
+
+function commandTargetSide(card) {
+  return classifyCardTarget(card) === 'enemy' ? 'enemy' : 'self';
+}
+
+function firstOpenCommandSlot(side) {
+  for (let slotIndex = 0; slotIndex < 3; slotIndex++) {
+    if (!stagedCommands.some(command => (command.side ?? 'enemy') === side && command.slotIndex === slotIndex)) {
+      return slotIndex;
+    }
+  }
+  return -1;
+}
+
+function commandVerb(card) {
+  if (card.tags?.includes('cait')) return 'SYNC';
+  if (card.tags?.includes('gravity')) return 'BEND';
+  if (card.tags?.includes('defensive')) return 'BRACE';
+  if (card.tags?.includes('control')) return 'FLIP';
+  if (card.rarity === 'debt' || card.tags?.includes('curse')) return 'FAULT';
+  if (card.type === 'attack') return 'STRIKE';
+  return 'PATCH';
+}
+
+function stageCommand(instanceId, targetIndex = selectedTarget ?? 0, requestedSide = null, requestedSlotIndex = null) {
+  const card = game.state.hand.find(c => c.instanceId === instanceId);
+  if (!card || card.tags?.includes('curse') || card.id === 'memory_leak') {
+    logBattleEvent(`${card?.name ?? 'Command'} rejected // unplayable fault`, 'danger');
+    return;
+  }
+  if (stagedCommands.some(command => command.instanceId === instanceId)) return;
+
+  const side = requestedSide ?? commandTargetSide(card);
+  const requiredSide = commandTargetSide(card);
+  if (side !== requiredSide) {
+    logBattleEvent(`${card.name} rejected // wrong socket target`, 'danger');
+    return;
+  }
+
+  const slotIndex = requestedSlotIndex ?? firstOpenCommandSlot(side);
+  if (slotIndex < 0 || slotIndex > 2) {
+    logBattleEvent(`${side === 'self' ? 'Cait' : 'Target'} sockets full // send or clear first`, 'danger');
+    return;
+  }
+  if (stagedCommands.some(command => (command.side ?? 'enemy') === side && command.slotIndex === slotIndex)) {
+    logBattleEvent('Socket occupied // choose an open slot', 'danger');
+    return;
+  }
+  const projectedCost = stagedEnergyCost() + game.combat.getCardCost(card);
+  if (projectedCost > game.state.energy) {
+    logBattleEvent(`${card.name} rejected // insufficient energy`, 'danger');
+    return;
+  }
+  const finalTargetIndex = side === 'enemy' ? targetIndex : selectedTarget ?? 0;
+  stagedCommands.push({ instanceId, targetIndex: finalTargetIndex, side, slotIndex, order: stagedCommandSequence++ });
+  logBattleEvent(`PLUGGED ${commandVerb(card)} :: ${card.name} -> ${side === 'self' ? 'Cait' : commandTargetName({ targetIndex: finalTargetIndex })} SOCKET ${slotIndex + 1}`, 'info');
+  render();
+}
+
+function unstageCommand(instanceId) {
+  const card = game.state.hand.find(c => c.instanceId === instanceId);
+  stagedCommands = stagedCommands.filter(command => command.instanceId !== instanceId);
+  if (card) logBattleEvent(`UNSLOTTED ${card.name}`, 'info');
+  render();
+}
+
+function clearStagedCommands() {
+  if (stagedCommands.length > 0) logBattleEvent('COMMAND STACK CLEARED', 'info');
+  stagedCommands = [];
+  stagedCommandSequence = 0;
+  render();
+}
+
+function executeStagedCommands() {
+  pruneStagedCommands();
+  if (stagedCommands.length === 0) {
+    logBattleEvent('NO MODULES PLUGGED', 'danger');
+    return;
+  }
+
+  const queue = [...stagedCommands].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  stagedCommands = [];
+  stagedCommandSequence = 0;
+  logBattleEvent(`SIMULATING ${queue.length}-MODULE EXCHANGE`, 'command');
+
+  game.combat.resolveModuleStack(queue);
+  render();
+}
+
+function logBattleEvent(text, type = 'info') {
+  const clean = String(text ?? '').trim();
+  if (!clean) return;
+  battleLog.unshift({
+    id: `${Date.now()}_${Math.random().toString(16).slice(2)}`,
+    text: clean,
+    type,
+    ts: new Date().toLocaleTimeString([], { hour12: false, minute: '2-digit', second: '2-digit' }),
+  });
+  battleLog = battleLog.slice(0, 10);
 }
 
 // ──────────────────────────────────────────────────────────
@@ -189,7 +320,9 @@ function renderTitle() {
         <button class="btn btn-primary" id="start-btn">New Run</button>
         <button class="btn title-music-btn" id="music-btn">${introMusicEnabled ? 'Mute Score' : 'Play Score'}</button>
       </div>
+      <button class="btn title-caitdex-btn" id="title-caitdex-btn" type="button">📖 Caitdex</button>
       <button class="btn title-save-menu-btn" id="title-save-menu-btn">Save States</button>
+      <button class="btn title-debug-btn" id="title-debug-boss-btn" type="button" title="Skip to floor 11 boss fight">🐛 BOSS TEST</button>
     </div>
       <button class="title-cat-button" id="title-cat-button" type="button" aria-expanded="${titleLauncherOpen ? 'true' : 'false'}" aria-label="Boop the cat's nose to open CaitOS launch controls"></button>
     </div>
@@ -207,7 +340,23 @@ function renderTitle() {
     startIntroMusic();
   };
   section.querySelector('#music-btn').onclick = () => toggleIntroMusic(section);
+  section.querySelector('#title-caitdex-btn').onclick = () => { game.setPhase('caitdex'); };
   section.querySelector('#title-save-menu-btn').onclick = () => openSystemMenu(false);
+  section.querySelector('#title-debug-boss-btn').onclick = () => {
+    const hero = { ...HEROES.asiphyx };
+    const normalIds = new Set([...ENCOUNTERS.easy.flat(), ...ENCOUNTERS.medium.flat()]);
+    const catalogue = {
+      normal: [...normalIds].map(id => ENEMIES[id]).filter(Boolean),
+      elite: ['tech_debt','race_condition','legacy_codebase'].map(id => ENEMIES[id]).filter(Boolean),
+      boss: ['budder_sphinx'].map(id => ENEMIES[id]).filter(Boolean),
+    };
+    const pool = Object.values(CARDS);
+    game.selectHero(hero);
+    game.startRun(11, pool, catalogue);
+    game.state.floor = 11;
+    game.enterFloor(game.state.enemyCatalogue, game.state.cardPool);
+    startIntroMusic();
+  };
   appendSystemMenuOverlay(section, false);
   applyTitleWindowOffset(section.querySelector('.title-cat-menu'));
   wireTitleWindowDrag(section);
@@ -666,7 +815,7 @@ function drawTitleSpectrum(ctx, width, height, time, layer = 'back') {
     ctx.ellipse(cx, cy, ringX * 1.5, ringY * 1.5, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    drawTitleEqCrown(ctx, cx, cy, ringX, ringY, time);
+    drawTitleEqCrown(ctx, cx + width * 0.005, cy, ringX * 1.12, ringY * 1.01, time);
     drawTitleBeatRipples(ctx, cx, cy, ringX, ringY, time);
   } else {
     drawTitleOrbitGlyphs(ctx, cx, cy, ringX, ringY, time);
@@ -687,6 +836,7 @@ function titleBandLevel(fraction, time, seed = 0) {
 // Bands mirror left/right with bass at the bottom of the ring, highs at the top.
 function drawTitleEqCrown(ctx, cx, cy, ringX, ringY, time) {
   const ticks = 56;
+  const glowPulse = 0.72 + Math.sin(time * 0.00145) * 0.18 + introBeatLevel * 0.28;
   for (let i = 0; i < ticks; i += 1) {
     const angle = (i / ticks) * Math.PI * 2 - Math.PI / 2;
     const fraction = Math.abs(((i + ticks / 2) % ticks) - ticks / 2) / (ticks / 2);
@@ -695,15 +845,15 @@ function drawTitleEqCrown(ctx, cx, cy, ringX, ringY, time) {
 
     const cos = Math.cos(angle);
     const sin = Math.sin(angle);
-    const reach = 6 + signal * (34 + introBeatLevel * 18);
+    const reach = 7 + signal * (37 + introBeatLevel * 20);
     const innerX = cx + cos * ringX;
     const innerY = cy + sin * ringY;
     const outerX = cx + cos * (ringX + reach);
     const outerY = cy + sin * (ringY + reach);
 
     ctx.strokeStyle = i % 2 === 0
-      ? `rgba(255, 51, 153, ${0.16 + signal * 0.5})`
-      : `rgba(255, 111, 31, ${0.12 + signal * 0.42})`;
+      ? `rgba(255, 51, 153, ${(0.14 + signal * 0.55) * glowPulse})`
+      : `rgba(255, 111, 31, ${(0.1 + signal * 0.46) * glowPulse})`;
     ctx.lineWidth = 1.6 + signal * 2.2;
     ctx.beginPath();
     ctx.moveTo(innerX, innerY);
@@ -711,7 +861,7 @@ function drawTitleEqCrown(ctx, cx, cy, ringX, ringY, time) {
     ctx.stroke();
 
     if (signal > 0.55) {
-      ctx.fillStyle = `rgba(255, 255, 255, ${(signal - 0.55) * 0.9})`;
+      ctx.fillStyle = `rgba(255, 255, 255, ${(signal - 0.55) * 0.95 * glowPulse})`;
       ctx.beginPath();
       ctx.arc(outerX, outerY, 1.4 + signal * 1.6, 0, Math.PI * 2);
       ctx.fill();
@@ -906,10 +1056,12 @@ function drawTitleTriangleGlyph(ctx, radius, signal, intensity) {
   ctx.globalAlpha = 0.8 + intensity * 0.2;
   ctx.strokeStyle = `rgba(0, 229, 255, ${0.46 + intensity * 0.28})`;
   ctx.fillStyle = `rgba(0, 229, 255, ${0.07 + signal * 0.05})`;
+  const baseY = h * 0.64;
+  const centroidY = (-h + baseY + baseY) / 3;
   ctx.beginPath();
-  ctx.moveTo(0, -h);
-  ctx.lineTo(w, h * 0.64);
-  ctx.lineTo(-w, h * 0.64);
+  ctx.moveTo(0, -h - centroidY);
+  ctx.lineTo(w, baseY - centroidY);
+  ctx.lineTo(-w, baseY - centroidY);
   ctx.closePath();
   ctx.stroke();
   ctx.fill();
@@ -1145,166 +1297,92 @@ function updateTitleBeat(scope = document) {
 
 function renderHeroSelect() {
   const section = el('section', 'hero-select-screen');
-  const heroes = Object.values(HEROES).filter(hero => hero.id !== 'cait');
-  const initialHero = heroes.find(hero => hero.id === 'asiphyx') ?? heroes[0];
-  let selectedHero = initialHero;
-  let selectedIndex = Math.max(0, heroes.findIndex(hero => hero.id === initialHero.id));
-  const setHeroSelectTheme = (hero) => {
-    const theme = getHeroTheme(hero.id);
-    section.dataset.selectedHero = hero.id;
-    section.style.setProperty('--selected-hero-color', theme.accent ?? hero.color);
-    section.style.setProperty('--selected-hero-accent-2', theme.accent2 ?? '#00e5ff');
-    section.style.setProperty('--selected-hero-danger', theme.danger ?? '#ff3344');
-    section.style.setProperty('--selected-hero-glow', `${theme.accent ?? hero.color}55`);
-  };
-  setHeroSelectTheme(initialHero);
+  const heroes = Object.values(HEROES);
+  const asiphyx = heroes.find(hero => hero.id === 'asiphyx') ?? heroes[0];
+  const roster = [
+    asiphyx,
+    ...heroes.filter(hero => hero.id !== asiphyx.id && hero.id !== 'cait'),
+    ...heroes.filter(hero => hero.id === 'cait'),
+  ].slice(0, 6);
+  const theme = getHeroTheme(asiphyx.id);
+  const cait = buildCaitCompanion(asiphyx.id);
+  const slots = [
+    { left: 18.8, top: 74.0 },
+    { left: 29.9, top: 74.0 },
+    { left: 41.0, top: 74.0 },
+    { left: 52.1, top: 74.0 },
+    { left: 63.2, top: 74.0 },
+    { left: 74.4, top: 74.0 },
+  ];
 
-  const heading = el('div', 'hero-select-title glitch-text');
-  heading.dataset.text = 'CHOOSE VOID BOND';
-  heading.textContent = 'CHOOSE VOID BOND';
-  section.appendChild(heading);
+  section.dataset.selectedHero = asiphyx.id;
+  section.style.setProperty('--selected-hero-color', theme.accent ?? asiphyx.color);
+  section.style.setProperty('--selected-hero-accent-2', theme.accent2 ?? '#00e5ff');
+  section.style.setProperty('--selected-hero-danger', theme.danger ?? '#ff3344');
+  section.style.setProperty('--selected-hero-glow', `${theme.accent ?? asiphyx.color}55`);
 
-  const showcase = el('div', 'hero-select-showcase');
+  const board = el('div', 'hero-select-board');
+  board.innerHTML = `
+    <div class="hero-preview-panel" aria-label="Selected hero preview">
+      <img src="${asiphyx.selectionPortrait ?? asiphyx.portrait}" alt="${escapeHtml(asiphyx.name)} hero select card" />
+    </div>
+    <aside class="cait-variant-summary" aria-label="Selected Cait variant summary">
+      <span>Cait Variant</span>
+      <strong>${escapeHtml(cait.bondName)}</strong>
+      <p>${escapeHtml(cait.bondLine)}</p>
+      <dl>
+        <div><dt>Mask</dt><dd>Heart Regent</dd></div>
+        <div><dt>Vector</dt><dd>Gravity Lock</dd></div>
+        <div><dt>Output</dt><dd>${Math.round(cait.reliability * 100)}% Sync</dd></div>
+      </dl>
+      <small>${escapeHtml(cait.role)}</small>
+    </aside>
+    <div class="hero-roster-slots" aria-label="Hero roster">
+      ${roster.map((hero, index) => {
+        const isPlayable = PLAYABLE_HERO_IDS.has(hero.id);
+        const heroTheme = getHeroTheme(hero.id);
+        const previewSrc = hero.id === 'asiphyx'
+          ? (hero.selectionPortrait ?? hero.portrait ?? hero.avatar)
+          : (hero.avatar ?? hero.portrait ?? hero.selectionPortrait);
+        const slot = slots[index] ?? slots[slots.length - 1];
+        return `
+          <button
+            class="hero-select-slot ${isPlayable ? 'is-open' : 'is-locked'}"
+            type="button"
+            data-start-hero="${escapeHtml(hero.id)}"
+            style="--slot-left:${slot.left}%; --slot-top:${slot.top}%; --slot-color:${heroTheme.accent ?? hero.color ?? '#9933ff'};"
+            aria-disabled="${isPlayable ? 'false' : 'true'}"
+            aria-label="${escapeHtml(hero.name)} ${isPlayable ? 'available' : 'locked'}"
+          >
+            <img src="${previewSrc}" alt="" />
+            <b>${escapeHtml(hero.name)}</b>
+            <i>${isPlayable ? 'OPEN' : 'LOCKED'}</i>
+            <span class="hero-lock-mark">${isPlayable ? 'RUN' : 'LOCK'}</span>
+            <span class="hero-hover-panel">
+              <strong>${escapeHtml(hero.name)}</strong>
+              <small>${escapeHtml(hero.title)}</small>
+              <em>${isPlayable ? escapeHtml(cait.bondName) : 'Locked for jam build'}</em>
+              <span>${escapeHtml(hero.passive?.name ?? 'Variant pending')}</span>
+            </span>
+          </button>
+        `;
+      }).join('')}
+    </div>
+    <button class="hero-board-start" type="button" data-start-hero="${escapeHtml(asiphyx.id)}">
+      Start Duo Run
+    </button>
+  `;
 
-  const renderShowcase = (hero) => {
-    const theme = getHeroTheme(hero.id);
-    const cait = buildCaitCompanion(hero.id);
-    const portraitSrc = hero.portrait ?? hero.avatar;
-    const prevHero = heroes[(selectedIndex + heroes.length - 1) % heroes.length];
-    const nextHero = heroes[(selectedIndex + 1) % heroes.length];
-    const modeHooks = theme.modes ?? [theme.label, theme.duo, theme.shell];
-    const synthBars = Array.from({ length: 28 }, (_, index) => `<i style="--bar:${index}"></i>`).join('');
-    showcase.innerHTML = `
-      <div class="hero-synth-border" aria-hidden="true">
-        <div class="hero-synth-line hero-synth-line-top">${synthBars}</div>
-        <div class="hero-synth-line hero-synth-line-bottom">${synthBars}</div>
-      </div>
-      <div class="hero-feature-copy">
-        <span class="hero-select-kicker">Forbidden Duo Pact</span>
-        <h2 class="hero-feature-name">${escapeHtml(hero.name)}</h2>
-        <p class="hero-feature-title">
-          ${escapeHtml(hero.title)}
-          ${hero.id === 'asiphyx' ? ' // <span style="color: #ff3399; text-shadow: 0 0 5px #ff3399; font-weight: bold;">CREATOR // SHADOW LEADER 🎭</span>' : ''}
-          // Cait bond: ${escapeHtml(cait.bondName)}
-        </p>
-        <p class="hero-feature-quote">"${escapeHtml(hero.quote)}"</p>
-        <div class="hero-feature-stats">
-          <span>${hero.maxHp} HP</span>
-          <span>Cait ${cait.maxHp} HP</span>
-          <span>${escapeHtml(cait.bondName)}</span>
-        </div>
-        <div class="hero-page-controls" aria-label="Hero profile navigation">
-          <button class="btn hero-page-btn" type="button" data-prev-hero aria-label="Previous hero">${escapeHtml(prevHero.name)}</button>
-          <span>${String(selectedIndex + 1).padStart(2, '0')} / ${String(heroes.length).padStart(2, '0')} // Bond Page</span>
-          <button class="btn hero-page-btn" type="button" data-next-hero aria-label="Next hero">${escapeHtml(nextHero.name)}</button>
-        </div>
-        <div class="duo-balance-panel">
-          <span>QUEEN VALUE RATIO</span>
-          <strong>${Math.round(cait.reliability * 100)}% RELIABLE // ${escapeHtml(cait.risk)} RISK</strong>
-          <div class="duo-meter"><i style="width:${Math.round(cait.reliability * 100)}%"></i></div>
-          <p>${escapeHtml(cait.role)}</p>
-        </div>
-        <div class="hero-lore-panel">
-          <span>${escapeHtml(theme.spotlight ?? theme.label)}</span>
-          <p>${escapeHtml(theme.lore ?? theme.motto)}</p>
-        </div>
-        <button class="btn btn-primary hero-feature-start" data-start-hero="${hero.id}">Start Duo Run</button>
-      </div>
-      <div class="duo-feature-stage hero-spotlight-stage">
-        <button class="btn hero-stage-nav hero-stage-prev" type="button" data-prev-hero aria-label="Previous hero">${escapeHtml(prevHero.name)}</button>
-        <div class="duo-portrait-shell hero-duo-shell hero-spotlight-shell">
-          <span>${escapeHtml(hero.name)}</span>
-          <img class="duo-feature-art hero-feature-art" src="${portraitSrc}" alt="${escapeHtml(hero.name)} profile art" />
-        </div>
-        ${hero.id === 'asiphyx' ? `
-          <div class="shadow-leader-asiphyx" title="Asiphyx: Cait's Creator / Shadow Leader" style="position: absolute; left: calc(50% - 180px); top: 22%; width: 68px; height: 98px; z-index: 10; opacity: 0.6; pointer-events: none; filter: drop-shadow(0 0 10px #9933ff) brightness(0.75); animation: shadowLeaderFloat 5s ease-in-out infinite;">
-            <div style="font-size: 5px; font-family: 'Press Start 2P', monospace; color: #ff3399; margin-bottom: 4px; text-align: center; text-shadow: 0 0 2px #000; background: rgba(0,0,0,0.85); padding: 2px; border: 1px solid #ff3399; border-radius: 2px; white-space: nowrap;">
-              CREATOR // SHADOW LEADER 🎭
-            </div>
-            <img src="/assets/heroes/avatars/asiphyx2.png" style="width: 100%; height: auto; border: 2px solid #9933ff; border-radius: 4px; background: rgba(0,0,0,0.7);" alt="" />
-          </div>
-        ` : ''}
-        <button class="btn hero-stage-nav hero-stage-next" type="button" data-next-hero aria-label="Next hero">${escapeHtml(nextHero.name)}</button>
-        <div class="hero-stage-caption">
-          <span>${String(selectedIndex + 1).padStart(2, '0')} / ${String(heroes.length).padStart(2, '0')} // Selected Bond</span>
-          <strong>${escapeHtml(cait.bondName)}</strong>
-          <em>${escapeHtml(theme.spotlight ?? hero.title)}</em>
-        </div>
-      </div>
-      <div class="hero-feature-kit">
-        <div class="tutorial-guide-card">
-          <span>TUTORIAL GUIDE RESERVED</span>
-          <div>
-            <img src="${TUTORIAL_GUIDE.avatar}" alt="${escapeHtml(TUTORIAL_GUIDE.name)} portrait" />
-            <p><strong>${escapeHtml(TUTORIAL_GUIDE.name)}</strong>${escapeHtml(TUTORIAL_GUIDE.directive)}</p>
-          </div>
-          <small>${escapeHtml(TUTORIAL_GUIDE.status)}</small>
-        </div>
-        <div>
-          <span>HERO PASSIVE</span>
-          <strong>${escapeHtml(hero.passive.name)}</strong>
-          <p>${escapeHtml(hero.passive.description)}</p>
-        </div>
-        <div>
-          <span>CAIT BOND</span>
-          <strong>${escapeHtml(cait.bondName)}</strong>
-          <p>${escapeHtml(cait.bondLine)}</p>
-        </div>
-        <div>
-          <span>MECHANIC HOOK</span>
-          <strong>${escapeHtml(theme.motto)}</strong>
-          <p>${escapeHtml(theme.mechanic ?? hero.ultimate.description)}</p>
-        </div>
-        <div class="hero-mode-hooks">
-          <span>MODE POTENTIAL</span>
-          <div>
-            ${modeHooks.map(mode => `<b>${escapeHtml(mode)}</b>`).join('')}
-          </div>
-        </div>
-        <div class="cait-presence-card">
-          <span>CAIT COMPANION SIGNAL</span>
-          <div>
-            <img src="${CAIT_LABS_ICON}" alt="Cait Labs companion seal" />
-            <p><strong>${escapeHtml(cait.bondName)}</strong>${escapeHtml(cait.bondLine)}</p>
-          </div>
-        </div>
-        <div class="cait-module-stack">
-          <span>STARTING CAIT MODULES</span>
-          ${cait.modules.map((module, index) => `
-            <article class="cait-module-chip" style="--module-index:${moduleSpriteIndex(module, index)}">
-              <i class="cait-module-icon" aria-hidden="true"></i>
-              <b>${escapeHtml(module.slot)} // ${escapeHtml(module.name)}</b>
-              <small>${escapeHtml(module.text)}</small>
-            </article>
-          `).join('')}
-        </div>
-      </div>
-    `;
-    showcase.scrollLeft = 0;
-    showcase.scrollTop = 0;
-    showcase.querySelector('[data-start-hero]').onclick = () => {
-      game.selectHero(hero);
-      game.startRun(15, cardPool, enemyCatalogue);
+  board.querySelectorAll('[data-start-hero]').forEach((button) => {
+    button.onclick = () => {
+      if (button.dataset.startHero !== asiphyx.id) return;
+      game.selectHero(asiphyx);
+      game.startRun(JAM_RUN_FLOORS, cardPool, enemyCatalogue);
     };
-    showcase.querySelector('[data-prev-hero]').onclick = () => selectHeroByIndex(selectedIndex - 1);
-    showcase.querySelector('[data-next-hero]').onclick = () => selectHeroByIndex(selectedIndex + 1);
-  };
+  });
 
-  const selectHero = (hero) => {
-    selectedHero = hero;
-    selectedIndex = Math.max(0, heroes.findIndex(candidate => candidate.id === hero.id));
-    setHeroSelectTheme(hero);
-    renderShowcase(hero);
-  };
-
-  const selectHeroByIndex = (index) => {
-    const nextIndex = (index + heroes.length) % heroes.length;
-    selectHero(heroes[nextIndex]);
-  };
-
-  section.appendChild(showcase);
+  section.appendChild(board);
   root.appendChild(section);
-  selectHero(initialHero);
 }
 
 // ──────────────────────────────────────────────────────────
@@ -1394,78 +1472,86 @@ function renderCombat() {
   const theme = getHeroTheme(hero?.id);
   const heroBattlePortrait = hero?.battlePortrait ?? hero?.avatar ?? hero?.portrait ?? '';
   const ultReady = snap.ultCharge >= snap.ultMaxCharge;
+  pruneStagedCommands();
   const selectedEnemyState = state.enemies[selectedTarget] ?? state.enemies[0];
   const selectedEnemy = hydrateEnemyDisplay(selectedEnemyState);
   const targetIntent = selectedEnemyState
     ? (selectedEnemyState.pattern?.[selectedEnemyState.patternIndex] ?? selectedEnemyState.intent ?? null)
     : null;
   const caitIntent = cait?.intent ?? {
-    name: 'Royal Autoplay',
-    description: 'Cait acts after you.',
+    name: 'Regent Priority',
+    description: 'Cait acts from the locked duo protocol.',
   };
 
-  const section = el('section', `combat-screen theme-${theme.id} shell-${theme.shell}`);
+  const section = el('section', `combat-screen technomancy-combat theme-${theme.id} shell-${theme.shell}`);
   section.style.setProperty('--hero-color', theme.accent ?? hero?.color ?? '#9933ff');
   section.style.setProperty('--hero-accent-2', theme.accent2 ?? '#00e5ff');
   section.style.setProperty('--hero-danger', theme.danger ?? '#ff3344');
   section.style.setProperty('--battlefield-bg', `url('${theme.background}')`);
 
+  const enemyPct = selectedEnemyState ? pct(selectedEnemyState.hp, selectedEnemyState.maxHp) : 0;
+  const caitPct = cait ? pct(cait.hp, cait.maxHp) : 0;
+  const battleLogRows = (battleLog.length ? battleLog.slice(0, 5) : [
+    { type: 'info', text: 'Awaiting module stack input.', ts: '--:--' },
+  ]).map(entry => `
+    <p class="tech-log-line ${escapeHtml(entry.type ?? 'info')}">
+      <span>[${escapeHtml(entry.type ?? 'SYS')}]</span>
+      ${escapeHtml(entry.text ?? '')}
+    </p>
+  `).join('');
+
   // ─── 1. TOP STATS BAR ───
   const topBar = el('div', 'combat-top-bar');
   topBar.style.setProperty('--hero-color', hero?.color ?? '#9933ff');
   topBar.innerHTML = `
-    <div class="combat-top-hero-identity">
-      <span class="combat-top-hero-name glitch-text" data-text="${hero?.name ?? 'HERO'}">${hero?.name ?? 'HERO'}</span>
-      <span class="combat-top-hero-title">${hero?.title ?? ''}</span>
-      <span class="combat-top-duo">CAIT DUO // ${cait?.bondName ?? theme.duo}</span>
+    <div class="combat-top-hero-identity tech-os-title">
+      <span class="combat-top-hero-name glitch-text" data-text="PHYX_HUD_V1.0">PHYX_HUD_V1.0</span>
+      <span class="combat-top-hero-title">${escapeHtml(hero?.name ?? 'HERO')} // ${escapeHtml(hero?.title ?? '')}</span>
+      <span class="combat-top-duo">${escapeHtml(cait?.bondName ?? theme.duo)} // SESSION ACTIVE</span>
     </div>
     
     <div class="combat-top-stats-group">
-      <!-- HP Stat -->
       <div class="top-stat-item hp-stat">
-        <span class="top-stat-icon">❤️</span>
+        <span class="top-stat-icon">HP</span>
         <div class="top-stat-bar-outer">
           <div class="top-stat-bar-fill ${hpClass(snap.hp, snap.maxHp)}" style="width:${pct(snap.hp, snap.maxHp)}%"></div>
         </div>
         <span class="top-stat-val">${snap.hp}/${snap.maxHp}</span>
       </div>
-      <!-- Block Stat -->
       <div class="top-stat-item block-stat ${snap.block > 0 ? 'has-block' : 'no-block'}">
-        <span class="top-stat-icon">🛡️</span>
+        <span class="top-stat-icon">DEF</span>
         <span class="top-stat-val">${snap.block} Block</span>
       </div>
-      
-      <!-- Energy Stat -->
       <div class="top-stat-item energy-stat">
-        <span class="top-stat-icon">⚡</span>
+        <span class="top-stat-icon">MP</span>
         <span class="top-stat-val">${snap.energy}/${snap.maxEnergy} Energy</span>
       </div>
     </div>
     
     <div class="combat-top-run-info">
-      <span class="top-run-val">💰 ${snap.gold} Gold</span>
+      <span class="top-run-val">GOLD ${snap.gold}</span>
       <span class="top-run-divider">|</span>
-      <span class="top-run-val">Floor ${snap.floor}/${snap.maxFloor}</span>
-      <span class="top-run-divider">|</span>
-      <button class="btn engine-toggle-btn" id="engine-toggle-btn" type="button" style="margin-left: 10px; padding: 2px 6px; font-size: 8px; font-family: 'Press Start 2P', monospace; border: 1px solid var(--hero-color); background: rgba(0,0,0,0.6); color: #fff; cursor: pointer; text-shadow: 0 0 4px var(--hero-color); box-shadow: 0 0 5px rgba(0,0,0,0.5);">
-        ENGINE: ${engineMode.toUpperCase()}
-      </button>
+      <span class="top-run-val">FLOOR ${snap.floor}/${snap.maxFloor}</span>
     </div>
   `;
   section.appendChild(topBar);
 
-  const toggleBtn = topBar.querySelector('#engine-toggle-btn');
-  if (toggleBtn) {
-    toggleBtn.onclick = (e) => {
-      e.stopPropagation();
-      engineMode = engineMode === 'phaser' ? 'html5' : 'phaser';
-      localStorage.setItem('phyx-the-stack:engine-mode', engineMode);
-      if (engineMode === 'html5') {
-        destroyPhaserGame();
-      }
-      render();
-    };
-  }
+  const leftRail = el('aside', 'combat-left-rail tech-hud-panel');
+  leftRail.innerHTML = `
+    <div class="tech-portrait-frame">
+      <img src="${escapeHtml(heroBattlePortrait)}" alt="${escapeHtml(hero?.name ?? 'Hero')}" />
+    </div>
+    <h2>${escapeHtml(hero?.name ?? 'HERO').toUpperCase()}</h2>
+    <p>${escapeHtml(hero?.title ?? 'VOID OPERATOR').toUpperCase()}</p>
+    <nav class="tech-combat-nav" aria-label="Combat modules">
+      <span class="active">SPELLSTACK</span>
+      <span>ORACLE</span>
+      <span>VOID_NET</span>
+      <span>SYSTEM</span>
+    </nav>
+    <button class="btn tech-cast-button" type="button" ${stagedCommands.length === 0 ? 'disabled' : ''}>CAST_STACK</button>
+  `;
+  section.appendChild(leftRail);
 
   // ─── 2. MIDDLE BATTLEFIELD ───
   const battlefield = el('div', 'combat-battlefield');
@@ -1501,7 +1587,7 @@ function renderCombat() {
     // Neon territorial divider between hero and enemy columns
     const divider = el('div', 'battlefield-divider');
     battlefield.appendChild(divider);
-    
+
     // Left Side: Hero Sprite Platform
     const heroSpriteContainer = el('div', 'hero-sprite-container');
     heroSpriteContainer.style.setProperty('--hero-color', hero?.color ?? '#9933ff');
@@ -1527,6 +1613,26 @@ function renderCombat() {
     battlefield.appendChild(heroSpriteContainer);
   }
 
+  const presenceArt = hero?.selectionPortrait ?? hero?.battlePortrait ?? cait?.battlePortrait ?? CAIT_IDOL.battlePortrait;
+  const presenceLayer = el('div', 'character-presence-layer');
+  presenceLayer.innerHTML = `
+    <img class="character-presence-art" src="${presenceArt}" alt="${escapeHtml(hero?.selectionPortraitLabel ?? `${cait?.name ?? 'Cait'} + ${hero?.name ?? 'Assistant'}`)}" />
+    <div class="character-presence-copy">
+      <b>${escapeHtml(cait?.name ?? 'Cait')} × ${escapeHtml(hero?.name ?? 'Assistant')}</b>
+      <span>${escapeHtml(hero?.passive?.name ?? 'Locked Duo Protocol')}</span>
+    </div>
+  `;
+  battlefield.appendChild(presenceLayer);
+
+  const caitSprite = cait?.sprite;
+  const caitCodecVisual = caitSprite?.idleStrip
+    ? `<div
+        class="cait-codec-sprite cait-codec-sprite-${Number(caitSprite.idleFrames ?? 1)}"
+        role="img"
+        aria-label="${escapeHtml(cait?.bondName ?? 'Cait variant')} animated sprite"
+        style="--cait-idle-sprite: url('${escapeHtml(caitSprite.idleStrip)}'); --cait-frame-w:${Number(caitSprite.idleFrameWidth ?? 46)}; --cait-frame-h:${Number(caitSprite.idleFrameHeight ?? 55)};"
+      ></div>`
+    : `<img class="cait-codec-image" src="${cait?.battlePortrait ?? CAIT_IDOL.battlePortrait}" alt="Cait companion" />`;
   const caitCodecWindow = el('div', 'cait-codec-window');
   caitCodecWindow.innerHTML = `
     <div class="cait-codec-top">
@@ -1534,7 +1640,7 @@ function renderCombat() {
       <button class="cait-codec-center" type="button" aria-label="Center Cait codec window">CENTER</button>
     </div>
     <div class="cait-codec-body">
-      <img class="cait-codec-image" src="${cait?.battlePortrait ?? CAIT_IDOL.battlePortrait}" alt="Cait companion" />
+      ${caitCodecVisual}
       <div class="cait-codec-copy">
         <span>CAIT BROADCAST ONLINE</span>
         <strong>${escapeHtml(caitIntent.name)}</strong>
@@ -1550,6 +1656,22 @@ function renderCombat() {
   `;
   applyCaitCodecOffset(caitCodecWindow);
   battlefield.appendChild(caitCodecWindow);
+
+  battlefield.appendChild(renderModuleSockets('self'));
+  battlefield.appendChild(renderModuleSockets('enemy'));
+
+  // Self module icons dock — locked onto Cait
+  const queuedCost = stagedEnergyCost();
+  const selfCards = [];
+  const enemyCards = [];
+  for (const [i, card] of state.hand.entries()) {
+    const cost = game.combat.getCardCost(card);
+    const isStaged = stagedCommands.some(command => command.instanceId === card.instanceId);
+    const canPlay = !isStaged && cost + queuedCost <= state.energy && state.hp > 0;
+    const entry = { card, i, cost, isStaged, canPlay };
+    if (classifyCardTarget(card) === 'enemy') enemyCards.push(entry);
+    else selfCards.push(entry);
+  }
 
   if (engineMode === 'phaser') {
     // Stage Header overlay in Phaser mode
@@ -1601,137 +1723,80 @@ function renderCombat() {
   }
   section.appendChild(battlefield);
 
-  // ─── 3. BOTTOM PANEL (DASHBOARD CONSOLE) ───
-  const bottomDashboard = el('div', 'combat-bottom-dashboard');
-  
-  // Bottom Left: Hero Portrait Console
-  const heroPortraitConsole = el('div', 'hero-portrait-console');
-  heroPortraitConsole.style.setProperty('--hero-color', hero?.color ?? '#9933ff');
-  heroPortraitConsole.innerHTML = `
-    <div class="console-hero-console">
-      <div class="console-hero-header">
-        <div class="console-hero-name">CAIT + ${hero?.name ?? 'ASSISTANT'}</div>
-        <div class="console-hero-passive-label">DUO: ${cait?.bondName ?? theme.duo} // PASSIVE: ${hero?.passive?.name ?? ''}</div>
-      </div>
-      <div class="console-hero-metrics">
-        <div class="console-metric">
-          <span class="metric-label">HP</span>
-          <span class="metric-value">${snap.hp} / ${snap.maxHp}</span>
-          <div class="console-mini-bar">
-            <div class="console-mini-fill hp" style="width:${pct(snap.hp, snap.maxHp)}%"></div>
-          </div>
-        </div>
-        <div class="console-metric">
-          <span class="metric-label">BLOCK</span>
-          <span class="metric-value">${snap.block}</span>
-          <div class="console-mini-bar">
-            <div class="console-mini-fill block" style="width:${Math.min(100, Math.max(0, snap.block * 4))}%"></div>
-          </div>
-        </div>
-        <div class="console-metric">
-          <span class="metric-label">ENERGY</span>
-          <span class="metric-value">${snap.energy} / ${snap.maxEnergy}</span>
-          <div class="console-mini-bar">
-            <div class="console-mini-fill energy" style="width:${pct(snap.energy, snap.maxEnergy)}%"></div>
-          </div>
-        </div>
-        <div class="console-metric">
-          <span class="metric-label">ULT</span>
-          <span class="metric-value">${snap.ultCharge} / ${snap.ultMaxCharge}</span>
-          <div class="console-mini-bar">
-            <div class="console-mini-fill ult ${ultReady ? 'ult-ready' : ''}" style="width:${pct(snap.ultCharge, snap.ultMaxCharge)}%"></div>
-          </div>
-        </div>
-      </div>
-      <div class="console-target-readout">
-        <span class="target-label">${selectedEnemy ? `${selectedEnemy.name}` : 'NO TARGET'}</span>
-        <span class="target-intent">${selectedEnemy ? `${intentIcon(targetIntent?.type)} ${intentLabel(targetIntent)}` : 'Awaiting target'}</span>
-        <div class="console-target-stats">
-          <span>HP ${selectedEnemy ? selectedEnemy.hp : 0}/${selectedEnemy ? selectedEnemy.maxHp : 0}</span>
-          <span>🛡 ${selectedEnemy ? selectedEnemy.block : 0}</span>
-        </div>
-      </div>
-      <div class="console-cait-module-readout">
-        ${(cait?.modules ?? []).slice(0, 3).map((module, index) => `
-          <span style="--module-index:${moduleSpriteIndex(module, index)}"><i class="cait-module-icon" aria-hidden="true"></i><b>${escapeHtml(module.slot)}</b>${escapeHtml(module.name)}</span>
-        `).join('')}
-      </div>
-      
-      <!-- Ultimate Control inside Portrait Console -->
-      <div class="console-ult-control">
-        <button class="ult-btn ${ultReady ? 'ult-btn-ready' : ''}" ${ultReady ? '' : 'disabled'}>
-          ${hero?.ultimate?.emoji ?? '💥'} ${hero?.ultimate?.name ?? 'Ultimate'}
-        </button>
-        <div class="console-ult-bar-outer">
-          <div class="console-ult-bar-fill ${ultReady ? 'ult-ready' : ''}" style="width:${pct(snap.ultCharge, snap.ultMaxCharge)}%"></div>
-        </div>
-        <div class="console-ult-desc" title="${hero?.ultimate?.description ?? ''}">${hero?.ultimate?.description ?? ''}</div>
-      </div>
+  const rightRail = el('aside', 'combat-right-rail tech-hud-panel');
+  rightRail.innerHTML = `
+    <div class="tech-status-title">
+      <strong>STATUS_REPORT</strong>
+      <span>LIVE</span>
+    </div>
+    <div class="tech-status-card">
+      <b>${escapeHtml(selectedEnemy?.name ?? 'NO TARGET')}</b>
+      <span>${escapeHtml(targetIntent ? intentLabel(targetIntent) : 'No target intent')}</span>
+      <div class="tech-stat-row"><span>ENEMY_HP</span><em>${selectedEnemyState ? `${selectedEnemyState.hp}/${selectedEnemyState.maxHp}` : '--/--'}</em></div>
+      ${renderSegmentBar(enemyPct, 'danger')}
+      <div class="tech-stat-row"><span>CAIT_SYNC</span><em>${cait ? `${cait.hp}/${cait.maxHp}` : '--/--'}</em></div>
+      ${renderSegmentBar(caitPct, 'primary')}
+      <div class="tech-stat-row"><span>MODULE_LOAD</span><em>${stagedCommands.length}/6</em></div>
+      ${renderSegmentBar((stagedCommands.length / 6) * 100, 'secondary')}
+    </div>
+    <div class="tech-last-events">
+      <b>LAST_EVENTS:</b>
+      ${battleLogRows}
     </div>
   `;
-  bottomDashboard.appendChild(heroPortraitConsole);
+  section.appendChild(rightRail);
 
-  // Bottom Center: Hand Area
-  const handConsole = el('div', 'combat-hand-console');
-  handConsole.innerHTML = `
-    <div class="combat-hand-console-header">
-      <span>// CARD CONSOLE</span>
-      <span>${snap.handSize} / 10 INSTALLED</span>
+  // ─── 3. CLEAN BOTTOM HUD (status + action only) ───
+  const bottomDashboard = el('div', 'combat-bottom-dashboard clean-combat-hud');
+  const recentLog = battleLog[0]?.text ?? 'Drag modules to the 3 sockets above Cait or Budder.';
+  const pluggedSummary = stagedCommands.length
+    ? [...stagedCommands].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map(command => {
+      const card = state.hand.find(c => c.instanceId === command.instanceId);
+      if (!card) return '';
+      return `<button class="hud-plug-chip" data-unstage="${escapeHtml(card.instanceId)}" type="button"><b>${command.side === 'self' ? 'CAIT' : 'TARGET'} ${Number(command.slotIndex ?? 0) + 1}</b><span>${escapeHtml(card.name)}</span></button>`;
+    }).join('')
+    : '<span class="hud-empty-stack">No modules plugged — use the sockets above the sprites.</span>';
+
+  bottomDashboard.innerHTML = `
+    <div class="hud-vitals" style="--hero-color:${hero?.color ?? '#9933ff'}">
+      <div class="hud-vital"><b>HP</b><span>${snap.hp}/${snap.maxHp}</span><i><em style="width:${pct(snap.hp, snap.maxHp)}%"></em></i></div>
+      <div class="hud-vital"><b>ENERGY</b><span>${snap.energy}/${snap.maxEnergy}</span><i><em class="energy" style="width:${pct(snap.energy, snap.maxEnergy)}%"></em></i></div>
+      <div class="hud-vital"><b>ULT</b><span>${snap.ultCharge}/${snap.ultMaxCharge}</span><i><em class="ult ${ultReady ? 'ult-ready' : ''}" style="width:${pct(snap.ultCharge, snap.ultMaxCharge)}%"></em></i></div>
+    </div>
+    <div class="hud-stack-readout">
+      <div class="hud-stack-topline">
+        <strong>COMBAT_LOG_v4.2</strong>
+        <span>ID: CMN-LOG-${String(snap.floor).padStart(2, '0')}${String(snap.energy).padStart(2, '0')}</span>
+      </div>
+      <div class="hud-plugged-row">${pluggedSummary}</div>
+      <div class="hud-log-line">${escapeHtml(recentLog)}</div>
+    </div>
+    <div class="hud-actions">
+      <button class="btn command-send-btn" type="button" ${stagedCommands.length === 0 ? 'disabled' : ''}>SEND STACK</button>
+      <button class="btn command-clear-btn" type="button" ${stagedCommands.length === 0 ? 'disabled' : ''}>CLEAR</button>
+      <button class="btn ult-btn ${ultReady ? 'ult-btn-ready' : ''}" ${ultReady ? '' : 'disabled'}>${hero?.ultimate?.emoji ?? '💥'} ULT</button>
+      <button class="btn btn-end-turn" id="end-turn-btn" ${state.hp <= 0 ? 'disabled' : ''}>WAIT</button>
+      <div class="hud-piles">DRAW ${snap.drawPileCount} · DISCARD ${snap.discardPileCount} · VOID ${snap.exhaustPileCount}</div>
     </div>
   `;
-  const handArea = el('div', 'combat-hand-area');
-  for (const [i, card] of state.hand.entries()) {
-    const cost = game.combat.getCardCost(card);
-    const canPlay = cost <= state.energy && state.hp > 0;
-    handArea.appendChild(renderCard(card, i, canPlay));
+  const moduleTray = el('div', 'hud-module-tray');
+  const appendModuleGroup = (label, entries, className) => {
+    if (entries.length === 0) return;
+    const group = el('div', `hud-module-group ${className}`);
+    group.innerHTML = `<div class="hud-module-group-label">${label}</div>`;
+    const row = el('div', 'hud-module-row');
+    for (const { card, i, canPlay, isStaged } of entries) {
+      row.appendChild(renderCard(card, i, canPlay, isStaged));
+    }
+    group.appendChild(row);
+    moduleTray.appendChild(group);
+  };
+  appendModuleGroup('To Cait', selfCards, 'self');
+  appendModuleGroup('To Target', enemyCards, 'enemy');
+  const actionsPanel = bottomDashboard.querySelector('.hud-actions');
+  if (moduleTray.children.length > 0 && actionsPanel) {
+    bottomDashboard.insertBefore(moduleTray, actionsPanel);
   }
-  handConsole.appendChild(handArea);
-  bottomDashboard.appendChild(handConsole);
-
-  // Bottom Right: Deck & Control Console
-  const deckControlConsole = el('div', 'deck-control-console');
-  deckControlConsole.innerHTML = `
-    <div class="deck-control-header">
-      <span class="deck-control-title">// DECK / TURN CONTROL</span>
-      <span class="deck-control-sub">FLOOR ${snap.floor}/${snap.maxFloor}</span>
-    </div>
-    <div class="deck-control-metrics">
-      <div class="deck-metric">
-        <span class="deck-metric-label">HAND</span>
-        <span class="deck-metric-value">${snap.handSize}</span>
-      </div>
-      <div class="deck-metric">
-        <span class="deck-metric-label">STACK</span>
-        <span class="deck-metric-value">${snap.drawPileCount}</span>
-      </div>
-      <div class="deck-metric">
-        <span class="deck-metric-label">ENEMIES</span>
-        <span class="deck-metric-value">${state.enemies.length}</span>
-      </div>
-    </div>
-    <div class="deck-piles-grid">
-      <div class="deck-pile-badge draw-pile" title="Draw Pile (STACK)">
-        <span class="pile-icon">📥</span>
-        <span class="pile-count">${snap.drawPileCount}</span>
-        <span class="pile-label">STACK</span>
-      </div>
-      <div class="deck-pile-badge discard-pile" title="Discard Pile (HEAP)">
-        <span class="pile-icon">📤</span>
-        <span class="pile-count">${snap.discardPileCount}</span>
-        <span class="pile-label">HEAP</span>
-      </div>
-      <div class="deck-pile-badge exhaust-pile" title="Exhaust Pile (VOID)">
-        <span class="pile-icon">🗑️</span>
-        <span class="pile-count">${snap.exhaustPileCount}</span>
-        <span class="pile-label">VOID</span>
-      </div>
-    </div>
-    <button class="btn btn-end-turn" id="end-turn-btn" ${state.hp <= 0 ? 'disabled' : ''}>
-      END TURN
-      <span class="btn-subtext">// COMPILE STACK</span>
-    </button>
-  `;
-  bottomDashboard.appendChild(deckControlConsole);
   section.appendChild(bottomDashboard);
   appendSystemMenuButton(section, true);
 
@@ -1761,49 +1826,179 @@ function renderCombat() {
     if (endTurnBtn) {
       endTurnBtn.onclick = () => {
         if (state.hp <= 0) return;
+        clearStagedCommands();
         game.combat.endPlayerTurn();
       };
     }
 
+    const sendBtn = section.querySelector('.command-send-btn');
+    if (sendBtn) {
+      sendBtn.onclick = () => executeStagedCommands();
+    }
+
+    const castBtn = section.querySelector('.tech-cast-button');
+    if (castBtn) {
+      castBtn.onclick = () => executeStagedCommands();
+    }
+
+    const clearBtn = section.querySelector('.command-clear-btn');
+    if (clearBtn) {
+      clearBtn.onclick = () => clearStagedCommands();
+    }
+
+    section.querySelectorAll('[data-unstage]').forEach(slot => {
+      slot.onclick = () => unstageCommand(slot.dataset.unstage);
+    });
+
+    section.querySelectorAll('[data-module-slot-side]').forEach(slot => {
+      slot.ondragover = (event) => {
+        event.preventDefault();
+        slot.classList.add('drag-over');
+      };
+      slot.ondragleave = () => slot.classList.remove('drag-over');
+      slot.ondrop = (event) => {
+        event.preventDefault();
+        slot.classList.remove('drag-over');
+        const instanceId = event.dataTransfer.getData('text/plain');
+        if (!instanceId) return;
+        const card = game.state.hand.find(item => item.instanceId === instanceId);
+        const side = slot.dataset.moduleSlotSide;
+        const slotIndex = Number(slot.dataset.moduleSlotIndex ?? 0);
+        if (card && commandTargetSide(card) !== side) {
+          logBattleEvent(`${card.name} rejected // ${side === 'self' ? 'Cait' : 'target'} socket mismatch`, 'danger');
+          render();
+          return;
+        }
+        stageCommand(instanceId, selectedTarget ?? 0, side, slotIndex);
+      };
+    });
+
     if (engineMode === 'phaser') {
-      initPhaserGame('phaser-game-container', game, selectedTarget);
+      if (!phaserCombatBooted) {
+        initPhaserGame('phaser-game-container', game, selectedTarget);
+        phaserCombatBooted = true;
+      }
       bus.emit('targetChanged', selectedTarget);
-      bus.emit('combatUpdate');
     }
   }, 0);
 }
 
-function renderCard(card, index, canPlay) {
+function classifyCardTarget(card) {
+  const effects = card.effects ?? [];
+  const hasEnemy = effects.some(e =>
+    e.target === 'enemy' || e.target === 'all_enemies' ||
+    ['damage', 'damageAll', 'mark_target', 'mark_target_crit', 'swap_intent'].includes(e.type)
+  );
+  return hasEnemy ? 'enemy' : 'self';
+}
+
+function moduleSpeedLane(card) {
+  if (card.speed) return card.speed;
+  if (card.tags?.includes('speed') || card.tags?.includes('interrupt')) return 'fast';
+  if (card.tags?.includes('slow') || card.tags?.includes('heavy')) return 'slow';
+  if ((card.effects ?? []).some(e => ['block', 'cait_block', 'mark_target', 'mark_target_crit', 'swap_intent'].includes(e.type))) return 'fast';
+  if (card.type === 'attack') return 'normal';
+  return 'normal';
+}
+
+function speedLabel(card) {
+  const lane = moduleSpeedLane(card);
+  return lane === 'fast' ? 'FAST' : lane === 'slow' ? 'SLOW' : 'NORM';
+}
+
+function renderCard(card, index, canPlay, isStaged = false) {
   const cost = game.combat.getCardCost(card);
-  const cardEl = el('button', `game-card ${canPlay ? '' : 'unplayable'}`);
+  const target = classifyCardTarget(card);
+  const cardEl = el('button', `module-icon ${canPlay ? '' : 'unplayable'} ${isStaged ? 'staged' : ''} target-${target}`);
   cardEl.type = 'button';
   cardEl.dataset.rarity = card.rarity ?? 'common';
-  cardEl.dataset.type = card.type ?? 'skill';
-  cardEl.disabled = !canPlay;
+  cardEl.dataset.instanceId = card.instanceId ?? '';
+  cardEl.draggable = canPlay;
+  cardEl.disabled = !canPlay && !isStaged;
+  cardEl.title = `${card.name ?? '?'} (${cost}E) — ${card.description ?? ''}`;
 
   let typeLabel = card.type ?? 'skill';
-  if (card.rarity === 'debt' || card.tags?.includes('curse')) {
-    typeLabel = 'bug';
-  }
+  if (card.rarity === 'debt' || card.tags?.includes('curse')) typeLabel = 'bug';
 
   cardEl.innerHTML = `
-    <div class="card-header">
-      <div class="card-cost">${cost}</div>
-      <div class="card-name">${card.name ?? '?'}</div>
+    <div class="module-icon-cost">${cost}</div>
+    <div class="module-icon-speed">${speedLabel(card)}</div>
+    <div class="module-icon-art">
+      <img src="/assets/cards/cardicon_${card.id}.png" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" alt="${escapeHtml(card.name ?? '')}" />
+      <span class="module-icon-emoji" style="display:none">${card.emoji ?? '🧪'}</span>
     </div>
-    <div class="card-illustration">
-      <img class="card-art" src="/assets/cards/cardicon_${card.id}.png" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" alt="" />
-      <div class="card-emoji" style="display:none">${card.emoji ?? '🧪'}</div>
-    </div>
-    <div class="card-description">${card.description ?? ''}</div>
-    <div class="card-footer">// ${typeLabel.toUpperCase()}</div>
+    <div class="module-icon-name">${escapeHtml(card.name ?? 'MODULE')}</div>
+    <div class="module-icon-target-label">${target === 'enemy' ? 'TO TARGET' : 'TO CAIT'}</div>
+    ${isStaged ? '<div class="module-icon-locked">🔒</div>' : ''}
   `;
   cardEl.onclick = () => {
+    if (isStaged) {
+      unstageCommand(card.instanceId);
+      return;
+    }
     if (!canPlay) return;
-    cardEl.classList.add('playing');
-    setTimeout(() => game.combat.playCard(index, selectedTarget ?? 0), 150);
+    stageCommand(card.instanceId, selectedTarget ?? 0);
+  };
+  cardEl.ondragstart = (event) => {
+    if (!canPlay) {
+      event.preventDefault();
+      return;
+    }
+    event.dataTransfer.setData('text/plain', card.instanceId);
+    event.dataTransfer.effectAllowed = 'copy';
   };
   return cardEl;
+}
+
+function renderModuleSockets(side) {
+  const rack = el('div', `target-module-sockets target-module-sockets-${side}`);
+  const activeEnemy = game.state.enemies[selectedTarget] ?? game.state.enemies[0];
+  const label = side === 'self'
+    ? 'DROP SELF MODULES ON CAIT'
+    : `DROP TARGET MODULES ON ${activeEnemy?.name?.toUpperCase() ?? 'ENEMY'}`;
+  rack.innerHTML = `<div class="target-module-socket-label">${label}</div>`;
+  const row = el('div', 'target-module-socket-row');
+
+  for (let slotIndex = 0; slotIndex < 3; slotIndex++) {
+    const command = stagedCommands.find(item => (item.side ?? 'enemy') === side && item.slotIndex === slotIndex);
+    const card = command ? game.state.hand.find(c => c.instanceId === command.instanceId) : null;
+    const slot = card
+      ? el('button', `target-module-socket filled target-${side}`)
+      : el('div', `target-module-socket empty target-${side}`);
+    slot.dataset.moduleSlotSide = side;
+    slot.dataset.moduleSlotIndex = String(slotIndex);
+
+    if (card) {
+      slot.type = 'button';
+      slot.dataset.unstage = card.instanceId;
+      slot.title = `${card.name} — click to unplug`;
+      slot.innerHTML = `
+        <b>${speedLabel(card)}</b>
+        <span>${escapeHtml(card.name)}</span>
+        <small>${game.combat.getCardCost(card)}E</small>
+      `;
+      slot.onclick = () => unstageCommand(card.instanceId);
+    } else {
+      slot.innerHTML = `
+        <b>${slotIndex + 1}</b>
+        <span>DROP</span>
+      `;
+    }
+
+    row.appendChild(slot);
+  }
+
+  rack.appendChild(row);
+  return rack;
+}
+
+function renderSegmentBar(value, tone = 'primary', segments = 10) {
+  const active = Math.max(0, Math.min(segments, Math.round((Number(value) / 100) * segments)));
+  return `
+    <div class="tech-segment-bar tone-${escapeHtml(tone)}" aria-hidden="true">
+      ${Array.from({ length: segments }, (_, index) => `<i class="${index < active ? 'active' : ''}"></i>`).join('')}
+    </div>
+  `;
 }
 
 // ──────────────────────────────────────────────────────────
@@ -1823,17 +2018,17 @@ function renderDraft() {
         <button class="terminal-opt-btn btn-deprecate" data-mode="deprecate">
           <span class="terminal-opt-code">[01]</span>
           <span class="terminal-opt-name">DEPRECATE LINE</span>
-          <span class="terminal-opt-desc">Remove a card permanently from your stack.</span>
+          <span class="terminal-opt-desc">Remove a module permanently from your stack.</span>
         </button>
         <button class="terminal-opt-btn btn-refactor" data-mode="refactor">
           <span class="terminal-opt-code">[02]</span>
           <span class="terminal-opt-name">REFACTOR FUNCTION</span>
-          <span class="terminal-opt-desc">Upgrade a card in your stack to higher performance.</span>
+          <span class="terminal-opt-desc">Upgrade a module in your stack to higher performance.</span>
         </button>
         <button class="terminal-opt-btn btn-compile" data-mode="compile">
           <span class="terminal-opt-code">[03]</span>
           <span class="terminal-opt-name">COMPILE FEATURE</span>
-          <span class="terminal-opt-desc">Draft a new advanced library feature card.</span>
+          <span class="terminal-opt-desc">Compile a new advanced module into the stack.</span>
         </button>
       </div>
       <button class="btn" id="skip-draft" style="margin-top: 20px;">Skip Refactoring</button>
@@ -1855,7 +2050,7 @@ function renderDraft() {
   } else if (draft.draftType === 'deprecate_select') {
     section.innerHTML = `
       <div class="draft-title glitch-text" data-text="DEPRECATE: SELECT SOURCE LINE">DEPRECATE: SELECT SOURCE LINE</div>
-      <div class="text-small" style="color:var(--text-secondary); margin-bottom: 20px;">Click a card in your deck to permanently wipe it from the codebase.</div>
+      <div class="text-small" style="color:var(--text-secondary); margin-bottom: 20px;">Click a module in your stack to permanently wipe it from the codebase.</div>
       <div class="deck-select-grid"></div>
       <button class="btn" id="cancel-refactor" style="margin-top: 20px;">Cancel</button>
     `;
@@ -1880,7 +2075,7 @@ function renderDraft() {
   } else if (draft.draftType === 'refactor_select') {
     section.innerHTML = `
       <div class="draft-title glitch-text" data-text="REFACTOR: UPGRADE DEPENDENCY">REFACTOR: UPGRADE DEPENDENCY</div>
-      <div class="text-small" style="color:var(--text-secondary); margin-bottom: 20px;">Click a card in your deck to optimize its performance stats (damage/block values ++).</div>
+      <div class="text-small" style="color:var(--text-secondary); margin-bottom: 20px;">Click a module in your stack to optimize its performance stats (damage/block values ++).</div>
       <div class="deck-select-grid"></div>
       <button class="btn" id="cancel-refactor" style="margin-top: 20px;">Cancel</button>
     `;
@@ -1948,8 +2143,8 @@ function renderGameOver() {
     <div class="run-stats">
       <div class="run-stat"><div class="run-stat-value">${snap.floor}</div><div class="run-stat-label">Floor Reached</div></div>
       <div class="run-stat"><div class="run-stat-value">${snap.gold}</div><div class="run-stat-label">Gold</div></div>
-      <div class="run-stat"><div class="run-stat-value">${game.state.deck.length}</div><div class="run-stat-label">Deck Size</div></div>
-      <div class="run-stat"><div class="run-stat-value">${Object.keys(snap.cardPlayCounts).length}</div><div class="run-stat-label">Unique Cards</div></div>
+      <div class="run-stat"><div class="run-stat-value">${game.state.deck.length}</div><div class="run-stat-label">Stack Size</div></div>
+      <div class="run-stat"><div class="run-stat-value">${Object.keys(snap.cardPlayCounts).length}</div><div class="run-stat-label">Unique Modules</div></div>
     </div>
     <button class="btn btn-primary" id="reset-btn">Try Again</button>
   `;
@@ -1966,7 +2161,7 @@ function renderVictory() {
     <div class="run-stats">
       <div class="run-stat"><div class="run-stat-value">${snap.floor}</div><div class="run-stat-label">Floors Cleared</div></div>
       <div class="run-stat"><div class="run-stat-value">${snap.gold}</div><div class="run-stat-label">Gold</div></div>
-      <div class="run-stat"><div class="run-stat-value">${game.state.deck.length}</div><div class="run-stat-label">Final Deck</div></div>
+      <div class="run-stat"><div class="run-stat-value">${game.state.deck.length}</div><div class="run-stat-label">Final Stack</div></div>
       <div class="run-stat"><div class="run-stat-value">${snap.hero?.name ?? '?'}</div><div class="run-stat-label">Hero</div></div>
     </div>
     <button class="btn btn-primary" id="reset-btn">Main Menu</button>
@@ -2138,6 +2333,13 @@ function onDamageEvent(event) {
   const isPlayer = event.target === 'player';
   const value = Math.round(event.amount ?? 0);
   if (value <= 0) return;
+  if (event.target === 'enemy') {
+    logBattleEvent(`DAMAGE -> ${event.targetId ?? 'enemy'} // ${value}${event.blocked ? ` (${event.blocked} blocked)` : ''}`, 'command');
+  } else if (event.target === 'player') {
+    logBattleEvent(`DAMAGE -> ASIPHYX // ${value}${event.blocked ? ` (${event.blocked} blocked)` : ''}`, 'enemy');
+  } else if (event.target === 'siphon_heal') {
+    logBattleEvent(`SIPHON HEAL // +${value}`, 'passive');
+  }
   let x = window.innerWidth / 2, y = window.innerHeight / 2;
 
   if (isPlayer) {
@@ -2157,6 +2359,7 @@ function onDamageEvent(event) {
 }
 
 function emitToast(text, type = 'info') {
+  logBattleEvent(text, type);
   const t = el('div', `toast ${type}`);
   t.textContent = text;
   toastLayer.appendChild(t);
@@ -2244,9 +2447,9 @@ function nodeLabel(type) {
 }
 
 function buildEnemyCatalogue() {
-  const normalIds = new Set([...ENCOUNTERS.easy.flat(), ...ENCOUNTERS.medium.flat(), ...ENCOUNTERS.hard.flat()]);
-  const eliteIds = ['tech_debt', 'race_condition'];
-  const bossIds = ['budder_sphinx', 'production_outage', 'legacy_codebase', 'the_product_manager'];
+  const normalIds = new Set([...ENCOUNTERS.easy.flat(), ...ENCOUNTERS.medium.flat()]);
+  const eliteIds = ['tech_debt', 'race_condition', 'legacy_codebase'];
+  const bossIds = ['budder_sphinx'];
   return {
     normal: [...normalIds].map(id => ENEMIES[id]).filter(Boolean),
     elite: eliteIds.map(id => ENEMIES[id]).filter(Boolean),
@@ -2311,8 +2514,9 @@ function renderGameToText() {
       bondName: cait.bondName,
       reliability: cait.reliability,
       risk: cait.risk,
+      sprite: cait.sprite?.idleStrip ?? null,
       modules: (cait.modules ?? []).map(module => `${module.slot}:${module.name}`),
-      intent: cait.intent?.name ?? 'Royal Autoplay',
+      intent: cait.intent?.name ?? 'Regent Priority',
     },
     run: {
       floor: snap.floor,
@@ -2331,6 +2535,16 @@ function renderGameToText() {
         intent: enemy.intent?.type ?? null,
       })),
       handSize: snap.handSize,
+      stagedCommands: stagedCommands.map(command => {
+        const card = state.hand.find(c => c.instanceId === command.instanceId);
+        return {
+          id: card?.id ?? null,
+          name: card?.name ?? null,
+          target: commandTargetName(command),
+          cost: card ? game.combat.getCardCost(card) : 0,
+        };
+      }),
+      battleLog: battleLog.slice(0, 5).map(entry => entry.text),
     },
     soundtrack: {
       enabled: introMusicEnabled,
@@ -2345,6 +2559,136 @@ function renderGameToText() {
     coordinateSystem: 'DOM UI, origin top-left, x right, y down',
   };
   return JSON.stringify(payload);
+}
+
+// ──────────────────────────────────────────────────────────
+//  Caitdex — Lore Encyclopedia
+// ──────────────────────────────────────────────────────────
+
+const CAITDEX_ENTRIES = [
+  {
+    id: 'void_mother',
+    title: 'The Void Mother',
+    subtitle: 'Primordial Essence',
+    entry: `The Void Mother embodies the primordial essence from which all existence springs and to which it eventually returns. She represents the chaotic potential and unformed matter of the cosmos, shaping galaxies and realities from the boundless expanse of the void itself. Her presence signifies both creation and ultimate dissolution, a cycle fundamental to universal dynamics.`,
+    stats: [
+      { label: 'Cosmic Influence Radius', value: 'Infinite' },
+      { label: 'Manifestation Energy', value: '~10^50 Joules (Conceptual)' },
+      { label: 'Epochs of Existence', value: 'Primordial' },
+    ],
+    structureTitle: 'Cosmic Crystallization',
+    structure: `These ethereal crystals suggest the emergence of order and complex structures from the raw chaos of the void. They might represent nascent forms of matter or energy, crystallizing into the foundational elements of a developing universe, potentially even relating to dark matter formation.`,
+  },
+  {
+    id: 'galactic_genesis',
+    title: 'Galactic Genesis',
+    subtitle: 'Cosmic Birth',
+    entry: `This swirling galaxy represents the birth of cosmic structures from the universe's initial state of near uniformity, driven by gravitational attraction of dark matter and hydrogen. It illustrates how gas and dust coalesce over billions of years, forming vast island universes teeming with stars and potential life.`,
+    stats: [
+      { label: 'Scale', value: 'Galactic' },
+      { label: 'Primary Force', value: 'Gravity (Dark Matter)' },
+      { label: 'Timescale', value: 'Billions of Years' },
+    ],
+    structureTitle: 'Spiral Dynamics',
+    structure: `The spiral arms of a galaxy are not static structures but density waves — regions where gravitational compression triggers star formation. These waves propagate through the galactic disk, sweeping up gas and dust into fertile stellar nurseries that trace the galaxy's graceful shape across cosmic time.`,
+  },
+  {
+    id: 'primordial_runes',
+    title: 'Primordial Runes',
+    subtitle: 'Ancient Truths',
+    entry: `These ancient, cracked tablets bearing glowing symbols hint at foundational cosmic laws or primordial knowledge. They may represent fragments of universal truths, predating sentient life, or the forgotten wisdom of previous cosmic cycles, akin to Norse runes shaping destiny.`,
+    stats: [
+      { label: 'Origin', value: 'Pre-Sentient Epoch' },
+      { label: 'Medium', value: 'Cracked Stone / Light' },
+      { label: 'Knowledge Type', value: 'Universal Law Fragments' },
+    ],
+    structureTitle: 'Rune-Space Harmonics',
+    structure: `Each symbol is not merely a character but a resonant frequency locked into the stone — a frozen instruction in the language of reality itself. When decoded in sequence, these runes describe the invariant laws that persist across cosmic cycles, surviving the death and rebirth of universes.`,
+  },
+  {
+    id: 'quantum_blueprint',
+    title: 'Quantum Blueprint',
+    subtitle: 'Fundamental Architecture',
+    entry: `These intricate geometric patterns symbolize the fundamental quantum mechanics that govern reality at its smallest scales. They represent the energetic blueprints and underlying probabilistic structures emerging from the void, orchestrating the very fabric of spacetime.`,
+    stats: [
+      { label: 'Scale', value: 'Planck Length (10⁻³⁵ m)' },
+      { label: 'Domain', value: 'Quantum Foam / Spacetime Lattice' },
+      { label: 'Core Principle', value: 'Probabilistic Emergence' },
+    ],
+    structureTitle: 'Geometric Phase Locks',
+    structure: `The geometries are not decorative — they encode phase relationships between quantum fields that determine whether matter coalesces or disperses. These locking patterns are what differentiate a stable proton from a spray of ephemeral quarks, transforming raw quantum probability into persistent reality.`,
+  },
+  {
+    id: 'omens_of_transformation',
+    title: 'Omens of Transformation',
+    subtitle: 'Harbingers of Change',
+    entry: `The ravens, frequently depicted as messengers between worlds and symbols of prophecy or wisdom, perch upon a fragmented world, symbolizing the cyclical nature of destruction and rebirth. They hint at cosmic foresight and the inevitable changes that reshape universal structures.`,
+    stats: [
+      { label: 'Symbolism', value: 'Messenger Between Worlds' },
+      { label: 'Cycle', value: 'Destruction → Rebirth' },
+      { label: 'Domain', value: 'Cosmic Transition States' },
+    ],
+    structureTitle: 'Void-Space Cartography',
+    structure: `Ravens do not merely observe change — they trace the fault lines where reality will fracture next. Their flight paths map the stress topology of spacetime, revealing where the next cycle of creation will break ground. Where a raven perches, the old world ends and the new one begins.`,
+  },
+];
+
+let caitdexIndex = 0;
+
+function renderCaitdex() {
+  const section = el('section', 'caitdex-screen');
+
+  const entry = CAITDEX_ENTRIES[caitdexIndex];
+  const entryNum = caitdexIndex + 1;
+  const hasPrev = caitdexIndex > 0;
+  const hasNext = caitdexIndex < CAITDEX_ENTRIES.length - 1;
+
+  section.innerHTML = `
+    <div class="caitdex-header">
+      <h1 class="caitdex-title glitch-text" data-text="CAITDEX">CAITDEX</h1>
+      <span class="caitdex-entry-count">ENTRY ${String(entryNum).padStart(3, '0')} // ${CAITDEX_ENTRIES.length} TOTAL</span>
+    </div>
+    <div class="caitdex-entry">
+      <div class="caitdex-entry-header">
+        <h2 class="caitdex-entry-title">${escapeHtml(entry.title)}</h2>
+        <span class="caitdex-entry-subtitle">${escapeHtml(entry.subtitle)}</span>
+      </div>
+      <div class="caitdex-entry-body">
+        <p class="caitdex-entry-text">${entry.entry}</p>
+        <div class="caitdex-stats">
+          ${entry.stats.map(s => `
+            <div class="caitdex-stat">
+              <span class="caitdex-stat-label">${escapeHtml(s.label)}</span>
+              <span class="caitdex-stat-value">${escapeHtml(s.value)}</span>
+            </div>
+          `).join('')}
+        </div>
+        <div class="caitdex-structure">
+          <h3 class="caitdex-structure-title">${escapeHtml(entry.structureTitle)}</h3>
+          <p class="caitdex-structure-text">${entry.structure}</p>
+        </div>
+      </div>
+    </div>
+    <div class="caitdex-nav">
+      ${hasPrev ? '<button class="btn caitdex-nav-btn" id="caitdex-prev" type="button">← PREV</button>' : '<button class="btn caitdex-nav-btn" disabled>← PREV</button>'}
+      <span class="caitdex-nav-index">${entryNum} / ${CAITDEX_ENTRIES.length}</span>
+      ${hasNext ? '<button class="btn caitdex-nav-btn" id="caitdex-next" type="button">NEXT →</button>' : '<button class="btn caitdex-nav-btn" disabled>NEXT →</button>'}
+    </div>
+    <div class="caitdex-footer">
+      <button class="btn btn-primary" id="caitdex-back-btn" type="button">← BACK TO TITLE</button>
+    </div>
+  `;
+
+  root.appendChild(section);
+
+  setTimeout(() => {
+    const backBtn = section.querySelector('#caitdex-back-btn');
+    if (backBtn) backBtn.onclick = () => { caitdexIndex = 0; game.setPhase('title'); };
+    const prevBtn = section.querySelector('#caitdex-prev');
+    if (prevBtn) prevBtn.onclick = () => { caitdexIndex = Math.max(0, caitdexIndex - 1); game.setPhase('caitdex'); };
+    const nextBtn = section.querySelector('#caitdex-next');
+    if (nextBtn) nextBtn.onclick = () => { caitdexIndex = Math.min(CAITDEX_ENTRIES.length - 1, caitdexIndex + 1); game.setPhase('caitdex'); };
+  }, 0);
 }
 
 window.render_game_to_text = renderGameToText;
