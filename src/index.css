@@ -3758,6 +3758,62 @@ body::after {
   filter: drop-shadow(0 0 2px #000);
 }
 
+.module-icon-detail {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%) translateY(6px);
+  width: clamp(190px, 24vw, 270px);
+  max-width: 280px;
+  padding: 9px 10px;
+  border: 1px solid rgba(0, 240, 255, 0.45);
+  border-radius: 6px;
+  background: rgba(9, 10, 12, 0.98);
+  color: var(--text-primary, #e5e2e1);
+  text-align: left;
+  display: grid;
+  gap: 4px;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 20;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(3px);
+}
+
+.module-icon:hover .module-icon-detail,
+.module-icon:focus-visible .module-icon-detail {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.module-icon-detail b {
+  display: block;
+  font-size: 0.66rem;
+  font-family: "JetBrains Mono", monospace;
+  line-height: 1.2;
+  color: var(--tech-green, #39ff14);
+}
+
+.module-icon-detail span {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 0.6rem;
+  line-height: 1.24;
+  color: rgba(229, 226, 225, 0.82);
+}
+
+.module-icon-detail small {
+  display: block;
+  color: rgba(229, 226, 225, 0.74);
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 /* ══════════════════════════════════════════════
    CAITDEX — Lore Encyclopedia
    ══════════════════════════════════════════════ */
@@ -9832,7 +9888,7 @@ body::after {
   background: var(--tech-void) !important;
   box-shadow: 0 0 14px rgba(57,255,20,0.7) !important;
   display: grid !important;
-  grid-template-columns: minmax(280px, 0.9fr) minmax(360px, 1fr) auto;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(440px, 1fr);
   align-items: center;
   z-index: 12;
 }
@@ -9864,6 +9920,77 @@ body::after {
   display: flex;
   justify-content: center;
   gap: 14px;
+}
+
+.technomancy-combat .combat-top-chips {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  width: min(100%, 860px);
+  min-height: 100%;
+  align-items: center;
+  padding: 6px 8px;
+  margin-left: auto;
+  border: 1px solid rgba(0, 240, 255, 0.22);
+  border-radius: 6px;
+  background: rgba(4, 6, 8, 0.65);
+  box-shadow: inset 0 0 12px rgba(0, 240, 255, 0.12);
+}
+
+.technomancy-combat .combat-top-chip-cluster {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+}
+
+.technomancy-combat .combat-top-chip-title {
+  color: rgba(0, 240, 255, 0.8);
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.technomancy-combat .combat-top-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  width: 100%;
+  min-height: 22px;
+}
+
+.technomancy-combat .combat-top-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid rgba(57, 255, 20, 0.4);
+  background: rgba(5, 5, 5, 0.72);
+  padding: 2px 6px;
+  color: rgba(229, 226, 225, 0.92);
+  font-size: 0.61rem;
+  letter-spacing: 0.06em;
+}
+
+.technomancy-combat .combat-top-chip b {
+  color: var(--tech-green);
+}
+
+.technomancy-combat .combat-top-chip small {
+  color: rgba(229, 226, 225, 0.75);
+}
+
+.technomancy-combat .combat-top-chip.artifact {
+  border-color: rgba(255, 0, 255, 0.45);
+}
+
+.technomancy-combat .combat-top-chip.empty {
+  border-color: rgba(0, 240, 255, 0.24);
+  color: rgba(229, 226, 225, 0.55);
+}
+
+.technomancy-combat .combat-top-stats-group,
+.technomancy-combat .combat-top-run-info {
+  display: none !important;
 }
 
 .technomancy-combat .top-stat-item {
@@ -9908,9 +10035,11 @@ body::after {
   grid-area: left;
   border-right: 2px solid var(--tech-magenta);
   padding: 22px 20px 20px;
-  display: grid;
-  grid-template-rows: auto auto auto 1fr auto;
-  justify-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 8px;
   min-height: 0;
 }
 
@@ -9973,7 +10102,7 @@ body::after {
 
 .tech-cast-button {
   width: 100%;
-  min-height: 46px !important;
+  min-height: 32px !important;
   border: 2px solid var(--tech-magenta) !important;
   background: rgba(5,5,5,0.82) !important;
   color: var(--tech-magenta) !important;
@@ -10096,9 +10225,9 @@ body::after {
   grid-area: right;
   border-left: 2px solid var(--tech-green);
   padding: 24px 20px;
-  display: grid;
-  grid-template-rows: auto auto 1fr;
-  gap: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   min-height: 0;
   box-shadow: inset 10px 0 28px rgba(57,255,20,0.08);
 }
@@ -10123,62 +10252,6 @@ body::after {
   border: 1px solid var(--tech-green);
   padding: 3px 5px;
   font-size: 0.58rem;
-}
-
-.tech-status-card {
-  position: relative;
-  border: 1px solid rgba(57,255,20,0.72);
-  background: rgba(5,5,5,0.86);
-  padding: 18px;
-  box-shadow: inset 0 0 24px rgba(57,255,20,0.07);
-}
-
-.tech-status-card::before,
-.tech-status-card::after {
-  content: "";
-  position: absolute;
-  width: 10px;
-  height: 10px;
-  background: var(--tech-green);
-}
-
-.tech-status-card::before {
-  left: 0;
-  top: 0;
-}
-
-.tech-status-card::after {
-  right: 0;
-  bottom: 0;
-}
-
-.tech-status-card b {
-  display: block;
-  color: var(--tech-green);
-  font-size: 1rem;
-  letter-spacing: 0.08em;
-}
-
-.tech-status-card > span {
-  display: block;
-  color: var(--tech-blue);
-  margin: 4px 0 16px;
-  font-size: 0.7rem;
-}
-
-.tech-stat-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  color: var(--tech-text);
-  font-size: 0.66rem;
-  letter-spacing: 0.1em;
-  margin: 12px 0 5px;
-}
-
-.tech-stat-row em {
-  color: var(--tech-green);
-  font-style: normal;
 }
 
 .tech-segment-bar {
@@ -10218,18 +10291,87 @@ body::after {
   box-shadow: 0 0 8px var(--tech-error);
 }
 
-.tech-last-events {
+.tech-left-log {
+  margin-top: auto;
+  border: 1px solid rgba(255,0,255,0.42);
+  background: rgba(5,5,5,0.84);
+  padding: 10px;
+  display: grid;
+  gap: 6px;
   min-height: 0;
-  border-top: 1px solid rgba(57,255,20,0.42);
-  padding-top: 14px;
+  max-height: 38%;
   overflow: hidden;
 }
 
-.tech-last-events b {
-  display: block;
+.tech-left-log b {
+  color: var(--tech-magenta);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+}
+
+.tech-left-log-body {
+  display: grid;
+  gap: 3px;
+  color: rgba(229, 226, 225, 0.82);
+  overflow: hidden;
+}
+
+.tech-left-log-line {
+  margin: 0;
+  font-size: 0.56rem;
+  line-height: 1.28;
+  color: rgba(229, 226, 225, 0.8);
+  letter-spacing: 0.04em;
+}
+
+.tech-left-log-loglines {
+  min-height: 0;
+  border-top: 1px solid rgba(255,0,255,0.22);
+  padding-top: 6px;
+  display: grid;
+  gap: 4px;
+  overflow: auto;
+}
+
+.tech-left-log-loglines .tech-log-line {
+  margin: 0;
+  font-size: 0.52rem;
+}
+
+.tech-right-log {
+  border: 1px solid rgba(57,255,20,0.52);
+  background: rgba(5,5,5,0.84);
+  padding: 10px;
+  display: grid;
+  gap: 5px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.tech-right-log b {
   color: var(--tech-green);
-  margin-bottom: 10px;
-  font-size: 0.72rem;
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+}
+
+.tech-right-log span {
+  color: rgba(229,226,225,0.8);
+  font-size: 0.56rem;
+  line-height: 1.35;
+}
+
+.tech-right-log-entries {
+  min-height: 0;
+  border-top: 1px solid rgba(57,255,20,0.26);
+  padding-top: 6px;
+  display: grid;
+  gap: 4px;
+  overflow: auto;
+}
+
+.tech-right-log-entries .tech-log-line {
+  margin: 0;
+  font-size: 0.52rem;
 }
 
 .tech-log-line {
@@ -10369,6 +10511,10 @@ body::after {
   border-color: var(--tech-magenta) !important;
 }
 
+.technomancy-combat .module-icon {
+  overflow: visible;
+}
+
 .technomancy-combat .module-icon-name,
 .technomancy-combat .module-icon-target-label,
 .technomancy-combat .module-icon-speed,
@@ -10456,7 +10602,11 @@ body::after {
 }
 
 .technomancy-combat .combat-top-bar {
-  grid-template-columns: minmax(260px, 0.8fr) minmax(430px, 1fr) auto !important;
+  grid-template-columns: minmax(250px, 0.68fr) minmax(420px, 1fr) !important;
+  height: 62px !important;
+  min-height: 62px !important;
+  padding-top: 5px !important;
+  padding-bottom: 5px !important;
 }
 
 .technomancy-combat .combat-left-rail {
@@ -10519,9 +10669,31 @@ body::after {
   box-shadow: 0 0 9px currentColor;
 }
 
-.technomancy-combat .tech-user-vital em.ult-ready {
-  background: var(--tech-green);
-  box-shadow: 0 0 12px var(--tech-green);
+.technomancy-combat .tech-user-ult {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid rgba(0, 240, 255, 0.28);
+  background: rgba(5, 5, 5, 0.75);
+  color: var(--tech-blue);
+  padding: 3px 4px;
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  min-height: 20px;
+}
+
+.technomancy-combat .tech-user-ult b {
+  color: var(--tech-magenta);
+}
+
+.technomancy-combat .tech-user-ult.ult-ready {
+  border-color: var(--tech-green);
+  color: var(--tech-green);
+}
+
+.technomancy-combat .tech-user-ult.ult-ready b {
+  color: var(--tech-green);
 }
 
 .technomancy-combat .tech-deck-readout,
@@ -10529,6 +10701,28 @@ body::after {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 5px;
+}
+
+.technomancy-combat .tech-run-readout {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.technomancy-combat .tech-run-readout span {
+  border: 1px solid rgba(57, 255, 20, 0.32);
+  background: rgba(57, 255, 20, 0.06);
+  color: rgba(229, 226, 225, 0.86);
+  min-height: 22px;
+  padding: 3px 4px;
+  font-size: 0.54rem;
+  letter-spacing: 0.06em;
+  text-align: center;
+}
+
+.technomancy-combat .tech-run-readout b {
+  color: var(--tech-green);
+  font-size: 0.6rem;
 }
 
 .technomancy-combat .tech-side-stack {
@@ -10557,7 +10751,7 @@ body::after {
   border-top: 1px solid rgba(255,0,255,0.25);
   border-bottom: 1px solid rgba(255,0,255,0.18);
   padding: 7px 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .technomancy-combat .left-module-tray {
@@ -10568,7 +10762,7 @@ body::after {
   gap: 8px !important;
   border: 0 !important;
   padding: 0 !important;
-  overflow: hidden auto;
+  overflow: visible;
   scrollbar-width: thin;
 }
 
@@ -10579,21 +10773,47 @@ body::after {
 }
 
 .technomancy-combat .left-module-tray .hud-module-row {
-  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  grid-template-columns: repeat(auto-fill, 52px) !important;
+  justify-content: start;
+  justify-items: stretch;
   align-content: start;
-  overflow: hidden auto;
+  overflow: visible;
   padding-right: 2px;
 }
 
 .technomancy-combat .left-module-tray .module-icon {
-  min-height: 70px !important;
-  max-height: 76px !important;
+  width: 48px !important;
+  height: 48px !important;
+  min-width: 48px !important;
+  min-height: 48px !important;
+  max-width: 48px !important;
+  max-height: 48px !important;
+  border: 1px solid var(--tech-blue) !important;
+  border-radius: 0 !important;
+  background: rgba(5,5,5,0.92) !important;
+  box-shadow: inset 0 0 18px rgba(0,240,255,0.08), 0 0 10px rgba(0,240,255,0.1) !important;
+  clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 9px 100%, 0 calc(100% - 9px));
+  z-index: 3;
+}
+
+.technomancy-combat .left-module-tray .module-icon:hover {
+  z-index: 12;
 }
 
 .technomancy-combat .left-module-tray .module-icon-cost {
-  min-width: 32px !important;
-  font-size: 0.45rem !important;
-  padding: 2px 3px !important;
+  min-width: 20px !important;
+  width: 20px !important;
+  height: 12px !important;
+  font-size: 0.42rem !important;
+  padding: 1px 2px !important;
+  border-radius: 0 !important;
+}
+
+.technomancy-combat .left-module-tray .module-icon-speed {
+  border-radius: 0 !important;
+  font-size: 0.43rem !important;
+  padding: 1px 3px !important;
+  line-height: 1.15 !important;
 }
 
 .technomancy-combat .tech-left-actions {
@@ -10603,10 +10823,10 @@ body::after {
 }
 
 .technomancy-combat .tech-left-actions .btn {
-  min-height: 34px !important;
-  padding: 6px !important;
+  min-height: 30px !important;
+  padding: 4px 6px !important;
   border-radius: 0 !important;
-  font-size: 0.58rem !important;
+  font-size: 0.54rem !important;
 }
 
 .technomancy-combat .target-module-sockets-self .target-module-socket-label {
@@ -10764,11 +10984,29 @@ body::after {
 
   .technomancy-combat .left-module-tray .hud-module-row {
     display: flex !important;
-    overflow: auto hidden;
+    overflow: auto;
   }
 
   .technomancy-combat .left-module-tray .module-icon {
-    min-width: 92px !important;
+    width: 48px !important;
+    height: 48px !important;
+    min-width: 48px !important;
+    min-height: 48px !important;
+    max-height: 48px !important;
+    max-width: 48px !important;
+  }
+
+  .technomancy-combat .left-module-tray .module-icon-cost {
+    min-width: 18px !important;
+    width: 18px !important;
+    height: 12px !important;
+    font-size: 0.39rem !important;
+    padding: 1px 2px !important;
+  }
+
+  .technomancy-combat .left-module-tray .module-icon-speed {
+    font-size: 0.39rem !important;
+    padding: 1px 2px !important;
   }
 
   .technomancy-combat .tech-left-actions {
@@ -10784,5 +11022,261 @@ body::after {
 
   .technomancy-combat .hud-lore-thread {
     display: none;
+  }
+}
+
+/* Phyx combat UI direction refinements:
+   Move module density to top; keep side rails for logs/notes. */
+.technomancy-combat .combat-top-bar {
+  gap: 8px !important;
+}
+
+.technomancy-combat .combat-top-content {
+  display: grid;
+  gap: 8px;
+}
+
+.technomancy-combat .combat-top-chips {
+  min-height: 32px;
+  margin: 0;
+}
+
+.technomancy-combat .combat-top-chip-row {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  gap: 6px;
+  padding-bottom: 2px;
+}
+
+.technomancy-combat .combat-top-module-section {
+  display: grid;
+  gap: 6px;
+}
+
+.technomancy-combat .combat-top-module-section-label {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 0.55rem;
+  letter-spacing: 0.1em;
+  background: rgba(4, 6, 15, 0.8);
+  color: rgba(229, 226, 225, 0.9);
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  text-transform: uppercase;
+}
+
+.technomancy-combat .combat-top-module-tray {
+  display: grid;
+  gap: 8px;
+}
+
+.technomancy-combat .combat-top-module-tray .hud-module-group-label {
+  margin-bottom: 4px;
+  font-size: 0.58rem;
+  letter-spacing: 0.12em;
+  color: rgba(0, 240, 255, 0.9);
+  text-transform: uppercase;
+}
+
+.technomancy-combat .combat-top-module-tray .hud-module-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 2px;
+  min-height: 56px;
+}
+
+.technomancy-combat .combat-top-module-tray .module-icon,
+.technomancy-combat .combat-top-module-tray .hud-module-row .module-icon,
+.technomancy-combat .hud-module-row .module-icon,
+.combat-top-module-overflow {
+  width: 56px !important;
+  min-width: 56px !important;
+  max-width: 56px !important;
+  height: 56px !important;
+  min-height: 56px !important;
+  max-height: 56px !important;
+}
+
+.technomancy-combat .combat-top-module-tray .module-icon {
+  padding: 6px !important;
+  position: relative;
+  display: inline-grid !important;
+  place-items: center;
+  grid-template-columns: 1fr;
+  border-radius: 8px !important;
+  border: 1px solid rgba(0, 229, 255, 0.35) !important;
+  background: rgba(4, 6, 17, 0.72) !important;
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.16);
+}
+
+.technomancy-combat .combat-top-module-tray .module-icon.target-self {
+  border-color: rgba(0, 229, 255, 0.48) !important;
+}
+
+.technomancy-combat .combat-top-module-tray .module-icon.target-enemy {
+  border-color: rgba(255, 51, 153, 0.48) !important;
+}
+
+.technomancy-combat .combat-top-module-tray .module-icon-art {
+  width: 36px;
+  height: 36px;
+}
+
+.technomancy-combat .combat-top-module-tray .module-icon-art img,
+.technomancy-combat .combat-top-module-tray .module-icon-emoji {
+  width: 36px;
+  height: 36px;
+}
+
+.technomancy-combat .combat-top-module-tray .module-icon-cost,
+.technomancy-combat .combat-top-module-tray .module-icon-speed {
+  position: absolute;
+  top: 4px;
+  width: auto;
+  min-width: 0;
+  height: auto;
+  padding: 2px 5px;
+  border-radius: 999px;
+  font-size: 0.48rem;
+  line-height: 1.15;
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.3);
+}
+
+.technomancy-combat .combat-top-module-tray .module-icon-cost {
+  left: 4px;
+}
+
+.technomancy-combat .combat-top-module-tray .module-icon-speed {
+  right: 4px;
+}
+
+.technomancy-combat .combat-top-module-tray .module-icon-name,
+.technomancy-combat .combat-top-module-tray .module-icon-target-label {
+  display: none !important;
+}
+
+.technomancy-combat .combat-top-module-tray .module-icon-locked {
+  position: absolute;
+  right: 2px;
+  top: 2px;
+  font-size: 9px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.technomancy-combat .combat-top-module-tray .module-icon-detail {
+  display: none;
+  position: absolute;
+  left: 0;
+  top: calc(100% + 6px);
+  width: min(250px, 54vw);
+  max-width: 240px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 229, 255, 0.4);
+  background: rgba(4, 6, 18, 0.95);
+  color: rgba(229, 226, 225, 0.95);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
+  z-index: 25;
+  font-size: 10px;
+  line-height: 1.3;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-2px);
+}
+
+.technomancy-combat .combat-top-module-tray .module-icon:hover .module-icon-detail,
+.technomancy-combat .combat-top-module-tray .module-icon:focus-visible .module-icon-detail {
+  display: block !important;
+  opacity: 1 !important;
+  transform: translateY(0);
+}
+
+.combat-top-module-overflow {
+  min-width: 56px !important;
+  max-width: 56px !important;
+  height: 56px !important;
+  min-height: 56px !important;
+  max-height: 56px !important;
+  border-radius: 8px !important;
+  border: 1px dashed rgba(0, 229, 255, 0.34) !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.56rem;
+  letter-spacing: 0.03em;
+  background: rgba(5, 7, 18, 0.74);
+}
+
+.technomancy-combat .combat-top-actions {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.technomancy-combat .combat-top-actions .btn {
+  min-height: 30px !important;
+}
+
+.combat-top-actions {
+  z-index: 4;
+}
+
+/* Keep side rails focused on logs; keep combat logs/personal notes in rail text blocks. */
+.technomancy-combat .combat-left-rail,
+.technomancy-combat .combat-right-rail {
+  overflow: hidden;
+}
+
+/* Keep combat codec visuals static to avoid sliding/invalid frame artifacts. */
+.cait-codec-sprite,
+.cait-codec-sprite-10 {
+  animation: none !important;
+}
+
+.cait-codec-sprite {
+  background-position: 0 0 !important;
+  background-size: cover !important;
+}
+
+@media (max-width: 1280px) {
+  .technomancy-combat .combat-top-module-tray .hud-module-row {
+    min-height: 52px;
+  }
+  .technomancy-combat .combat-top-module-tray .module-icon,
+  .combat-top-module-overflow {
+    width: 54px !important;
+    min-width: 54px !important;
+    max-width: 54px !important;
+    height: 54px !important;
+    min-height: 54px !important;
+    max-height: 54px !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .technomancy-combat .combat-top-content {
+    gap: 6px;
+  }
+
+  .technomancy-combat .combat-top-module-tray .hud-module-row {
+    overflow-x: auto;
+    scrollbar-width: thin;
   }
 }

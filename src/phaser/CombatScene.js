@@ -10,6 +10,8 @@ const BUDDER_MOON_TEXTURE = 'budder_moon_orbit';
 const BUDDER_BLACK_PLANET_TEXTURE = 'budder_blackplanet_orbit';
 const ASIPHYX_PULL_TEAL_TEXTURE = 'asiphyx_gravity_pull_teal';
 const ASIPHYX_PULL_RED_TEXTURE = 'asiphyx_gravity_pull_red';
+const CAYT_IDLE_TEXTURE = 'combat_cait_idle';
+const ENABLE_CAYT_COMBAT_IDLE_ANIMATION = false;
 
 export class CombatScene extends Phaser.Scene {
   constructor() {
@@ -18,6 +20,7 @@ export class CombatScene extends Phaser.Scene {
     this.heroSprite = null;
     this.enemySprites = [];
     this.eventListeners = [];
+    this.budderCat = null;
   }
 
   init(data) {
@@ -33,6 +36,28 @@ export class CombatScene extends Phaser.Scene {
       // Preload the hero's portrait as their battle sprite
       const portraitPath = hero.battlePortrait || hero.avatar || hero.portrait;
       this.load.image(`hero_${hero.id}`, portraitPath);
+    }
+
+    const cait = state?.cait;
+    if (ENABLE_CAYT_COMBAT_IDLE_ANIMATION && cait?.sprite?.idleStrip) {
+      const frameWidth = Number(cait.sprite.idleFrameWidth) || 46;
+      const frameHeight = Number(cait.sprite.idleFrameHeight) || 55;
+      const frameCount = Number(cait.sprite.idleFrames) || 1;
+      if (frameWidth > 0 && frameHeight > 0 && frameCount > 0) {
+        this.load.spritesheet(CAYT_IDLE_TEXTURE, cait.sprite.idleStrip, {
+          frameWidth,
+          frameHeight,
+          startFrame: 0,
+          endFrame: Math.max(0, frameCount - 1),
+        });
+      }
+    }
+
+    if (cait?.battlePortrait || cait?.avatar || cait?.portrait) {
+      const portrait = cait.battlePortrait || cait.avatar || cait.portrait;
+      this.load.image('combat_cait_portrait', portrait);
+    } else if (hero) {
+      this.load.image('combat_cait_portrait', hero.portrait || hero.avatar || hero.battlePortrait);
     }
 
     if (state && state.enemies) {
@@ -98,6 +123,9 @@ export class CombatScene extends Phaser.Scene {
     // ─── 2. Draw Hero Sprite ───
     this.createHero();
 
+    // ─── 2b. Cute visual reference cat
+    this.createBudderBuddyCat(width, height);
+
     // ─── 3. Draw Enemies ───
     this.createEnemies();
     this.queuePendingAsiphyxGravityPull();
@@ -121,6 +149,39 @@ export class CombatScene extends Phaser.Scene {
       if (this.heroGlow) {
         this.heroGlow.y = this.heroSprite.y + 70;
         this.heroGlow.scaleX = 1 + Math.sin(t) * 0.05;
+      }
+    }
+
+    if (this.budderCat?.container) {
+      const { container, vx, vy, radiusX, radiusY } = this.budderCat;
+      container.x += vx;
+      container.y += vy;
+
+      let hitX = false;
+      let hitY = false;
+
+      if (container.x < radiusX) {
+        container.x = radiusX;
+        this.budderCat.vx = -vx;
+        hitX = true;
+      } else if (container.x > this.scale.width - radiusX) {
+        container.x = this.scale.width - radiusX;
+        this.budderCat.vx = -vx;
+        hitX = true;
+      }
+
+      if (container.y < radiusY) {
+        container.y = radiusY;
+        this.budderCat.vy = -vy;
+        hitY = true;
+      } else if (container.y > this.scale.height - radiusY) {
+        container.y = this.scale.height - radiusY;
+        this.budderCat.vy = -vy;
+        hitY = true;
+      }
+
+      if (hitX || hitY) {
+        this.cycleBudderBuddyColor();
       }
     }
   }
@@ -194,9 +255,15 @@ export class CombatScene extends Phaser.Scene {
   createHero() {
     const state = this.gameRef?.state;
     const hero = state?.hero;
+    const cait = state?.cait;
     if (!hero) return;
 
     const heroColor = Phaser.Display.Color.HexStringToColor(hero.color || '#9933ff').color;
+    const caitHasIdle = ENABLE_CAYT_COMBAT_IDLE_ANIMATION && cait && this.textures.exists(CAYT_IDLE_TEXTURE);
+    const caitPortraitReady = this.textures.exists('combat_cait_portrait');
+    const idleFrameW = Number(cait?.sprite?.idleFrameWidth) || 46;
+    const idleFrameH = Number(cait?.sprite?.idleFrameHeight) || 55;
+    const idleFrames = Number(cait?.sprite?.idleFrames) || 1;
 
     this.heroGlow = this.add.container(180, 220);
     for (let i = 0; i < 5; i++) {
@@ -208,7 +275,6 @@ export class CombatScene extends Phaser.Scene {
     }
 
     this.heroSprite = this.add.container(180, 150);
-
     const anchor = this.add.graphics();
     anchor.lineStyle(2, heroColor, 0.7);
     anchor.strokeCircle(0, -6, 22);
@@ -220,26 +286,35 @@ export class CombatScene extends Phaser.Scene {
     anchor.lineBetween(0, 22, 0, 38);
     this.heroSprite.add(anchor);
 
-    const sigil = this.add.text(0, -7, 'A', {
-      fontFamily: 'Press Start 2P, monospace',
-      fontSize: '18px',
-      color: '#e8d7ff'
-    }).setOrigin(0.5);
-    this.heroSprite.add(sigil);
+    if (caitHasIdle) {
+      const animKey = `combat_cait_idle_anim_${idleFrameW}x${idleFrameH}_n${idleFrames}`;
+      if (!this.anims.exists(animKey)) {
+        this.anims.create({
+          key: animKey,
+          frames: this.anims.generateFrameNumbers(CAYT_IDLE_TEXTURE),
+          frameRate: Math.min(16, Math.max(4, Math.floor(idleFrames / 2))),
+          repeat: -1,
+        });
+      }
 
-    const tagBg = this.add.graphics();
-    tagBg.fillStyle(0x000000, 0.55);
-    tagBg.lineStyle(1, heroColor, 0.44);
-    tagBg.fillRectShape(new Phaser.Geom.Rectangle(-58, 36, 116, 16));
-    tagBg.strokeRectShape(new Phaser.Geom.Rectangle(-58, 36, 116, 16));
-    this.heroSprite.add(tagBg);
-
-    const tagTxt = this.add.text(0, 44, `${hero.name.toUpperCase()} : ACTIVE`, {
-      fontFamily: 'Press Start 2P, monospace',
-      fontSize: '6px',
-      color: '#ffffff'
-    }).setOrigin(0.5);
-    this.heroSprite.add(tagTxt);
+      const sprite = this.add.sprite(0, -10, CAYT_IDLE_TEXTURE);
+      const displayW = 112;
+      const displayH = Math.round(112 * (idleFrameH / idleFrameW));
+      sprite.setDisplaySize(displayW, displayH);
+      sprite.play(animKey);
+      this.heroSprite.add(sprite);
+    } else if (caitPortraitReady) {
+      const portrait = this.add.image(0, -10, 'combat_cait_portrait');
+      portrait.setDisplaySize(92, 92);
+      this.heroSprite.add(portrait);
+    } else {
+      const sigil = this.add.text(0, -7, 'C', {
+        fontFamily: 'Press Start 2P, monospace',
+        fontSize: '18px',
+        color: '#e8d7ff'
+      }).setOrigin(0.5);
+      this.heroSprite.add(sigil);
+    }
 
     // HP Bar
     this.heroHpBar = this.add.graphics();
@@ -857,6 +932,58 @@ export class CombatScene extends Phaser.Scene {
       }
       targetG.alpha = 1.0;
     }
+  }
+
+  createBudderBuddyCat(width, height) {
+    const radiusX = Math.max(28, Math.round(width * 0.06));
+    const radiusY = Math.max(24, Math.round(height * 0.05));
+    const startX = Phaser.Math.Clamp(width * 0.45, radiusX + 32, width - radiusX - 32);
+    const startY = Phaser.Math.Clamp(height * 0.38, radiusY + 32, height - radiusY - 32);
+    const palette = [
+      0x39ff14,
+      0x00e5ff,
+      0xff33ff,
+      0xffa726,
+      0x66f7ff
+    ];
+    const catLabel = this.add.text(0, 2, '🐱', {
+      fontFamily: 'Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji',
+      fontSize: '26px',
+    }).setOrigin(0.5, 0.5);
+
+    const border = this.add.graphics();
+    const container = this.add.container(startX, startY, [border, catLabel]);
+    this.budderCat = {
+      container,
+      border,
+      vx: 2.15,
+      vy: 1.7,
+      radiusX,
+      radiusY,
+      colorPalette: palette,
+      colorIndex: 0,
+    };
+
+    this.budderCatSetColor(this.budderCat.colorPalette[0]);
+    container.setDepth(16);
+    container.setScale(1.02);
+  }
+
+  budderCatSetColor(color) {
+    const cat = this.budderCat;
+    if (!cat?.border) return;
+    cat.border.clear();
+    cat.border.lineStyle(3, color, 1);
+    cat.border.strokeRoundedRect(-18, -16, 36, 30, 6);
+    cat.border.lineStyle(1, 0x111111, 0.45);
+    cat.border.strokeRoundedRect(-15, -13, 30, 24, 4);
+  }
+
+  cycleBudderBuddyColor() {
+    const cat = this.budderCat;
+    if (!cat) return;
+    cat.colorIndex = (cat.colorIndex + 1) % cat.colorPalette.length;
+    this.budderCatSetColor(cat.colorPalette[cat.colorIndex]);
   }
 
   setupEventBusListeners() {

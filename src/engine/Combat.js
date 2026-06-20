@@ -11,6 +11,9 @@
 import bus from './EventBus.js';
 import { ENEMIES } from '../data/enemies.js';
 
+const STARTING_CARDS_PER_TURN = 2;
+const MAX_HAND_SIZE = 8;
+
 // ── Helpers ────────────────────────────────────────────────
 
 /**
@@ -243,7 +246,7 @@ export class Combat {
       }
     }
 
-    this.drawCards(5);
+    this.drawCards(STARTING_CARDS_PER_TURN);
     bus.emit('combatUpdate', this._snapshot());
   }
 
@@ -254,7 +257,16 @@ export class Combat {
    */
   drawCards(n) {
     const s = this.gs.state;
+    let capWarningShown = false;
     for (let i = 0; i < n; i++) {
+      if (s.hand.length >= MAX_HAND_SIZE) {
+        if (!capWarningShown) {
+          bus.emit('toast', { text: `HAND CAP // ${MAX_HAND_SIZE} modules max while active.`, type: 'danger' });
+          capWarningShown = true;
+        }
+        break;
+      }
+
       if (s.drawPile.length === 0) {
         if (s.discardPile.length === 0) break;
         if (s.hero?.id === 'asiphyx' && !this.combatState.asiphyxShuffleThisTurn) {
@@ -826,7 +838,7 @@ export class Combat {
               ? s.enemies[this.combatState.markedTargetIndex]
               : pickRandom(s.enemies);
             if (target) {
-              this._dealDamageToEnemy(target, blockVal);
+              this._dealDamageToEnemy(target, blockVal, { source: 'cait' });
               bus.emit('toast', { text: `Transmute: Cait strikes for ${blockVal}!`, type: 'passive' });
             }
           }
@@ -1118,7 +1130,7 @@ export class Combat {
     const s = this.gs.state;
     if (!s.cait || s.enemies.length === 0) return;
 
-    const reliability = s.cait.reliability ?? 0.6;
+    const reliability = Math.min(0.98, Math.max(0.75, s.cait.reliability ?? 0.6));
     const baseDamage = 6 + Math.floor(s.floor * 0.5);
     const attackCount = 1 + Math.max(0, this.combatState.caitExtraActions);
     let landedAny = false;
@@ -1136,8 +1148,10 @@ export class Combat {
       if (hitRoll < reliability) {
         fullHit = true;
         damageDealt = Math.round(baseDamage * this.combatState.caitDamageMult) + kineticBonus + potentialDrain;
-      } else if (hitRoll < reliability + 0.3) {
+      } else if (hitRoll < reliability + 0.15) {
         damageDealt = Math.round(baseDamage * 0.5) + Math.round(kineticBonus * 0.5);
+      } else {
+        damageDealt = Math.max(1, Math.round(baseDamage * 0.25));
       }
 
       if (damageDealt > 0 && (kineticBonus > 0 || potentialDrain > 0)) {
@@ -1367,6 +1381,7 @@ export class Combat {
    */
   _dealDamageToEnemy(enemy, rawDamage, meta = {}) {
     const s = this.gs.state;
+    const source = meta.source ?? 'asiphyx';
     const strengthMultiplier = 1 + (enemy.strength ?? 0) / 100;
     const raw = Math.max(0, rawDamage * strengthMultiplier);
     let remaining = raw;
@@ -1382,6 +1397,7 @@ export class Combat {
     bus.emit('damageDealt', {
       target: 'enemy',
       targetId: enemy.id,
+      source,
       amount: raw,
       blocked: absorbed,
       hpAfter: enemy.hp,
@@ -1428,7 +1444,7 @@ export class Combat {
       const counterDmg = this.combatState.counterDamage;
       // Source is an enemy object
       if (source && source.hp !== undefined) {
-        this._dealDamageToEnemy(source, counterDmg);
+        this._dealDamageToEnemy(source, counterDmg, { source: source.id ?? source.name ?? 'enemy' });
         bus.emit('toast', { text: `Counter: ${counterDmg} damage back!`, type: 'passive' });
       }
     }
@@ -1436,7 +1452,7 @@ export class Combat {
     // Reflect: bounce percentage of raw damage back to attacker
     if (this.combatState.reflectPercent > 0 && source && source.hp !== undefined && rawDamage > 0) {
       const reflectDmg = Math.max(1, Math.floor(rawDamage * this.combatState.reflectPercent));
-      this._dealDamageToEnemy(source, reflectDmg);
+      this._dealDamageToEnemy(source, reflectDmg, { source: source.id ?? source.name ?? 'enemy' });
       bus.emit('toast', { text: `Gravity Mirror: ${reflectDmg} reflected!`, type: 'passive' });
     }
 

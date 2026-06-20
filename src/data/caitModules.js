@@ -18,7 +18,7 @@ export const CAIT_DUO_LOADOUTS = {
     bondName: 'Kinetic Regent',
     bondLine: 'Heart-mask Cait in regent state: playful face, ruthless vector math, and every redirected threat becoming her opening.',
     role: 'Asiphyx stores force. Cait spends vector locks as follow-up damage.',
-    reliability: 0.58,
+    reliability: 0.8,
     risk: 'Medium',
     sprite: {
       idleStrip: '/assets/heroes/kinetic-regent-cait/cait_kinetic_regent_idle_strip.png',
