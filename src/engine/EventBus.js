@@ -9,6 +9,7 @@
 //   'combatUpdate'  — HP, block, energy, piles changed
 //   'damageDealt'   — { target, amount } for floating numbers
 //   'cardPlayed'    — { card, target } for animations
+//   'caitAttackWindup' — { targetId, targetIndex, amount } before Cait strike lands
 //   'enemyAction'   — { enemy, action } for enemy turn FX
 //   'draftOffered'  — { cards } pick-one-of-three screen
 // ============================================================

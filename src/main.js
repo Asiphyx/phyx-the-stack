@@ -1813,6 +1813,8 @@ function renderCombat() {
 
   // Wire event handlers asynchronously to ensure DOM availability
   setTimeout(() => {
+    if (!section.isConnected || game.state.phase !== 'combat') return;
+
     const ultBtn = section.querySelector('.ult-btn');
     if (ultBtn && ultReady) {
       ultBtn.onclick = () => {

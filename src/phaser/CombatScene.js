@@ -857,6 +857,7 @@ export class CombatScene extends Phaser.Scene {
     // 1. Damage event listener (projectiles + floating texts)
     const onDamage = (event) => {
       const isPlayer = event.target === 'player';
+      const isCaitStrike = event.source === 'cait';
       const amount = Math.round(event.amount);
       if (amount <= 0) return;
 
@@ -868,6 +869,24 @@ export class CombatScene extends Phaser.Scene {
         if (sprite) {
           targetX = sprite.x;
           targetY = sprite.y;
+          if (isCaitStrike) {
+            const delay = 600 + Math.max(0, Number(event.actionIndex ?? 0)) * 180;
+            this.time.delayedCall(delay, () => {
+              if (sprite.active) {
+                this.tweens.add({
+                  targets: sprite,
+                  x: targetX + 8,
+                  duration: 50,
+                  yoyo: true,
+                  repeat: 3,
+                  onComplete: () => { if (sprite.active) sprite.x = targetX; }
+                });
+              }
+              this.spawnFloatingNumber(targetX, targetY - 40, `-${amount}`, event.crit ? '#ff66ff' : '#00e5ff');
+              this.cameras.main.flash(70, 60, 0, 90, 0.1);
+            });
+            return;
+          }
           // Shake target
           this.tweens.add({
             targets: sprite,
@@ -909,6 +928,10 @@ export class CombatScene extends Phaser.Scene {
       
       // Flash screen red/cyan
       this.cameras.main.flash(80, isPlayer ? 100 : 0, isPlayer ? 0 : 100, isPlayer ? 0 : 100, 0.15);
+    };
+
+    const onCaitAttackWindup = (event) => {
+      this.spawnCaitMomentumBlackHole(event);
     };
 
     // 2. Combat update listener
@@ -977,6 +1000,7 @@ export class CombatScene extends Phaser.Scene {
 
     // Bind and save references
     this.eventListeners.push(bus.on('damageDealt', onDamage));
+    this.eventListeners.push(bus.on('caitAttackWindup', onCaitAttackWindup));
     this.eventListeners.push(bus.on('combatUpdate', onCombatUpdate));
     this.eventListeners.push(bus.on('enemyAction', onEnemyAction));
     this.eventListeners.push(bus.on('cardPlayed', onCardPlayed));
@@ -1035,6 +1059,187 @@ export class CombatScene extends Phaser.Scene {
     }
 
     this.time.delayedCall(320, () => sparks.destroy());
+  }
+
+  spawnCaitMomentumBlackHole(event = {}) {
+    if (this.gameRef?.state?.hero?.id !== 'asiphyx') return;
+
+    const actionIndex = Math.max(0, Number(event.actionIndex ?? 0));
+    const startDelay = actionIndex * 260;
+    const target = this.enemySprites.find(sprite => sprite.getData('enemyId') === event.targetId)
+      ?? this.enemySprites[event.targetIndex]
+      ?? this.enemySprites[0];
+    if (!target) return;
+
+    const sourceX = (this.heroSprite?.x ?? 180) + 16;
+    const sourceY = (this.heroSprite?.y ?? 150) + 58;
+    const targetX = target.x;
+    const targetY = target.y;
+    const holeX = Phaser.Math.Linear(sourceX, targetX, 0.82);
+    const holeY = Phaser.Math.Linear(sourceY, targetY, 0.72) - 22;
+    const strikeAngle = Phaser.Math.RadToDeg(Math.atan2(holeY - sourceY, holeX - sourceX));
+
+    this.time.delayedCall(startDelay, () => {
+      const hole = this.add.container(holeX, holeY);
+      hole.setDepth(18);
+
+      const shadow = this.add.circle(0, 0, 24, 0x000000, 1);
+      shadow.setStrokeStyle(3, event.crit ? 0xff66ff : 0x66fff0, 0.96);
+      shadow.setBlendMode('MULTIPLY');
+      hole.add(shadow);
+
+      const eventHorizon = this.add.circle(0, 0, 34, 0x000000, 0);
+      eventHorizon.setStrokeStyle(4, 0xff4fa8, 0.92);
+      eventHorizon.setBlendMode('ADD');
+      hole.add(eventHorizon);
+
+      const accretion = this.add.ellipse(0, 0, 78, 24);
+      accretion.setStrokeStyle(3, 0x66fff0, 0.88);
+      accretion.setAngle(strikeAngle);
+      accretion.setBlendMode('ADD');
+      hole.add(accretion);
+
+      const inner = this.add.ellipse(0, 0, 46, 16);
+      inner.setStrokeStyle(2, 0xffffff, 0.72);
+      inner.setAngle(strikeAngle + 14);
+      inner.setBlendMode('ADD');
+      hole.add(inner);
+
+      this.tweens.add({
+        targets: hole,
+        scale: 1.18,
+        angle: event.crit ? -44 : -28,
+        duration: 240,
+        ease: 'Back.out',
+        onComplete: () => {
+          this.tweens.add({
+            targets: hole,
+            angle: hole.angle - 220,
+            scale: 0.78,
+            alpha: 0,
+            delay: 520,
+            duration: 320,
+            ease: 'Cubic.easeIn',
+            onComplete: () => hole.destroy()
+          });
+        }
+      });
+
+      for (let i = 0; i < 22; i++) {
+        const t = i / 21;
+        const particle = this.add.circle(
+          Phaser.Math.Linear(sourceX, holeX, t * 0.56) + Math.sin(i * 1.7) * 18,
+          Phaser.Math.Linear(sourceY, holeY, t * 0.56) + Math.cos(i * 1.3) * 14,
+          i % 4 === 0 ? 2.8 : 1.7,
+          i % 2 === 0 ? 0x66fff0 : 0xff4fa8,
+          0.78
+        );
+        particle.setDepth(17);
+        particle.setBlendMode('ADD');
+        this.tweens.add({
+          targets: particle,
+          x: holeX + Math.cos(i) * 4,
+          y: holeY + Math.sin(i) * 4,
+          scale: 0.25,
+          alpha: 0,
+          duration: 310 + (i % 5) * 38,
+          delay: i * 12,
+          ease: 'Cubic.easeIn',
+          onComplete: () => particle.destroy()
+        });
+      }
+
+      const pullLine = this.add.graphics();
+      pullLine.setDepth(16);
+      pullLine.setBlendMode('ADD');
+      pullLine.lineStyle(5, 0xff4fa8, 0.42);
+      pullLine.lineBetween(sourceX, sourceY, holeX, holeY);
+      pullLine.lineStyle(2, 0x66fff0, 0.86);
+      pullLine.lineBetween(sourceX + 12, sourceY - 8, holeX - 10, holeY + 8);
+      this.tweens.add({
+        targets: pullLine,
+        alpha: 0,
+        duration: 620,
+        ease: 'Quad.out',
+        onComplete: () => pullLine.destroy()
+      });
+
+      const caitVector = this.add.container(sourceX, sourceY);
+      caitVector.setDepth(19);
+      const caitCore = this.add.ellipse(0, 0, 34, 22, 0xff4fa8, 0.76);
+      caitCore.setStrokeStyle(2, 0xffffff, 0.82);
+      caitCore.setBlendMode('ADD');
+      const caitText = this.add.text(0, 0, 'C', {
+        fontFamily: 'Press Start 2P, monospace',
+        fontSize: '12px',
+        color: '#ffffff',
+        stroke: '#ff4fa8',
+        strokeThickness: 3,
+      }).setOrigin(0.5);
+      caitVector.add([caitCore, caitText]);
+
+      this.tweens.add({
+        targets: caitVector,
+        x: holeX,
+        y: holeY,
+        angle: strikeAngle + 720,
+        scaleX: 0.62,
+        scaleY: 1.28,
+        duration: 360,
+        delay: 170,
+        ease: 'Cubic.easeIn',
+        onComplete: () => {
+          this.spawnCaitMomentumImpact(holeX, holeY, targetX, targetY, event.crit);
+          this.tweens.add({
+            targets: caitVector,
+            x: sourceX,
+            y: sourceY,
+            angle: strikeAngle + 1080,
+            scaleX: 1,
+            scaleY: 1,
+            alpha: 0,
+            duration: 320,
+            ease: 'Cubic.easeOut',
+            onComplete: () => caitVector.destroy()
+          });
+        }
+      });
+    });
+  }
+
+  spawnCaitMomentumImpact(holeX, holeY, targetX, targetY, crit = false) {
+    const color = crit ? 0xff66ff : 0x66fff0;
+    const slash = this.add.graphics();
+    slash.setDepth(20);
+    slash.setBlendMode('ADD');
+    slash.lineStyle(8, color, 0.96);
+    slash.lineBetween(holeX, holeY, targetX, targetY);
+    slash.lineStyle(2, 0xffffff, 0.9);
+    slash.lineBetween(holeX - 10, holeY + 12, targetX + 10, targetY - 12);
+    this.tweens.add({
+      targets: slash,
+      alpha: 0,
+      duration: 260,
+      ease: 'Quad.out',
+      onComplete: () => slash.destroy()
+    });
+
+    for (let i = 0; i < 4; i++) {
+      const ring = this.add.ellipse(targetX, targetY, 32 + i * 14, 16 + i * 7);
+      ring.setStrokeStyle(2, i % 2 === 0 ? color : 0xff4fa8, 0.72);
+      ring.setAngle(-16 + i * 13);
+      ring.setDepth(20);
+      ring.setBlendMode('ADD');
+      this.tweens.add({
+        targets: ring,
+        scaleX: 1.9,
+        scaleY: 1.45,
+        alpha: 0,
+        duration: 340 + i * 60,
+        ease: 'Quad.out',
+        onComplete: () => ring.destroy()
+      });
+    }
   }
 
   isAsiphyxGravityCard(card) {

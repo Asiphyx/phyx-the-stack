@@ -1174,7 +1174,17 @@ export class Combat {
         bus.emit('toast', { text: `Center of Gravity: Cait crits for ${damageDealt}.`, type: 'passive' });
       }
 
-      this._dealDamageToEnemy(target, damageDealt);
+      bus.emit('caitAttackWindup', {
+        targetId: target.id,
+        targetIndex: s.enemies.findIndex(enemy => enemy.id === target.id),
+        amount: damageDealt,
+        actionIndex: action,
+        attackCount,
+        crit: critActive,
+        extraMomentum: action > 0,
+      });
+
+      this._dealDamageToEnemy(target, damageDealt, { source: 'cait', actionIndex: action, crit: critActive });
       landedAny = true;
 
       // Determine siphon rate (one-shot boost overrides persistent)
@@ -1361,7 +1371,7 @@ export class Combat {
    * @param {object} enemy
    * @param {number} rawDamage
    */
-  _dealDamageToEnemy(enemy, rawDamage) {
+  _dealDamageToEnemy(enemy, rawDamage, meta = {}) {
     const s = this.gs.state;
     const strengthMultiplier = 1 + (enemy.strength ?? 0) / 100;
     const raw = Math.max(0, rawDamage * strengthMultiplier);
@@ -1381,6 +1391,7 @@ export class Combat {
       amount: raw,
       blocked: absorbed,
       hpAfter: enemy.hp,
+      ...meta,
     });
 
     if (enemy.hp <= 0) {
