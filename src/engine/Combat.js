@@ -270,8 +270,7 @@ export class Combat {
         const card = s.drawPile.pop();
         s.hand.push(card);
         if (card.id === 'memory_leak') {
-          s.energy = Math.max(0, s.energy - 1);
-          bus.emit('toast', { text: 'Memory Leak: -1 Energy!', type: 'danger' });
+          bus.emit('toast', { text: 'Memory Leak surfaced!', type: 'danger' });
         }
       }
     }
@@ -305,16 +304,12 @@ export class Combat {
       return false;
     }
 
-    const effectiveCost = this.getCardCost(card);
-    if (effectiveCost > s.energy) return false;
-
     // Hero-only checks
     if (card.heroOnly && card.heroOnly !== s.hero?.id) {
       bus.emit('combatUpdate', this._snapshot());
       return false;
     }
 
-    s.energy -= effectiveCost;
     s.hand.splice(handIndex, 1);
 
     // Cait: first card this turn is always free
@@ -740,8 +735,7 @@ export class Combat {
           break;
         }
         case 'loseEnergy': {
-          const val = toDisplayInt(effect.value ?? 0);
-          s.energy = Math.max(0, s.energy - val);
+          bus.emit('toast', { text: 'Energy drain ignored // module pathing active', type: 'info' });
           break;
         }
         case 'gravity_well': {

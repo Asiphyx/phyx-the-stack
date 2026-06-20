@@ -575,11 +575,11 @@ export class CombatScene extends Phaser.Scene {
     }
 
     const orbitConfigs = [
-      { texture: BUDDER_BLUE_STAR_TEXTURE, anim: `${BUDDER_BLUE_STAR_TEXTURE}_loop`, ready: blueReady, radiusX: 218, radiusY: 72, size: 128, alpha: 0.92, duration: 3370, startAngle: 310, spinDuration: 1760, delay: 120, startFrame: 2, bodyAngle: 28, lane: 'side' },
-      { texture: BUDDER_PURPLE_STAR_TEXTURE, anim: `${BUDDER_PURPLE_STAR_TEXTURE}_loop`, ready: purpleReady, radiusX: 108, radiusY: 134, size: 130, alpha: 0.9, duration: 3090, startAngle: 55, spinDuration: 2240, delay: 540, startFrame: 7, bodyAngle: 115, lane: 'vertical', layer: 'front' },
-      { texture: BUDDER_PLANET_TEXTURE, anim: `${BUDDER_PLANET_TEXTURE}_loop`, ready: planetReady, radiusX: 274, radiusY: 96, size: 96, alpha: 0.94, duration: 4930, startAngle: 180, spinDuration: 2680, delay: 260, startFrame: 4, bodyAngle: 208, lane: 'side' },
-      { texture: BUDDER_MOON_TEXTURE, anim: `${BUDDER_MOON_TEXTURE}_loop`, ready: moonReady, radiusX: 88, radiusY: 146, size: 74, alpha: 0.9, duration: 3810, startAngle: 116, spinDuration: 1970, delay: 780, startFrame: 1, bodyAngle: 330, lane: 'vertical', layer: 'front' },
-      { texture: BUDDER_BLACK_PLANET_TEXTURE, anim: `${BUDDER_BLACK_PLANET_TEXTURE}_loop`, ready: blackPlanetReady, radiusX: 252, radiusY: 88, size: 88, alpha: 0.88, duration: 5470, startAngle: 244, spinDuration: 2930, delay: 390, startFrame: 6, bodyAngle: 66, lane: 'side' },
+      { texture: BUDDER_BLUE_STAR_TEXTURE, anim: `${BUDDER_BLUE_STAR_TEXTURE}_loop`, ready: blueReady, radiusX: 218, radiusY: 72, size: 128, alpha: 0.92, duration: 2860, startAngle: 310, spinDuration: 1130, delay: 120, startFrame: 2, bodyAngle: 28, lane: 'side' },
+      { texture: BUDDER_PURPLE_STAR_TEXTURE, anim: `${BUDDER_PURPLE_STAR_TEXTURE}_loop`, ready: purpleReady, radiusX: 108, radiusY: 134, size: 130, alpha: 0.9, duration: 4410, startAngle: 55, spinDuration: 3470, delay: 540, startFrame: 7, bodyAngle: 115, lane: 'vertical', layer: 'front' },
+      { texture: BUDDER_PLANET_TEXTURE, anim: `${BUDDER_PLANET_TEXTURE}_loop`, ready: planetReady, radiusX: 274, radiusY: 96, size: 96, alpha: 0.94, duration: 6120, startAngle: 180, spinDuration: 5140, delay: 260, startFrame: 4, bodyAngle: 208, lane: 'side' },
+      { texture: BUDDER_MOON_TEXTURE, anim: `${BUDDER_MOON_TEXTURE}_loop`, ready: moonReady, radiusX: 88, radiusY: 146, size: 74, alpha: 0.9, duration: 2380, startAngle: 116, spinDuration: 1810, delay: 780, startFrame: 1, bodyAngle: 330, lane: 'vertical', layer: 'front' },
+      { texture: BUDDER_BLACK_PLANET_TEXTURE, anim: `${BUDDER_BLACK_PLANET_TEXTURE}_loop`, ready: blackPlanetReady, radiusX: 252, radiusY: 88, size: 88, alpha: 0.88, duration: 7330, startAngle: 244, spinDuration: 6420, delay: 390, startFrame: 6, bodyAngle: 66, lane: 'side' },
     ];
 
     orbitConfigs.forEach((config) => {
@@ -649,58 +649,67 @@ export class CombatScene extends Phaser.Scene {
   }
 
   createBudderGlowBits(fx, frontFx, hitW, hitH) {
-    const glowPoints = [
-      { x: -74, y: -58, color: 0x66f7ff, delay: 0, front: false },
-      { x: 82, y: -38, color: 0xff66e8, delay: 260, front: true },
-      { x: -36, y: 74, color: 0xb0ff6a, delay: 520, front: true },
-      { x: 44, y: 54, color: 0xffffff, delay: 780, front: false },
-      { x: 0, y: -98, color: 0xffd166, delay: 1040, front: true },
-    ];
+    const colors = [0x66f7ff, 0xff66e8, 0xb0ff6a, 0xffffff, 0xffd166];
+    for (let i = 0; i < 24; i++) {
+      const wave = i * 2.399963;
+      const spreadX = hitW * (0.14 + ((i * 37) % 100) / 145);
+      const spreadY = hitH * (0.12 + ((i * 53) % 100) / 160);
+      const x = Math.cos(wave) * spreadX;
+      const y = -8 + Math.sin(wave * 1.37) * spreadY;
+      const color = colors[i % colors.length];
+      const layer = i % 3 === 0 ? fx : frontFx;
 
-    glowPoints.forEach((point, index) => {
-      const halo = this.add.circle(point.x, point.y, 10 + index * 1.5, point.color, 0.42);
-      halo.setBlendMode('ADD');
-      (point.front ? frontFx : fx).add(halo);
+      const spark = this.add.circle(x, y, 1.2 + (i % 3) * 0.55, color, 0);
+      spark.setBlendMode('ADD');
+      layer.add(spark);
       this.tweens.add({
-        targets: halo,
-        scale: 2.4 + index * 0.15,
-        alpha: 0.9,
-        duration: 1050 + index * 140,
-        delay: point.delay,
+        targets: spark,
+        alpha: 0.95,
+        scale: 1.9 + (i % 4) * 0.25,
+        x: x + Math.cos(wave + 1.7) * (8 + (i % 5) * 2),
+        y: y + Math.sin(wave + 0.9) * (6 + (i % 4) * 2),
+        duration: 220 + (i % 6) * 45,
+        delay: i * 83,
         yoyo: true,
         repeat: -1,
-        ease: 'Sine.inOut'
+        repeatDelay: 520 + (i % 7) * 110,
+        ease: 'Stepped'
       });
 
-      const core = this.add.circle(point.x, point.y, 3, point.color, 0.9);
-      core.setBlendMode('ADD');
-      (point.front ? frontFx : fx).add(core);
+      const glitch = this.add.rectangle(x + 4, y - 2, 10 + (i % 4) * 4, 1, color, 0);
+      glitch.setBlendMode('ADD');
+      glitch.setAngle(-36 + (i * 23) % 72);
+      layer.add(glitch);
       this.tweens.add({
-        targets: core,
-        scale: 1.8,
-        alpha: 1,
-        duration: 680 + index * 90,
-        delay: point.delay + 120,
+        targets: glitch,
+        alpha: 0.72,
+        scaleX: 0.35,
+        duration: 110 + (i % 5) * 28,
+        delay: 140 + i * 97,
         yoyo: true,
         repeat: -1,
-        ease: 'Sine.inOut'
+        repeatDelay: 740 + (i % 6) * 125,
+        ease: 'Stepped'
       });
-    });
+    }
 
-    const corona = this.add.ellipse(0, 8, hitW * 0.76, hitH * 0.42);
-    corona.setStrokeStyle(2, 0xff66e8, 0.82);
-    corona.setBlendMode('ADD');
-    frontFx.add(corona);
-    this.tweens.add({
-      targets: corona,
-      alpha: 0.92,
-      scaleX: 1.12,
-      scaleY: 0.84,
-      duration: 1450,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.inOut'
-    });
+    for (let i = 0; i < 6; i++) {
+      const shard = this.add.rectangle(-hitW * 0.32 + i * hitW * 0.13, -hitH * 0.18 + (i % 3) * hitH * 0.16, hitW * 0.12, 1, i % 2 === 0 ? 0xff66e8 : 0x66f7ff, 0);
+      shard.setBlendMode('ADD');
+      shard.setAngle(-18 + i * 9);
+      frontFx.add(shard);
+      this.tweens.add({
+        targets: shard,
+        alpha: 0.82,
+        scaleX: 0.32,
+        duration: 130 + i * 35,
+        delay: 180 + i * 190,
+        yoyo: true,
+        repeat: -1,
+        repeatDelay: 820 + i * 140,
+        ease: 'Stepped'
+      });
+    }
   }
 
   createBudderParticleLanes(frontFx, hitW, hitH) {

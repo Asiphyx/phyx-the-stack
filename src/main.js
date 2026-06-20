@@ -50,6 +50,7 @@ let activeDraft = [];
 let selectedTarget = 0;
 let stagedCommands = [];
 let stagedCommandSequence = 0;
+const MODULE_SIDE_LIMIT = 3;
 let battleLog = [];
 let introAudio = null;
 let introMusicEnabled = false;
@@ -136,9 +137,9 @@ bus.on('draftOffered', ({ cards }) => {
 });
 bus.on('damageDealt', onDamageEvent);
 bus.on('toast', ({ text, type = 'info' }) => emitToast(text, type));
-bus.on('cardPlayed', ({ card, targetIndex, energy }) => {
+bus.on('cardPlayed', ({ card, targetIndex }) => {
   const target = game.state.enemies[targetIndex];
-  logBattleEvent(`SENT ${card.name} ${target ? `-> ${target.name}` : ''} // energy ${energy}`, 'command');
+  logBattleEvent(`SENT ${card.name} ${target ? `-> ${target.name}` : ''} // ${speedLabel(card)} PATH`, 'command');
 });
 bus.on('enemyAction', ({ enemy, action }) => {
   logBattleEvent(`${enemy?.name ?? 'Enemy'} :: ${action?.description ?? action?.type ?? 'action'}`, 'enemy');
@@ -175,13 +176,6 @@ function render() {
   appendMusicControlBar();
 }
 
-function stagedEnergyCost() {
-  return stagedCommands.reduce((total, command) => {
-    const card = game.state.hand.find(c => c.instanceId === command.instanceId);
-    return total + (card ? game.combat.getCardCost(card) : 0);
-  }, 0);
-}
-
 function pruneStagedCommands() {
   const handIds = new Set(game.state.hand.map(card => card.instanceId));
   stagedCommands = stagedCommands.filter(command => handIds.has(command.instanceId));
@@ -197,7 +191,7 @@ function commandTargetSide(card) {
 }
 
 function firstOpenCommandSlot(side) {
-  for (let slotIndex = 0; slotIndex < 3; slotIndex++) {
+  for (let slotIndex = 0; slotIndex < MODULE_SIDE_LIMIT; slotIndex++) {
     if (!stagedCommands.some(command => (command.side ?? 'enemy') === side && command.slotIndex === slotIndex)) {
       return slotIndex;
     }
@@ -231,22 +225,17 @@ function stageCommand(instanceId, targetIndex = selectedTarget ?? 0, requestedSi
   }
 
   const slotIndex = requestedSlotIndex ?? firstOpenCommandSlot(side);
-  if (slotIndex < 0 || slotIndex > 2) {
-    logBattleEvent(`${side === 'self' ? 'Cait' : 'Target'} sockets full // send or clear first`, 'danger');
+  if (slotIndex < 0 || slotIndex >= MODULE_SIDE_LIMIT) {
+    logBattleEvent(`${side === 'self' ? 'Cait' : 'User'} path full // three modules max`, 'danger');
     return;
   }
   if (stagedCommands.some(command => (command.side ?? 'enemy') === side && command.slotIndex === slotIndex)) {
     logBattleEvent('Socket occupied // choose an open slot', 'danger');
     return;
   }
-  const projectedCost = stagedEnergyCost() + game.combat.getCardCost(card);
-  if (projectedCost > game.state.energy) {
-    logBattleEvent(`${card.name} rejected // insufficient energy`, 'danger');
-    return;
-  }
   const finalTargetIndex = side === 'enemy' ? targetIndex : selectedTarget ?? 0;
   stagedCommands.push({ instanceId, targetIndex: finalTargetIndex, side, slotIndex, order: stagedCommandSequence++ });
-  logBattleEvent(`PLUGGED ${commandVerb(card)} :: ${card.name} -> ${side === 'self' ? 'Cait' : commandTargetName({ targetIndex: finalTargetIndex })} SOCKET ${slotIndex + 1}`, 'info');
+  logBattleEvent(`PLUGGED ${commandVerb(card)} :: ${card.name} -> ${side === 'self' ? 'Cait' : 'User Path'} ${slotIndex + 1}`, 'info');
   render();
 }
 
@@ -1482,6 +1471,17 @@ function renderCombat() {
     name: 'Regent Priority',
     description: 'Cait acts from the locked duo protocol.',
   };
+  const selfCommands = stagedCommands.filter(command => (command.side ?? 'enemy') === 'self').length;
+  const userCommands = stagedCommands.filter(command => (command.side ?? 'enemy') === 'enemy').length;
+  const selfCards = [];
+  const enemyCards = [];
+  for (const [i, card] of state.hand.entries()) {
+    const isStaged = stagedCommands.some(command => command.instanceId === card.instanceId);
+    const canPlay = !isStaged && state.hp > 0;
+    const entry = { card, i, isStaged, canPlay };
+    if (classifyCardTarget(card) === 'enemy') enemyCards.push(entry);
+    else selfCards.push(entry);
+  }
 
   const section = el('section', `combat-screen technomancy-combat theme-${theme.id} shell-${theme.shell}`);
   section.style.setProperty('--hero-color', theme.accent ?? hero?.color ?? '#9933ff');
@@ -1522,9 +1522,9 @@ function renderCombat() {
         <span class="top-stat-icon">DEF</span>
         <span class="top-stat-val">${snap.block} Block</span>
       </div>
-      <div class="top-stat-item energy-stat">
-        <span class="top-stat-icon">MP</span>
-        <span class="top-stat-val">${snap.energy}/${snap.maxEnergy} Energy</span>
+      <div class="top-stat-item block-stat">
+        <span class="top-stat-icon">PATH</span>
+        <span class="top-stat-val">USER ${userCommands}/${MODULE_SIDE_LIMIT} · CAIT ${selfCommands}/${MODULE_SIDE_LIMIT}</span>
       </div>
     </div>
     
@@ -1543,14 +1543,45 @@ function renderCombat() {
     </div>
     <h2>${escapeHtml(hero?.name ?? 'HERO').toUpperCase()}</h2>
     <p>${escapeHtml(hero?.title ?? 'VOID OPERATOR').toUpperCase()}</p>
-    <nav class="tech-combat-nav" aria-label="Combat modules">
-      <span class="active">SPELLSTACK</span>
-      <span>ORACLE</span>
-      <span>VOID_NET</span>
-      <span>SYSTEM</span>
-    </nav>
-    <button class="btn tech-cast-button" type="button" ${stagedCommands.length === 0 ? 'disabled' : ''}>CAST_STACK</button>
+    <div class="tech-user-vitals" style="--hero-color:${hero?.color ?? '#9933ff'}">
+      <div class="tech-user-vital"><b>HP</b><span>${snap.hp}/${snap.maxHp}</span><i><em style="width:${pct(snap.hp, snap.maxHp)}%"></em></i></div>
+      <div class="tech-user-vital"><b>ULT</b><span>${snap.ultCharge}/${snap.ultMaxCharge}</span><i><em class="${ultReady ? 'ult-ready' : ''}" style="width:${pct(snap.ultCharge, snap.ultMaxCharge)}%"></em></i></div>
+    </div>
+    <div class="tech-deck-readout">
+      <span>DRAW <b>${snap.drawPileCount}</b></span>
+      <span>DISCARD <b>${snap.discardPileCount}</b></span>
+      <span>VOID <b>${snap.exhaustPileCount}</b></span>
+    </div>
+    <div class="tech-side-stack">
+      <span>USER PATH ${userCommands}/${MODULE_SIDE_LIMIT}</span>
+      <span>CAIT SLOTS ${selfCommands}/${MODULE_SIDE_LIMIT}</span>
+    </div>
+    <div class="left-module-mount" aria-label="User module tray"></div>
+    <div class="tech-left-actions">
+      <button class="btn command-send-btn tech-cast-button" type="button" ${stagedCommands.length === 0 ? 'disabled' : ''}>SEND STACK</button>
+      <button class="btn command-clear-btn" type="button" ${stagedCommands.length === 0 ? 'disabled' : ''}>CLEAR</button>
+      <button class="btn ult-btn ${ultReady ? 'ult-btn-ready' : ''}" ${ultReady ? '' : 'disabled'}>${hero?.ultimate?.emoji ?? '💥'} ULT</button>
+      <button class="btn btn-end-turn" id="end-turn-btn" ${state.hp <= 0 ? 'disabled' : ''}>WAIT</button>
+    </div>
   `;
+  const leftModuleMount = leftRail.querySelector('.left-module-mount');
+  const leftModuleTray = el('div', 'hud-module-tray left-module-tray');
+  const appendModuleGroup = (label, entries, className) => {
+    if (entries.length === 0) return;
+    const group = el('div', `hud-module-group ${className}`);
+    group.innerHTML = `<div class="hud-module-group-label">${label}</div>`;
+    const row = el('div', 'hud-module-row');
+    for (const { card, i, canPlay, isStaged } of entries) {
+      row.appendChild(renderCard(card, i, canPlay, isStaged));
+    }
+    group.appendChild(row);
+    leftModuleTray.appendChild(group);
+  };
+  appendModuleGroup('User Modules', enemyCards, 'enemy');
+  appendModuleGroup('Cait Sync Modules', selfCards, 'self');
+  if (leftModuleMount && leftModuleTray.children.length > 0) {
+    leftModuleMount.appendChild(leftModuleTray);
+  }
   section.appendChild(leftRail);
 
   // ─── 2. MIDDLE BATTLEFIELD ───
@@ -1660,36 +1691,11 @@ function renderCombat() {
   battlefield.appendChild(renderModuleSockets('self'));
   battlefield.appendChild(renderModuleSockets('enemy'));
 
-  // Self module icons dock — locked onto Cait
-  const queuedCost = stagedEnergyCost();
-  const selfCards = [];
-  const enemyCards = [];
-  for (const [i, card] of state.hand.entries()) {
-    const cost = game.combat.getCardCost(card);
-    const isStaged = stagedCommands.some(command => command.instanceId === card.instanceId);
-    const canPlay = !isStaged && cost + queuedCost <= state.energy && state.hp > 0;
-    const entry = { card, i, cost, isStaged, canPlay };
-    if (classifyCardTarget(card) === 'enemy') enemyCards.push(entry);
-    else selfCards.push(entry);
-  }
-
   if (engineMode === 'phaser') {
-    // Stage Header overlay in Phaser mode
-    const arenaHeader = el('div', 'arena-header');
-    arenaHeader.innerHTML = `
-      <span class="arena-cait">BATTLE STAGE</span>
-      <span class="arena-theme">${escapeHtml(theme.spotlight ?? theme.label)}</span>
-    `;
-    battlefield.appendChild(arenaHeader);
+    // Phaser owns the arena surface; HUD labels stay outside the playfield.
   } else {
     // Right Side: Enemy Area
     const enemyArea = el('div', 'combat-enemy-area');
-    const arenaHeader = el('div', 'arena-header');
-    arenaHeader.innerHTML = `
-      <span class="arena-cait">BATTLE STAGE</span>
-      <span class="arena-theme">${escapeHtml(theme.spotlight ?? theme.label)}</span>
-    `;
-    enemyArea.appendChild(arenaHeader);
     for (const [i, rawEnemy] of state.enemies.entries()) {
       const enemy = hydrateEnemyDisplay(rawEnemy);
       const intent = enemy.pattern?.[enemy.patternIndex] ?? { type: 'none', description: '...' };
@@ -1736,8 +1742,10 @@ function renderCombat() {
       ${renderSegmentBar(enemyPct, 'danger')}
       <div class="tech-stat-row"><span>CAIT_SYNC</span><em>${cait ? `${cait.hp}/${cait.maxHp}` : '--/--'}</em></div>
       ${renderSegmentBar(caitPct, 'primary')}
-      <div class="tech-stat-row"><span>MODULE_LOAD</span><em>${stagedCommands.length}/6</em></div>
-      ${renderSegmentBar((stagedCommands.length / 6) * 100, 'secondary')}
+      <div class="tech-stat-row"><span>USER_PATH</span><em>${userCommands}/${MODULE_SIDE_LIMIT}</em></div>
+      ${renderSegmentBar((userCommands / MODULE_SIDE_LIMIT) * 100, 'secondary')}
+      <div class="tech-stat-row"><span>CAIT_SLOTS</span><em>${selfCommands}/${MODULE_SIDE_LIMIT}</em></div>
+      ${renderSegmentBar((selfCommands / MODULE_SIDE_LIMIT) * 100, 'primary')}
     </div>
     <div class="tech-last-events">
       <b>LAST_EVENTS:</b>
@@ -1746,57 +1754,35 @@ function renderCombat() {
   `;
   section.appendChild(rightRail);
 
-  // ─── 3. CLEAN BOTTOM HUD (status + action only) ───
+  // ─── 3. CLEAN BOTTOM HUD (dialogue/lore only) ───
   const bottomDashboard = el('div', 'combat-bottom-dashboard clean-combat-hud');
-  const recentLog = battleLog[0]?.text ?? 'Drag modules to the 3 sockets above Cait or Budder.';
+  const recentLog = battleLog[0]?.text ?? 'Route up to three User modules and three Cait modules, then send the stack from the left rail.';
   const pluggedSummary = stagedCommands.length
     ? [...stagedCommands].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map(command => {
       const card = state.hand.find(c => c.instanceId === command.instanceId);
       if (!card) return '';
-      return `<button class="hud-plug-chip" data-unstage="${escapeHtml(card.instanceId)}" type="button"><b>${command.side === 'self' ? 'CAIT' : 'TARGET'} ${Number(command.slotIndex ?? 0) + 1}</b><span>${escapeHtml(card.name)}</span></button>`;
+      return `<span class="hud-plug-chip"><b>${command.side === 'self' ? 'CAIT' : 'USER'} ${Number(command.slotIndex ?? 0) + 1}</b><span>${escapeHtml(card.name)}</span></span>`;
     }).join('')
-    : '<span class="hud-empty-stack">No modules plugged — use the sockets above the sprites.</span>';
+    : '<span class="hud-empty-stack">No modules routed yet.</span>';
 
   bottomDashboard.innerHTML = `
-    <div class="hud-vitals" style="--hero-color:${hero?.color ?? '#9933ff'}">
-      <div class="hud-vital"><b>HP</b><span>${snap.hp}/${snap.maxHp}</span><i><em style="width:${pct(snap.hp, snap.maxHp)}%"></em></i></div>
-      <div class="hud-vital"><b>ENERGY</b><span>${snap.energy}/${snap.maxEnergy}</span><i><em class="energy" style="width:${pct(snap.energy, snap.maxEnergy)}%"></em></i></div>
-      <div class="hud-vital"><b>ULT</b><span>${snap.ultCharge}/${snap.ultMaxCharge}</span><i><em class="ult ${ultReady ? 'ult-ready' : ''}" style="width:${pct(snap.ultCharge, snap.ultMaxCharge)}%"></em></i></div>
+    <div class="hud-dialogue-speaker">
+      <span>CAIT_BROADCAST</span>
+      <b>${escapeHtml(cait?.name ?? 'Cait')}</b>
     </div>
     <div class="hud-stack-readout">
       <div class="hud-stack-topline">
-        <strong>COMBAT_LOG_v4.2</strong>
-        <span>ID: CMN-LOG-${String(snap.floor).padStart(2, '0')}${String(snap.energy).padStart(2, '0')}</span>
+        <strong>${escapeHtml(caitIntent.name)}</strong>
+        <span>FLOOR ${snap.floor}/${snap.maxFloor} // ${escapeHtml(cait?.bondName ?? theme.duo)}</span>
       </div>
       <div class="hud-plugged-row">${pluggedSummary}</div>
       <div class="hud-log-line">${escapeHtml(recentLog)}</div>
     </div>
-    <div class="hud-actions">
-      <button class="btn command-send-btn" type="button" ${stagedCommands.length === 0 ? 'disabled' : ''}>SEND STACK</button>
-      <button class="btn command-clear-btn" type="button" ${stagedCommands.length === 0 ? 'disabled' : ''}>CLEAR</button>
-      <button class="btn ult-btn ${ultReady ? 'ult-btn-ready' : ''}" ${ultReady ? '' : 'disabled'}>${hero?.ultimate?.emoji ?? '💥'} ULT</button>
-      <button class="btn btn-end-turn" id="end-turn-btn" ${state.hp <= 0 ? 'disabled' : ''}>WAIT</button>
-      <div class="hud-piles">DRAW ${snap.drawPileCount} · DISCARD ${snap.discardPileCount} · VOID ${snap.exhaustPileCount}</div>
+    <div class="hud-lore-thread">
+      <b>${escapeHtml(hero?.passive?.name ?? 'Duo Protocol')}</b>
+      <span>${escapeHtml(caitIntent.description)}</span>
     </div>
   `;
-  const moduleTray = el('div', 'hud-module-tray');
-  const appendModuleGroup = (label, entries, className) => {
-    if (entries.length === 0) return;
-    const group = el('div', `hud-module-group ${className}`);
-    group.innerHTML = `<div class="hud-module-group-label">${label}</div>`;
-    const row = el('div', 'hud-module-row');
-    for (const { card, i, canPlay, isStaged } of entries) {
-      row.appendChild(renderCard(card, i, canPlay, isStaged));
-    }
-    group.appendChild(row);
-    moduleTray.appendChild(group);
-  };
-  appendModuleGroup('To Cait', selfCards, 'self');
-  appendModuleGroup('To Target', enemyCards, 'enemy');
-  const actionsPanel = bottomDashboard.querySelector('.hud-actions');
-  if (moduleTray.children.length > 0 && actionsPanel) {
-    bottomDashboard.insertBefore(moduleTray, actionsPanel);
-  }
   section.appendChild(bottomDashboard);
   appendSystemMenuButton(section, true);
 
@@ -1909,7 +1895,6 @@ function speedLabel(card) {
 }
 
 function renderCard(card, index, canPlay, isStaged = false) {
-  const cost = game.combat.getCardCost(card);
   const target = classifyCardTarget(card);
   const cardEl = el('button', `module-icon ${canPlay ? '' : 'unplayable'} ${isStaged ? 'staged' : ''} target-${target}`);
   cardEl.type = 'button';
@@ -1917,20 +1902,20 @@ function renderCard(card, index, canPlay, isStaged = false) {
   cardEl.dataset.instanceId = card.instanceId ?? '';
   cardEl.draggable = canPlay;
   cardEl.disabled = !canPlay && !isStaged;
-  cardEl.title = `${card.name ?? '?'} (${cost}E) — ${card.description ?? ''}`;
+  cardEl.title = `${card.name ?? '?'} (${speedLabel(card)} path) — ${card.description ?? ''}`;
 
   let typeLabel = card.type ?? 'skill';
   if (card.rarity === 'debt' || card.tags?.includes('curse')) typeLabel = 'bug';
 
   cardEl.innerHTML = `
-    <div class="module-icon-cost">${cost}</div>
+    <div class="module-icon-cost">${commandVerb(card)}</div>
     <div class="module-icon-speed">${speedLabel(card)}</div>
     <div class="module-icon-art">
       <img src="/assets/cards/cardicon_${card.id}.png" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" alt="${escapeHtml(card.name ?? '')}" />
       <span class="module-icon-emoji" style="display:none">${card.emoji ?? '🧪'}</span>
     </div>
     <div class="module-icon-name">${escapeHtml(card.name ?? 'MODULE')}</div>
-    <div class="module-icon-target-label">${target === 'enemy' ? 'TO TARGET' : 'TO CAIT'}</div>
+    <div class="module-icon-target-label">${target === 'enemy' ? 'USER PATH' : 'CAIT SLOT'}</div>
     ${isStaged ? '<div class="module-icon-locked">🔒</div>' : ''}
   `;
   cardEl.onclick = () => {
@@ -1956,12 +1941,12 @@ function renderModuleSockets(side) {
   const rack = el('div', `target-module-sockets target-module-sockets-${side}`);
   const activeEnemy = game.state.enemies[selectedTarget] ?? game.state.enemies[0];
   const label = side === 'self'
-    ? 'DROP SELF MODULES ON CAIT'
-    : `DROP TARGET MODULES ON ${activeEnemy?.name?.toUpperCase() ?? 'ENEMY'}`;
+    ? 'CAIT MODULE SLOTS'
+    : `USER MODULE PATH -> ${activeEnemy?.name?.toUpperCase() ?? 'ENEMY'}`;
   rack.innerHTML = `<div class="target-module-socket-label">${label}</div>`;
   const row = el('div', 'target-module-socket-row');
 
-  for (let slotIndex = 0; slotIndex < 3; slotIndex++) {
+  for (let slotIndex = 0; slotIndex < MODULE_SIDE_LIMIT; slotIndex++) {
     const command = stagedCommands.find(item => (item.side ?? 'enemy') === side && item.slotIndex === slotIndex);
     const card = command ? game.state.hand.find(c => c.instanceId === command.instanceId) : null;
     const slot = card
@@ -1977,7 +1962,7 @@ function renderModuleSockets(side) {
       slot.innerHTML = `
         <b>${speedLabel(card)}</b>
         <span>${escapeHtml(card.name)}</span>
-        <small>${game.combat.getCardCost(card)}E</small>
+        <small>${commandVerb(card)}</small>
       `;
       slot.onclick = () => unstageCommand(card.instanceId);
     } else {
@@ -2525,7 +2510,6 @@ function renderGameToText() {
       maxFloor: snap.maxFloor,
       hp: snap.hp,
       maxHp: snap.maxHp,
-      energy: snap.energy,
       deckSize: snap.deckSize,
     },
     combat: {
@@ -2537,13 +2521,18 @@ function renderGameToText() {
         intent: enemy.intent?.type ?? null,
       })),
       handSize: snap.handSize,
+      moduleCaps: {
+        user: `${stagedCommands.filter(command => (command.side ?? 'enemy') === 'enemy').length}/${MODULE_SIDE_LIMIT}`,
+        cait: `${stagedCommands.filter(command => (command.side ?? 'enemy') === 'self').length}/${MODULE_SIDE_LIMIT}`,
+      },
       stagedCommands: stagedCommands.map(command => {
         const card = state.hand.find(c => c.instanceId === command.instanceId);
         return {
           id: card?.id ?? null,
           name: card?.name ?? null,
           target: commandTargetName(command),
-          cost: card ? game.combat.getCardCost(card) : 0,
+          path: card ? speedLabel(card) : null,
+          side: (command.side ?? 'enemy') === 'self' ? 'cait' : 'user',
         };
       }),
       battleLog: battleLog.slice(0, 5).map(entry => entry.text),

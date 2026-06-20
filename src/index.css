@@ -10297,6 +10297,11 @@ body::after {
 .technomancy-combat .hud-log-line {
   color: var(--tech-blue) !important;
   font-size: 0.72rem !important;
+  white-space: normal !important;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .technomancy-combat .hud-vitals {
@@ -10441,5 +10446,343 @@ body::after {
     grid-row: auto !important;
     border: 0 !important;
     padding: 0 !important;
+  }
+}
+
+/* EOF combat command-flow override: left rail owns modules; bottom is dialogue only. */
+.technomancy-combat {
+  grid-template-columns: clamp(286px, 22vw, 390px) minmax(500px, 1fr) clamp(248px, 17vw, 320px) !important;
+  grid-template-rows: 50px minmax(0, 1fr) clamp(132px, 16vh, 168px) !important;
+}
+
+.technomancy-combat .combat-top-bar {
+  grid-template-columns: minmax(260px, 0.8fr) minmax(430px, 1fr) auto !important;
+}
+
+.technomancy-combat .combat-left-rail {
+  padding: 14px 14px 12px !important;
+  display: flex !important;
+  flex-direction: column;
+  align-items: stretch;
+  justify-items: stretch;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.technomancy-combat .tech-portrait-frame {
+  width: min(92px, 7vw) !important;
+  align-self: center;
+}
+
+.technomancy-combat .combat-left-rail h2 {
+  margin: 6px 0 0 !important;
+}
+
+.technomancy-combat .combat-left-rail p {
+  margin: 0 0 4px !important;
+}
+
+.technomancy-combat .tech-user-vitals {
+  display: grid;
+  gap: 6px;
+  border: 1px solid rgba(255,0,255,0.42);
+  background: rgba(5,5,5,0.74);
+  padding: 7px;
+}
+
+.technomancy-combat .tech-user-vital {
+  display: grid;
+  grid-template-columns: 34px 58px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  color: var(--tech-magenta);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+}
+
+.technomancy-combat .tech-user-vital b,
+.technomancy-combat .tech-user-vital span {
+  white-space: nowrap;
+}
+
+.technomancy-combat .tech-user-vital i {
+  height: 9px;
+  border: 1px solid currentColor;
+  background: #111;
+  padding: 1px;
+}
+
+.technomancy-combat .tech-user-vital em {
+  display: block;
+  height: 100%;
+  background: currentColor;
+  box-shadow: 0 0 9px currentColor;
+}
+
+.technomancy-combat .tech-user-vital em.ult-ready {
+  background: var(--tech-green);
+  box-shadow: 0 0 12px var(--tech-green);
+}
+
+.technomancy-combat .tech-deck-readout,
+.technomancy-combat .tech-side-stack {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.technomancy-combat .tech-side-stack {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.technomancy-combat .tech-deck-readout span,
+.technomancy-combat .tech-side-stack span {
+  border: 1px solid rgba(57,255,20,0.34);
+  background: rgba(57,255,20,0.055);
+  color: var(--tech-green);
+  min-height: 24px;
+  padding: 4px 5px;
+  font-size: 0.54rem;
+  letter-spacing: 0.06em;
+  text-align: center;
+}
+
+.technomancy-combat .tech-deck-readout b {
+  color: var(--tech-blue);
+}
+
+.technomancy-combat .left-module-mount {
+  min-height: 0;
+  flex: 1;
+  border-top: 1px solid rgba(255,0,255,0.25);
+  border-bottom: 1px solid rgba(255,0,255,0.18);
+  padding: 7px 0;
+  overflow: hidden;
+}
+
+.technomancy-combat .left-module-tray {
+  height: 100%;
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  grid-auto-rows: minmax(0, 1fr);
+  gap: 8px !important;
+  border: 0 !important;
+  padding: 0 !important;
+  overflow: hidden auto;
+  scrollbar-width: thin;
+}
+
+.technomancy-combat .left-module-tray .hud-module-group {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.technomancy-combat .left-module-tray .hud-module-row {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  align-content: start;
+  overflow: hidden auto;
+  padding-right: 2px;
+}
+
+.technomancy-combat .left-module-tray .module-icon {
+  min-height: 70px !important;
+  max-height: 76px !important;
+}
+
+.technomancy-combat .left-module-tray .module-icon-cost {
+  min-width: 32px !important;
+  font-size: 0.45rem !important;
+  padding: 2px 3px !important;
+}
+
+.technomancy-combat .tech-left-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.technomancy-combat .tech-left-actions .btn {
+  min-height: 34px !important;
+  padding: 6px !important;
+  border-radius: 0 !important;
+  font-size: 0.58rem !important;
+}
+
+.technomancy-combat .target-module-sockets-self .target-module-socket-label {
+  color: var(--tech-blue) !important;
+}
+
+.technomancy-combat .target-module-sockets-enemy .target-module-socket-label {
+  color: var(--tech-magenta) !important;
+}
+
+.technomancy-combat .arena-header {
+  display: none !important;
+}
+
+.technomancy-combat .combat-bottom-dashboard.clean-combat-hud {
+  grid-template-columns: clamp(112px, 13vw, 160px) minmax(0, 1fr) clamp(180px, 20vw, 280px) !important;
+  grid-template-rows: minmax(0, 1fr) !important;
+  gap: 12px !important;
+  padding: 12px 14px !important;
+}
+
+.technomancy-combat .hud-dialogue-speaker {
+  border-right: 1px solid rgba(57,255,20,0.28);
+  padding-right: 10px;
+  display: grid;
+  align-content: center;
+  gap: 5px;
+}
+
+.technomancy-combat .hud-dialogue-speaker span {
+  color: var(--tech-blue);
+  font-size: 0.54rem;
+  letter-spacing: 0.14em;
+}
+
+.technomancy-combat .hud-dialogue-speaker b {
+  color: var(--tech-green);
+  font-size: clamp(0.82rem, 1.2vw, 1.15rem);
+  letter-spacing: 0.08em;
+}
+
+.technomancy-combat .hud-stack-readout {
+  grid-column: auto !important;
+  grid-row: auto !important;
+  border: 0 !important;
+  padding: 0 !important;
+  min-width: 0;
+}
+
+.technomancy-combat .hud-plugged-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 6px 0;
+  min-height: 24px;
+  overflow: hidden;
+}
+
+.technomancy-combat .hud-plug-chip {
+  display: inline-grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px;
+  align-items: center;
+  max-width: 180px;
+  border: 1px solid rgba(255,0,255,0.34);
+  background: rgba(255,0,255,0.08);
+  color: var(--tech-magenta);
+  padding: 3px 5px;
+  font-size: 0.54rem;
+}
+
+.technomancy-combat .hud-plug-chip span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.technomancy-combat .hud-lore-thread {
+  border-left: 1px solid rgba(57,255,20,0.28);
+  padding-left: 12px;
+  display: grid;
+  align-content: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.technomancy-combat .hud-lore-thread b {
+  color: var(--tech-magenta);
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+}
+
+.technomancy-combat .hud-lore-thread span {
+  color: rgba(229,226,225,0.78);
+  font-size: 0.62rem;
+  line-height: 1.35;
+}
+
+@media (max-width: 1180px) {
+  .technomancy-combat {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: 50px minmax(284px, 1fr) 252px 160px !important;
+    grid-template-areas:
+      "top"
+      "arena"
+      "left"
+      "log" !important;
+  }
+
+  .technomancy-combat .combat-left-rail {
+    display: grid !important;
+    grid-area: left !important;
+    grid-template-columns: 86px minmax(0, 1fr) 128px;
+    grid-template-rows: auto auto minmax(0, 1fr);
+    gap: 6px 8px;
+    margin: 0 12px 8px !important;
+    padding: 8px !important;
+    border: 2px solid var(--tech-magenta);
+  }
+
+  .technomancy-combat .combat-right-rail {
+    display: none !important;
+  }
+
+  .technomancy-combat .tech-portrait-frame {
+    grid-row: 1 / 3;
+    width: 74px !important;
+  }
+
+  .technomancy-combat .combat-left-rail h2,
+  .technomancy-combat .combat-left-rail p {
+    text-align: left;
+  }
+
+  .technomancy-combat .tech-user-vitals {
+    grid-column: 3;
+    grid-row: 1 / 3;
+  }
+
+  .technomancy-combat .tech-deck-readout,
+  .technomancy-combat .tech-side-stack {
+    grid-column: 2;
+  }
+
+  .technomancy-combat .left-module-mount {
+    grid-column: 1 / 3;
+    grid-row: 3;
+    border: 0;
+    padding: 0;
+  }
+
+  .technomancy-combat .left-module-tray {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .technomancy-combat .left-module-tray .hud-module-row {
+    display: flex !important;
+    overflow: auto hidden;
+  }
+
+  .technomancy-combat .left-module-tray .module-icon {
+    min-width: 92px !important;
+  }
+
+  .technomancy-combat .tech-left-actions {
+    grid-column: 3;
+    grid-row: 3;
+    align-content: start;
+  }
+
+  .technomancy-combat .combat-bottom-dashboard.clean-combat-hud {
+    margin: 0 12px 8px !important;
+    grid-template-columns: 92px minmax(0, 1fr) !important;
+  }
+
+  .technomancy-combat .hud-lore-thread {
+    display: none;
   }
 }
