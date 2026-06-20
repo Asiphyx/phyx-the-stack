@@ -175,7 +175,7 @@ export const ENEMIES = {
     sprite: '/assets/enemies/budder_sphinx_fixed.png',
     idleSprite: '/assets/enemies/budder_sphinx_roll_strip.png',
     idleFrames: 4,
-    maxHp: 130,
+    maxHp: 115,
     pattern: [
       { type: 'block', value: 18, description: 'Gold Wobble — Gain 18 block.' },
       { type: 'attack', value: 14, description: 'Toast-Cat Pounce — Deal 14 damage.' },

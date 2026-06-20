@@ -200,6 +200,7 @@ export class Combat {
   /** Begin a new player turn. */
   startPlayerTurn() {
     const s = this.gs.state;
+    bus.emit('turnPhase', { phase: 'player' });
 
     // Apply block reset / retention rules
     if (!this.combatState.retainPlayerBlock) {
@@ -434,8 +435,13 @@ export class Combat {
     timeline.sort((a, b) => (a.priority - b.priority) || (a.order - b.order));
     bus.emit('toast', { text: `STACK EXCHANGE // ${timeline.map(a => a.lane.toUpperCase()).join(' > ')}`, type: 'command' });
 
+    let lastPhase = null;
     for (const action of timeline) {
       if (s.hp <= 0 || s.enemies.length === 0) break;
+      if (action.kind !== lastPhase) {
+        bus.emit('turnPhase', { phase: action.kind });
+        lastPhase = action.kind;
+      }
       if (action.kind === 'cait') {
         this._executeCaitTurn({ decayCombo: false, resetExtraActions: false });
         continue;
@@ -1113,11 +1119,13 @@ export class Combat {
 
     if (allowCait) {
       // Cait acts autonomously between player and enemy turns only after a committed stack.
+      bus.emit('turnPhase', { phase: 'cait' });
       this._executeCaitTurn();
     } else if (reason === 'wait') {
       bus.emit('toast', { text: 'WAIT // no routed modules, Cait holds fire.', type: 'enemy' });
     }
 
+    bus.emit('turnPhase', { phase: 'enemy' });
     this._executeEnemyTurn();
   }
 
@@ -1136,7 +1144,7 @@ export class Combat {
     if (!s.cait || s.enemies.length === 0) return;
 
     const reliability = Math.min(0.98, Math.max(0.75, s.cait.reliability ?? 0.6));
-    const baseDamage = 6 + Math.floor(s.floor * 0.5);
+    const baseDamage = 6 + Math.floor(s.floor * 0.66);
     const attackCount = 1 + Math.max(0, this.combatState.caitExtraActions);
     let landedAny = false;
 

@@ -9,3 +9,4 @@ tmp/
 tmp_asset_contact/
 .serena/
 .superpowers/
+scripts/*.mjs

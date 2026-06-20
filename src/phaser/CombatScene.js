@@ -1091,25 +1091,29 @@ export class CombatScene extends Phaser.Scene {
 
     // 2. Combat update listener
     const onCombatUpdate = () => {
-      this.updateHeroHp();
-      
-      // Update each enemy
       const state = this.gameRef?.state;
-      if (state && state.enemies) {
-        // If enemy count changes, redraw them
-        if (state.enemies.length !== this.enemySprites.length) {
-          this.createEnemies();
-          // Update highlights since layout regenerated
-          this.enemySprites.forEach((sprite, idx) => {
-            this.updateEnemyTargetHighlight(sprite, idx);
-          });
-        } else {
+      if (!state || !state.enemies) return;
+
+      // IMMEDIATE: sync sprite array so damage event targets exist.
+      // The HP value redraw is queued below so bars animate after damage.
+      if (state.enemies.length !== this.enemySprites.length) {
+        this.createEnemies();
+        this.enemySprites.forEach((sprite, idx) => {
+          this.updateEnemyTargetHighlight(sprite, idx);
+        });
+      }
+
+      // QUEUED: HP bar redraws play after all damage animations for this phase
+      // so the player sees damage numbers then the HP bar update, not a pre-jump.
+      this.queueFx(() => {
+        this.updateHeroHp();
+        if (state.enemies.length === this.enemySprites.length) {
           this.enemySprites.forEach((sprite, idx) => {
             const enemyData = state.enemies[idx];
             if (enemyData) this.updateEnemyHp(sprite, enemyData);
           });
         }
-      }
+      }, 420);
     };
 
     // 3. Enemy Action FX
@@ -1159,6 +1163,21 @@ export class CombatScene extends Phaser.Scene {
       });
     };
 
+    // 5. Turn phase banner — shows "CAIT STRIKES", "ENEMY TURN" etc. so the
+    //    player can SEE the turn order instead of all FX firing at once.
+    const PHASE_LABELS = {
+      cait: { text: 'CAIT STRIKES', color: '#ff66cc', gap: 680 },
+      module: { text: 'MODULE RESOLVE', color: '#00e5ff', gap: 420 },
+      enemy: { text: 'ENEMY TURN', color: '#ff3344', gap: 700 },
+    };
+    const onTurnPhase = ({ phase }) => {
+      const cfg = PHASE_LABELS[phase];
+      if (!cfg) return;
+      this.queueFx(() => {
+        this.showTurnBanner(cfg.text, cfg.color);
+      }, cfg.gap);
+    };
+
     // Bind and save references
     this.eventListeners.push(bus.on('damageDealt', onDamage));
     this.eventListeners.push(bus.on('caitAttackWindup', onCaitAttackWindup));
@@ -1167,6 +1186,7 @@ export class CombatScene extends Phaser.Scene {
     this.eventListeners.push(bus.on('cardPlayed', onCardPlayed));
     this.eventListeners.push(bus.on('toast', onToast));
     this.eventListeners.push(bus.on('targetChanged', onTargetChanged));
+    this.eventListeners.push(bus.on('turnPhase', onTurnPhase));
     
     // Bind window resize
     const onResize = () => {
@@ -1174,6 +1194,45 @@ export class CombatScene extends Phaser.Scene {
     };
     window.addEventListener('resize', onResize);
     this.eventListeners.push(() => window.removeEventListener('resize', onResize));
+  }
+
+  showTurnBanner(text, color = '#ffffff') {
+    if (this.turnBannerText?.active) this.turnBannerText.destroy();
+    if (this.turnBannerBg?.active) this.turnBannerBg.destroy();
+    const cx = this.scale.width / 2;
+    const cy = 42;
+    const bgColor = Phaser.Display.Color.HexStringToColor(color).color;
+    this.turnBannerBg = this.add.rectangle(cx, cy, 340, 34, bgColor, 0.12);
+    this.turnBannerBg.setStrokeStyle(2, bgColor, 0.7);
+    this.turnBannerBg.setDepth(50);
+    this.turnBannerBg.setBlendMode('ADD');
+    this.turnBannerBg.setAlpha(0);
+    this.turnBannerText = this.add.text(cx, cy, text, {
+      fontFamily: 'Press Start 2P, monospace',
+      fontSize: '14px',
+      color,
+      stroke: '#000000',
+      strokeThickness: 4,
+    }).setOrigin(0.5).setDepth(51).setAlpha(0);
+    this.tweens.add({
+      targets: [this.turnBannerText, this.turnBannerBg],
+      alpha: 1,
+      duration: 180,
+      ease: 'Quad.out',
+      onComplete: () => {
+        this.tweens.add({
+          targets: [this.turnBannerText, this.turnBannerBg],
+          alpha: 0,
+          duration: 400,
+          delay: 220,
+          ease: 'Quad.in',
+          onComplete: () => {
+            this.turnBannerText?.destroy();
+            this.turnBannerBg?.destroy();
+          }
+        });
+      }
+    });
   }
 
   spawnLaserBeam(fromX, fromY, toX, toY, color) {

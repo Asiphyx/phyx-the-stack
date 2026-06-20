@@ -166,6 +166,28 @@ bus.on('enemyAction', ({ enemy, action }) => {
   setTimeout(() => root.classList.remove('screen-shake'), 300);
 });
 
+bus.on('turnPhase', ({ phase }) => {
+  const labels = {
+    cait: 'CAIT STRIKES',
+    module: 'MODULE RESOLVE',
+    enemy: 'ENEMY TURN',
+    player: 'PLAYER TURN',
+  };
+  const label = labels[phase];
+  if (!label) return;
+  // Use persistent body-level banner that survives re-renders
+  let banner = document.getElementById('phyx-turn-banner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'phyx-turn-banner';
+    banner.className = 'combat-turn-banner';
+    document.body.appendChild(banner);
+  }
+  banner.textContent = label;
+  banner.dataset.phase = phase;
+  banner.classList.add('is-visible');
+});
+
 render();
 
 function render() {
@@ -355,7 +377,7 @@ function renderTitle() {
     const normalIds = new Set([...ENCOUNTERS.easy.flat(), ...ENCOUNTERS.medium.flat()]);
     const catalogue = {
       normal: [...normalIds].map(id => ENEMIES[id]).filter(Boolean),
-      elite: ['tech_debt','race_condition','legacy_codebase'].map(id => ENEMIES[id]).filter(Boolean),
+      elite: ['tech_debt','race_condition'].map(id => ENEMIES[id]).filter(Boolean),
       boss: ['budder_sphinx'].map(id => ENEMIES[id]).filter(Boolean),
     };
     const pool = Object.values(CARDS);
@@ -1658,12 +1680,6 @@ function renderCombat() {
       <div class="combat-top-module-section">
         <div class="combat-top-module-section-label">MODULES IN HAND</div>
       </div>
-      <div class="combat-top-actions">
-        <button class="btn command-send-btn tech-cast-button" type="button" ${stagedCommands.length === 0 ? 'disabled' : ''}>SEND STACK</button>
-        <button class="btn command-clear-btn" type="button" ${stagedCommands.length === 0 ? 'disabled' : ''}>CLEAR</button>
-        <button class="btn ult-btn ${ultReady ? 'ult-ready' : ''}" ${ultReady ? '' : 'disabled'}>${hero?.ultimate?.emoji ?? '💥'} ULT</button>
-        <button class="btn btn-end-turn" id="end-turn-btn" ${state.hp <= 0 ? 'disabled' : ''}>WAIT</button>
-      </div>
     </div>
   `;
   const topModuleSection = topBar.querySelector('.combat-top-module-section');
@@ -1679,6 +1695,19 @@ function renderCombat() {
     </div>
     <h2>${escapeHtml(hero?.name ?? 'HERO').toUpperCase()}</h2>
     <p>${escapeHtml(hero?.title ?? 'VOID OPERATOR').toUpperCase()}</p>
+    <div class="combat-left-hp">
+      <div class="hero-hp-display">
+        <span class="hero-hp-text">${snap.hp} / ${snap.maxHp} HP</span>
+        <div class="hero-hp-bar"><div class="hero-hp-fill" style="width:${pct(snap.hp, snap.maxHp)}%"></div></div>
+        ${snap.block > 0 ? `<div class="hero-block-display">🛡 ${snap.block}</div>` : ''}
+      </div>
+    </div>
+    <div class="combat-actions-panel">
+      <button class="btn command-send-btn tech-cast-button" type="button" ${stagedCommands.length === 0 ? 'disabled' : ''}>SEND STACK</button>
+      <button class="btn command-clear-btn" type="button" ${stagedCommands.length === 0 ? 'disabled' : ''}>CLEAR</button>
+      <button class="btn ult-btn ${ultReady ? 'ult-ready' : ''}" ${ultReady ? '' : 'disabled'}>${hero?.ultimate?.emoji ?? '💥'} ULT</button>
+      <button class="btn btn-end-turn" id="end-turn-btn" ${state.hp <= 0 ? 'disabled' : ''}>END TURN</button>
+    </div>
     <div class="tech-left-log">
       <b>PLAYER NOTES</b>
       <div class="tech-left-log-body">
@@ -1694,7 +1723,7 @@ function renderCombat() {
   // ─── 2. MIDDLE BATTLEFIELD ───
   const battlefield = el('div', 'combat-battlefield');
   battlefield.style.setProperty('--battlefield-bg', `url('${theme.background}')`);
-  
+
   if (engineMode === 'phaser') {
     battlefield.classList.add('phaser-active');
     const phaserContainer = getPhaserContainer();
@@ -1751,42 +1780,45 @@ function renderCombat() {
     battlefield.appendChild(heroSpriteContainer);
   }
 
-  const presenceArt = hero?.selectionPortrait ?? hero?.battlePortrait ?? cait?.battlePortrait ?? CAIT_IDOL.battlePortrait;
-  const presenceLayer = el('div', 'character-presence-layer');
-  presenceLayer.innerHTML = `
-    <img class="character-presence-art" src="${presenceArt}" alt="${escapeHtml(hero?.selectionPortraitLabel ?? `${cait?.name ?? 'Cait'} + ${hero?.name ?? 'Assistant'}`)}" />
-    <div class="character-presence-copy">
-      <b>${escapeHtml(cait?.name ?? 'Cait')} × ${escapeHtml(hero?.name ?? 'Assistant')}</b>
-      <span>${escapeHtml(hero?.passive?.name ?? 'Locked Duo Protocol')}</span>
-    </div>
-  `;
-  battlefield.appendChild(presenceLayer);
-
-  const caitSprite = cait?.sprite;
-    const caitCodecVisual = `<img class="cait-codec-image" src="${cait?.battlePortrait ?? CAIT_IDOL.battlePortrait}" alt="Cait companion" />`;
-  const caitCodecWindow = el('div', 'cait-codec-window');
-  caitCodecWindow.innerHTML = `
-    <div class="cait-codec-top">
-      <span>CAIT_CODEC://PEON_QUEEN</span>
-      <button class="cait-codec-center" type="button" aria-label="Center Cait codec window">CENTER</button>
-    </div>
-    <div class="cait-codec-body">
-      ${caitCodecVisual}
-      <div class="cait-codec-copy">
-        <span>CAIT BROADCAST ONLINE</span>
-        <strong>${escapeHtml(caitIntent.name)}</strong>
-        <p>${escapeHtml(caitIntent.description)}</p>
-        <div class="cait-codec-health" aria-label="Cait health">
-          <b>Cait HP</b>
-          <i><em style="width:${cait ? pct(cait.hp, cait.maxHp) : 0}%"></em></i>
-          <strong>${cait ? `${cait.hp}/${cait.maxHp}` : '--/--'}</strong>
-        </div>
-        <small>${escapeHtml(cait?.bondName ?? theme.duo)} // ${cait ? 'SYNCED' : 'SYNCING'}</small>
+  if (engineMode !== 'phaser') {
+    const presenceArt = hero?.selectionPortrait ?? hero?.battlePortrait ?? cait?.battlePortrait ?? CAIT_IDOL.battlePortrait;
+    const presenceLayer = el('div', 'character-presence-layer');
+    presenceLayer.innerHTML = `
+      <img class="character-presence-art" src="${presenceArt}" alt="${escapeHtml(hero?.selectionPortraitLabel ?? `${cait?.name ?? 'Cait'} + ${hero?.name ?? 'Assistant'}`)}" />
+      <div class="character-presence-copy">
+        <b>${escapeHtml(cait?.name ?? 'Cait')} × ${escapeHtml(hero?.name ?? 'Assistant')}</b>
+        <span>${escapeHtml(hero?.passive?.name ?? 'Locked Duo Protocol')}</span>
       </div>
-    </div>
-  `;
-  applyCaitCodecOffset(caitCodecWindow);
-  battlefield.appendChild(caitCodecWindow);
+    `;
+    battlefield.appendChild(presenceLayer);
+
+    const caitSprite = cait?.sprite;
+    const caitCodecVisual = `<img class="cait-codec-image" src="${cait?.battlePortrait ?? CAIT_IDOL.battlePortrait}" alt="Cait companion" />`;
+    const caitCodecWindow = el('div', 'cait-codec-window');
+    caitCodecWindow.innerHTML = `
+      <div class="cait-codec-top">
+        <span>CAIT_CODEC://PEON_QUEEN</span>
+        <button class="cait-codec-center" type="button" aria-label="Center Cait codec window">CENTER</button>
+      </div>
+      <div class="cait-codec-body">
+        ${caitCodecVisual}
+        <div class="cait-codec-copy">
+          <span>CAIT BROADCAST ONLINE</span>
+          <strong>${escapeHtml(caitIntent.name)}</strong>
+          <p>${escapeHtml(caitIntent.description)}</p>
+          <div class="cait-codec-health" aria-label="Cait health">
+            <b>Cait HP</b>
+            <i><em style="width:${cait ? pct(cait.hp, cait.maxHp) : 0}%"></em></i>
+            <strong>${cait ? `${cait.hp}/${cait.maxHp}` : '--/--'}</strong>
+          </div>
+          <small>${escapeHtml(cait?.bondName ?? theme.duo)} // ${cait ? 'SYNCED' : 'SYNCING'}</small>
+        </div>
+      </div>
+    `;
+    void caitSprite;
+    applyCaitCodecOffset(caitCodecWindow);
+    battlefield.appendChild(caitCodecWindow);
+  }
 
   if (engineMode === 'phaser') {
     // Phaser owns the arena surface; HUD labels stay outside the playfield.
@@ -1835,16 +1867,13 @@ function renderCombat() {
     <div class="tech-right-log">
       <b>TACTICAL READOUT</b>
       <span>${escapeHtml(selectedEnemy?.name ?? 'NO TARGET')} is about to ${escapeHtml(targetIntent ? intentLabel(targetIntent) : 'wait').toLowerCase()}.</span>
-      <span>Hint: ${escapeHtml(battleLog[0]?.text ?? 'Play modules to build your stack, then execute on WAIT or ULT when ready.')}</span>
-      <span>${escapeHtml(cait?.name ?? 'Cait')} status: ${cait ? `${cait.hp}/${cait.maxHp} HP` : 'syncing'}</span>
       <div class="tech-right-log-entries">
         ${battleLogRows}
       </div>
     </div>
     <div class="tech-right-log">
-      <b>${escapeHtml(cait?.name ?? 'Cait')} BROADCAST</b>
-      <span>${escapeHtml(caitIntent.name)}</span>
-      <span>${escapeHtml(caitIntent.description)}</span>
+      <b>${escapeHtml(cait?.name ?? 'Cait')} // ${escapeHtml(cait?.bondName ?? theme.duo)}</b>
+      <span>${cait ? `${cait.hp}/${cait.maxHp} HP` : 'syncing'}</span>
     </div>
   `;
   section.appendChild(rightRail);
@@ -1883,13 +1912,15 @@ function renderCombat() {
 
   root.appendChild(section);
   appendSystemMenuOverlay(section, true);
-  wireCaitCodecDrag(caitCodecWindow);
-  const caitCodecCenter = caitCodecWindow.querySelector('.cait-codec-center');
-  if (caitCodecCenter) {
-    caitCodecCenter.onclick = () => {
-      caitCodecOffset = { x: 0, y: 0 };
-      applyCaitCodecOffset(caitCodecWindow);
-    };
+  if (typeof caitCodecWindow !== 'undefined' && caitCodecWindow) {
+    wireCaitCodecDrag(caitCodecWindow);
+    const caitCodecCenter = caitCodecWindow.querySelector('.cait-codec-center');
+    if (caitCodecCenter) {
+      caitCodecCenter.onclick = () => {
+        caitCodecOffset = { x: 0, y: 0 };
+        applyCaitCodecOffset(caitCodecWindow);
+      };
+    }
   }
 
   // Wire event handlers asynchronously to ensure DOM availability
@@ -2564,7 +2595,9 @@ function nodeLabel(type) {
 
 function buildEnemyCatalogue() {
   const normalIds = new Set([...ENCOUNTERS.easy.flat(), ...ENCOUNTERS.medium.flat()]);
-  const eliteIds = ['tech_debt', 'race_condition', 'legacy_codebase'];
+  // legacy_codebase is tier:'boss' (120 HP) — NOT an elite. Leaving it in the
+  // elite pool caused a 173 HP / 17-turn cliff at floor 5. Use true elites only.
+  const eliteIds = ['tech_debt', 'race_condition'];
   const bossIds = ['budder_sphinx'];
   return {
     normal: [...normalIds].map(id => ENEMIES[id]).filter(Boolean),
