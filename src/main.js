@@ -1323,7 +1323,7 @@ function renderHeroSelect() {
   ].slice(0, 6);
   const theme = getHeroTheme(asiphyx.id);
   const cait = buildCaitCompanion(asiphyx.id);
-  const caitRegentSprite = cait.sprite?.portrait ?? '/assets/heroes/kinetic-regent-cait/cait_kinetic_regent_from_idle.png';
+  const caitRegentSprite = '/assets/heroes/kinetic-regent-cait/animations/from-sheet/frame_02_wink_back.png';
   const slots = [
     { left: 18.8, top: 74.0 },
     { left: 29.9, top: 74.0 },

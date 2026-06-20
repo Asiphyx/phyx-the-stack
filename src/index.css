@@ -9538,12 +9538,13 @@ body::after {
 }
 
 .cait-regent-preview img {
-  width: min(68%, 260px);
-  height: min(74%, 360px);
+  width: 86%;
+  height: 88%;
   object-fit: contain;
-  image-rendering: pixelated;
+  object-position: center bottom;
+  image-rendering: auto;
   filter: saturate(1.25) contrast(1.08) drop-shadow(0 0 18px rgba(255, 51, 153, 0.5));
-  transform: scale(2.4);
+  transform: none;
 }
 
 .cait-regent-preview span {
@@ -9670,16 +9671,17 @@ body::after {
 
 .hero-select-slot img {
   position: absolute;
-  left: 9%;
-  top: 10%;
+  left: 50%;
+  top: 7%;
   z-index: 0;
-  width: 82%;
-  height: 72% !important;
-  max-height: 72% !important;
+  width: auto;
+  height: 78% !important;
+  max-height: 78% !important;
   aspect-ratio: 1 / 1;
   display: block;
   object-fit: contain;
   object-position: center;
+  transform: translateX(-50%);
   border: 1px solid color-mix(in srgb, var(--slot-color) 62%, rgba(255,255,255,0.12));
   background:
     radial-gradient(circle at 50% 48%, rgba(255,255,255,0.06), transparent 45%),
@@ -9691,10 +9693,12 @@ body::after {
 .hero-select-slot::after {
   content: "";
   position: absolute;
-  left: 9%;
-  top: 10%;
-  width: 82%;
-  height: 72%;
+  left: 50%;
+  top: 7%;
+  width: auto;
+  height: 78%;
+  aspect-ratio: 1 / 1;
+  transform: translateX(-50%);
   z-index: 2;
   pointer-events: none;
   border: 1px solid rgba(0, 229, 255, 0.22);
@@ -9706,14 +9710,15 @@ body::after {
 
 .mystery-portrait {
   position: absolute;
-  left: 9%;
-  top: 10%;
+  left: 50%;
+  top: 7%;
   z-index: 0;
-  width: 82%;
-  height: 72%;
+  width: auto;
+  height: 78%;
   display: grid;
   place-items: center;
   aspect-ratio: 1 / 1;
+  transform: translateX(-50%);
   border: 1px solid rgba(255,255,255,0.14);
   background:
     radial-gradient(circle at 50% 42%, rgba(255,255,255,0.16), transparent 32%),
@@ -9729,10 +9734,12 @@ body::after {
 .hero-select-slot.is-locked::before {
   content: "";
   position: absolute;
-  left: 9%;
-  top: 10%;
-  width: 82%;
-  height: 72%;
+  left: 50%;
+  top: 7%;
+  width: auto;
+  height: 78%;
+  aspect-ratio: 1 / 1;
+  transform: translateX(-50%);
   z-index: 1;
   pointer-events: none;
   background: rgba(0, 0, 0, 0.34);
@@ -9786,8 +9793,8 @@ body::after {
 }
 
 .hero-select-slot.is-locked img {
-  opacity: 0.58;
-  filter: grayscale(0.58) brightness(0.72) saturate(0.72);
+  opacity: 0.72;
+  filter: grayscale(0.5) brightness(0.78) saturate(0.78);
 }
 
 .hero-select-slot.is-locked b {
@@ -9813,7 +9820,7 @@ body::after {
 
 .hero-select-slot:hover img,
 .hero-select-slot:focus-visible img {
-  transform: translateY(-3px) scale(1.04);
+  transform: translateX(-50%) translateY(-3px) scale(1.04);
   opacity: 1;
   filter: saturate(1.15) contrast(1.08);
 }
