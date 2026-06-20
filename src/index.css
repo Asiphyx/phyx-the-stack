@@ -9928,46 +9928,89 @@ body::after {
 
 .hero-board-start {
   position: absolute;
-  left: 82.0%;
-  top: 89.4%;
+  left: 50%;
+  top: 58.8%;
   z-index: 7;
-  width: 16.4%;
+  width: clamp(54px, 5.6vw, 92px);
   min-width: 0;
-  height: 6.9%;
-  min-height: clamp(24px, 2.35vw, 36px);
-  border: 1px solid rgba(0,229,255,0.72);
-  background: linear-gradient(90deg, rgba(0,0,0,0.88), rgba(0,229,255,0.18), rgba(0,0,0,0.88));
-  color: var(--neon-cyan);
+  aspect-ratio: 1;
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  border: 2px solid rgba(255, 116, 220, 0.86);
+  border-radius: 50% 50% 46% 46%;
+  background:
+    radial-gradient(circle at 50% 46%, rgba(255, 255, 255, 0.32), transparent 22%),
+    radial-gradient(circle at 50% 52%, rgba(255, 43, 214, 0.92), rgba(123, 44, 255, 0.34) 54%, rgba(0, 0, 0, 0.62) 72%);
+  color: transparent;
   cursor: pointer;
   font-family: var(--font-heading);
   font-weight: 700;
-  font-size: clamp(0.5rem, 0.72vw, 0.82rem);
+  font-size: 0;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  box-shadow: 0 0 20px rgba(0,229,255,0.22);
-  transition: background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+  box-shadow:
+    0 0 0 1px rgba(255, 214, 247, 0.24),
+    0 0 22px rgba(255, 43, 214, 0.62),
+    0 0 46px rgba(0, 229, 255, 0.24),
+    inset 0 0 18px rgba(255, 255, 255, 0.16);
+  transform: translate(-50%, -50%) rotate(45deg);
+  transition: filter 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+.hero-board-start::before,
+.hero-board-start::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+.hero-board-start::before {
+  inset: 12%;
+  border: 1px solid rgba(255, 224, 252, 0.82);
+  border-radius: inherit;
+  box-shadow: inset 0 0 12px rgba(255, 255, 255, 0.12);
+}
+
+.hero-board-start::after {
+  left: 53%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  border-top: clamp(8px, 0.78vw, 13px) solid transparent;
+  border-bottom: clamp(8px, 0.78vw, 13px) solid transparent;
+  border-left: clamp(12px, 1.12vw, 19px) solid rgba(255, 255, 255, 0.94);
+  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.75));
+  transform: translate(-48%, -50%) rotate(-45deg);
 }
 
 .hero-board-start:hover,
 .hero-board-start:focus-visible {
-  color: #041014;
-  background: linear-gradient(90deg, var(--neon-cyan), #9dffcb);
-  box-shadow: 0 0 26px rgba(0,229,255,0.5);
+  filter: brightness(1.16) saturate(1.12);
+  box-shadow:
+    0 0 0 1px rgba(255, 214, 247, 0.38),
+    0 0 30px rgba(255, 43, 214, 0.8),
+    0 0 62px rgba(0, 229, 255, 0.34),
+    inset 0 0 20px rgba(255, 255, 255, 0.22);
+  transform: translate(-50%, -50%) rotate(45deg) scale(1.05);
 }
 
 /* Disabled when a locked hero is being browsed */
 .hero-board-start.is-disabled {
   border-color: rgba(255,143,77,0.6);
-  background: linear-gradient(90deg, rgba(0,0,0,0.9), rgba(255,143,77,0.14), rgba(0,0,0,0.9));
-  color: #ff9f5d;
+  background:
+    radial-gradient(circle at 50% 46%, rgba(255, 255, 255, 0.12), transparent 22%),
+    radial-gradient(circle at 50% 52%, rgba(255, 143, 77, 0.58), rgba(0, 0, 0, 0.72) 68%);
+  color: transparent;
   cursor: not-allowed;
-  box-shadow: none;
+  box-shadow: 0 0 14px rgba(255,143,77,0.22);
+  filter: grayscale(0.28) brightness(0.78);
 }
 
 .hero-board-start.is-disabled:hover {
-  color: #ff9f5d;
-  background: linear-gradient(90deg, rgba(0,0,0,0.9), rgba(255,143,77,0.14), rgba(0,0,0,0.9));
-  box-shadow: none;
+  color: transparent;
+  transform: translate(-50%, -50%) rotate(45deg);
+  box-shadow: 0 0 14px rgba(255,143,77,0.22);
 }
 
 /* ── Interactive overlays for painted backdrop controls ──
@@ -11788,5 +11831,439 @@ body::after {
   .technomancy-combat .combat-top-module-tray .hud-module-row {
     overflow-x: auto;
     scrollbar-width: thin;
+  }
+}
+
+/* Final HUD placement pass: modules live in the Battle Notes rail, leaving the
+   top strip as compact identity/status instead of another crowded tray. */
+.technomancy-combat {
+  grid-template-columns: clamp(286px, 22vw, 390px) minmax(500px, 1fr) clamp(294px, 18vw, 354px) !important;
+  grid-template-rows: 76px minmax(0, 1fr) clamp(112px, 14vh, 146px) !important;
+}
+
+.technomancy-combat .combat-top-bar {
+  height: 76px !important;
+  min-height: 76px !important;
+  max-height: 76px !important;
+  grid-template-columns: minmax(238px, 0.28fr) minmax(0, 1fr) !important;
+  padding: 6px 12px !important;
+}
+
+.technomancy-combat .combat-top-content {
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 0.52fr) !important;
+  grid-template-rows: minmax(0, 36px) minmax(0, 22px) !important;
+  grid-template-areas:
+    "chips chips"
+    "metrics metrics" !important;
+  gap: 5px !important;
+}
+
+.technomancy-combat .combat-top-chips {
+  grid-template-columns: minmax(0, 0.74fr) minmax(0, 1.05fr) minmax(0, 0.78fr) !important;
+  min-height: 0 !important;
+  padding: 4px 6px !important;
+}
+
+.technomancy-combat .combat-top-chip-cluster {
+  gap: 2px !important;
+}
+
+.technomancy-combat .combat-top-chip-title {
+  font-size: 0.43rem !important;
+}
+
+.technomancy-combat .combat-top-chip {
+  min-height: 15px !important;
+  padding: 1px 4px !important;
+  font-size: 0.48rem !important;
+}
+
+.technomancy-combat .combat-top-metrics {
+  justify-content: flex-start;
+  align-content: center;
+  gap: 4px 10px !important;
+  font-size: 0.54rem !important;
+  opacity: 0.84;
+}
+
+.technomancy-combat .combat-top-module-section,
+.technomancy-combat .combat-top-module-tray {
+  display: none !important;
+}
+
+.technomancy-combat .combat-right-rail {
+  padding: 18px 16px !important;
+  gap: 9px !important;
+}
+
+.tech-right-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.tech-right-metrics span {
+  min-width: 0;
+  border: 1px solid rgba(57, 255, 20, 0.34);
+  background: rgba(57, 255, 20, 0.055);
+  color: rgba(229, 226, 225, 0.84);
+  padding: 4px 5px;
+  font-size: 0.52rem;
+  letter-spacing: 0.06em;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.tech-right-metrics b {
+  color: var(--tech-blue);
+}
+
+.tech-module-dock {
+  min-height: 0;
+  border: 1px solid rgba(0, 240, 255, 0.36);
+  background: rgba(5, 5, 5, 0.78);
+  padding: 9px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 8px;
+  box-shadow: inset 0 0 18px rgba(0, 240, 255, 0.055);
+}
+
+.tech-module-dock-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px solid rgba(0, 240, 255, 0.24);
+  padding-bottom: 6px;
+}
+
+.tech-module-dock-title b {
+  color: var(--tech-blue);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+}
+
+.tech-module-dock-title span {
+  color: rgba(229, 226, 225, 0.72);
+  font-size: 0.52rem;
+  letter-spacing: 0.1em;
+}
+
+.technomancy-combat .right-module-tray {
+  display: grid !important;
+  grid-column: 1 / -1 !important;
+  grid-template-columns: 1fr !important;
+  justify-self: stretch;
+  width: 100%;
+  gap: 10px !important;
+  min-height: 0;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  overflow: visible;
+}
+
+.technomancy-combat .right-module-tray .hud-module-group {
+  min-height: 0;
+  width: 100%;
+  display: grid;
+  gap: 5px;
+}
+
+.technomancy-combat .right-module-tray .hud-module-group-label {
+  color: var(--tech-magenta) !important;
+  font-size: 0.54rem !important;
+  letter-spacing: 0.14em;
+}
+
+.technomancy-combat .right-module-tray .hud-module-group.self .hud-module-group-label {
+  color: var(--tech-blue) !important;
+}
+
+.technomancy-combat .right-module-tray .hud-module-row {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(58px, 1fr)) !important;
+  gap: 7px !important;
+  min-height: 62px;
+  overflow: visible;
+  align-items: stretch;
+}
+
+.technomancy-combat .right-module-tray .module-icon,
+.technomancy-combat .right-module-tray .hud-module-row .module-icon,
+.technomancy-combat .right-module-tray .combat-top-module-overflow {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  height: 62px !important;
+  min-height: 62px !important;
+  max-height: 62px !important;
+  padding: 6px !important;
+  position: relative;
+  display: inline-grid !important;
+  place-items: center;
+  border: 1px solid var(--tech-blue) !important;
+  border-radius: 0 !important;
+  background: rgba(5, 5, 5, 0.92) !important;
+  box-shadow: inset 0 0 18px rgba(0, 240, 255, 0.08), 0 0 10px rgba(0, 240, 255, 0.1) !important;
+  clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 9px 100%, 0 calc(100% - 9px));
+}
+
+.technomancy-combat .right-module-tray .module-icon.target-enemy {
+  border-color: var(--tech-magenta) !important;
+}
+
+.technomancy-combat .right-module-tray .module-icon.target-self {
+  border-color: var(--tech-blue) !important;
+}
+
+.technomancy-combat .right-module-tray .module-icon-art,
+.technomancy-combat .right-module-tray .module-icon-art img,
+.technomancy-combat .right-module-tray .module-icon-emoji {
+  width: 34px !important;
+  height: 34px !important;
+}
+
+.technomancy-combat .right-module-tray .module-icon-name,
+.technomancy-combat .right-module-tray .module-icon-target-label {
+  display: none !important;
+}
+
+.technomancy-combat .right-module-tray .module-icon-cost,
+.technomancy-combat .right-module-tray .module-icon-speed {
+  top: 3px !important;
+  padding: 1px 3px !important;
+  font-size: 0.38rem !important;
+  line-height: 1.1 !important;
+}
+
+.technomancy-combat .right-module-tray .module-icon-detail {
+  display: none !important;
+  position: absolute;
+  left: auto !important;
+  right: 0 !important;
+  top: calc(100% + 6px) !important;
+  width: min(250px, 68vw);
+  max-width: 240px;
+  padding: 8px 10px;
+  border: 1px solid rgba(0, 240, 255, 0.4);
+  background: rgba(4, 6, 18, 0.96);
+  color: rgba(229, 226, 225, 0.95);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.42);
+  z-index: 40 !important;
+  font-size: 10px;
+  line-height: 1.3;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-2px);
+}
+
+.technomancy-combat .right-module-tray .module-icon:hover .module-icon-detail,
+.technomancy-combat .right-module-tray .module-icon:focus-visible .module-icon-detail {
+  display: grid !important;
+  opacity: 1 !important;
+  transform: translateY(0) !important;
+}
+
+.technomancy-combat .combat-right-rail .tech-right-log {
+  flex: 0 1 auto;
+}
+
+.technomancy-combat .combat-right-rail .tech-right-log:first-of-type {
+  flex: 1 1 0;
+}
+
+@media (max-width: 1180px) {
+  .technomancy-combat {
+    grid-template-rows: 72px minmax(240px, 1fr) 188px 168px 132px !important;
+    grid-template-areas:
+      "top"
+      "arena"
+      "right"
+      "left"
+      "log" !important;
+  }
+
+  .technomancy-combat .combat-right-rail {
+    display: grid !important;
+    grid-area: right !important;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
+    gap: 6px;
+    margin: 0 12px 8px !important;
+    padding: 8px !important;
+    border: 2px solid var(--tech-green);
+  }
+
+  .technomancy-combat .combat-left-rail {
+    display: grid !important;
+    grid-area: left !important;
+    grid-template-columns: 86px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    gap: 6px 8px;
+    margin: 0 12px 8px !important;
+    padding: 8px !important;
+    border: 2px solid var(--tech-magenta);
+  }
+
+  .technomancy-combat .combat-top-content {
+    grid-template-columns: 1fr !important;
+  }
+
+  .tech-status-title,
+  .tech-right-metrics {
+    grid-column: 1;
+  }
+
+  .tech-module-dock {
+    grid-column: 1;
+    grid-row: auto;
+    min-height: 0;
+    padding: 7px;
+  }
+
+  .technomancy-combat .combat-right-rail .tech-right-log {
+    display: none;
+  }
+
+  .tech-status-title {
+    padding-bottom: 5px;
+  }
+
+  .tech-status-title strong {
+    font-size: 0.92rem;
+  }
+
+  .tech-right-metrics {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 3px;
+  }
+
+  .tech-right-metrics span {
+    min-height: 28px;
+    padding: 2px;
+    font-size: 0.42rem;
+    white-space: normal;
+  }
+
+  .tech-module-dock-title {
+    padding-bottom: 4px;
+  }
+
+  .tech-module-dock-title b,
+  .tech-module-dock-title span {
+    font-size: 0.48rem;
+  }
+
+  .technomancy-combat .right-module-tray {
+    gap: 5px !important;
+  }
+
+  .technomancy-combat .right-module-tray .hud-module-group {
+    grid-template-columns: 74px minmax(0, 1fr);
+    align-items: center;
+    gap: 6px;
+  }
+
+  .technomancy-combat .right-module-tray .hud-module-row {
+    grid-template-columns: repeat(auto-fit, minmax(42px, 1fr)) !important;
+    min-height: 46px;
+    gap: 5px !important;
+  }
+
+  .technomancy-combat .right-module-tray .module-icon,
+  .technomancy-combat .right-module-tray .hud-module-row .module-icon,
+  .technomancy-combat .right-module-tray .combat-top-module-overflow {
+    height: 46px !important;
+    min-height: 46px !important;
+    max-height: 46px !important;
+  }
+
+  .technomancy-combat .right-module-tray .module-icon-art,
+  .technomancy-combat .right-module-tray .module-icon-art img,
+  .technomancy-combat .right-module-tray .module-icon-emoji {
+    width: 25px !important;
+    height: 25px !important;
+  }
+
+  .technomancy-combat .tech-portrait-frame {
+    grid-column: 1;
+    grid-row: 1;
+    width: 76px !important;
+    align-self: start;
+  }
+
+  .technomancy-combat .combat-left-rail h2,
+  .technomancy-combat .combat-left-rail p,
+  .technomancy-combat .tech-left-log {
+    display: none !important;
+  }
+
+  .combat-left-hp {
+    grid-column: 1;
+    grid-row: 1;
+    align-self: end;
+    margin: 0 !important;
+  }
+
+  .hero-hp-text {
+    font-size: 7px;
+  }
+
+  .combat-actions-panel {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: stretch;
+    gap: 5px;
+  }
+
+  .combat-actions-panel .btn {
+    min-height: 28px !important;
+    font-size: 7px !important;
+  }
+
+  .combat-actions-panel .command-send-btn {
+    min-height: 32px !important;
+    font-size: 8px !important;
+  }
+
+  .technomancy-combat .combat-bottom-dashboard.clean-combat-hud {
+    grid-template-columns: 82px minmax(0, 1fr) !important;
+    gap: 8px !important;
+    padding: 10px !important;
+  }
+
+  .technomancy-combat .hud-dialogue-speaker {
+    padding-right: 8px;
+  }
+
+  .technomancy-combat .hud-dialogue-speaker span {
+    font-size: 0.42rem;
+    letter-spacing: 0.08em;
+  }
+
+  .technomancy-combat .hud-dialogue-speaker b {
+    font-size: 0.72rem;
+  }
+
+  .technomancy-combat .hud-stack-topline {
+    display: grid;
+    gap: 2px;
+  }
+
+  .technomancy-combat .hud-stack-topline strong {
+    font-size: 0.68rem !important;
+    line-height: 1.05;
+  }
+
+  .technomancy-combat .hud-stack-topline span,
+  .technomancy-combat .hud-log-line {
+    font-size: 0.5rem !important;
+    line-height: 1.25;
+  }
+
+  .technomancy-combat .hud-plugged-row {
+    display: none;
   }
 }

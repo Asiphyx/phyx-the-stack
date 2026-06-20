@@ -1689,11 +1689,11 @@ function renderCombat() {
     tray.appendChild(group);
   };
 
-  const topModuleTray = el('div', 'hud-module-tray combat-top-module-tray');
-  appendModuleGroup(topModuleTray, 'USER PATH', enemyCards, 'enemy');
-  appendModuleGroup(topModuleTray, 'CAIT PATH', selfCards, 'self');
-  if (!topModuleTray.hasChildNodes()) {
-    topModuleTray.innerHTML = '<span class="combat-top-empty-modules">NO MODULES IN HAND</span>';
+  const sideModuleTray = el('div', 'hud-module-tray right-module-tray');
+  appendModuleGroup(sideModuleTray, 'USER PATH', enemyCards, 'enemy');
+  appendModuleGroup(sideModuleTray, 'CAIT PATH', selfCards, 'self');
+  if (!sideModuleTray.hasChildNodes()) {
+    sideModuleTray.innerHTML = '<span class="combat-top-empty-modules">NO MODULES IN HAND</span>';
   }
 
   // ─── 1. TOP STATS BAR ───
@@ -1736,15 +1736,8 @@ function renderCombat() {
         <span>HAND <b>${state.hand.length}</b></span>
         <span>ENEMIES <b>${state.enemies.length}</b></span>
       </div>
-      <div class="combat-top-module-section">
-        <div class="combat-top-module-section-label">MODULES IN HAND</div>
-      </div>
     </div>
   `;
-  const topModuleSection = topBar.querySelector('.combat-top-module-section');
-  if (topModuleSection) {
-    topModuleSection.appendChild(topModuleTray);
-  }
   section.appendChild(topBar);
 
   const leftRail = el('aside', 'combat-left-rail tech-hud-panel');
@@ -1923,6 +1916,20 @@ function renderCombat() {
       <strong>BATTLE NOTES</strong>
       <span>LIVE</span>
     </div>
+    <div class="tech-right-metrics" aria-label="Combat counters">
+      <span>DRAW <b>${snap.drawPileCount}</b></span>
+      <span>DISCARD <b>${snap.discardPileCount}</b></span>
+      <span>VOID <b>${snap.exhaustPileCount}</b></span>
+      <span>HAND <b>${state.hand.length}</b></span>
+      <span>USER ${userCommands}/${MODULE_SIDE_LIMIT}</span>
+      <span>CAIT ${selfCommands}/${MODULE_SIDE_LIMIT}</span>
+    </div>
+    <div class="tech-module-dock">
+      <div class="tech-module-dock-title">
+        <b>MODULE ROUTER</b>
+        <span>${state.hand.length} READY</span>
+      </div>
+    </div>
     <div class="tech-right-log">
       <b>TACTICAL READOUT</b>
       <span>${escapeHtml(selectedEnemy?.name ?? 'NO TARGET')} is about to ${escapeHtml(targetIntent ? intentLabel(targetIntent) : 'wait').toLowerCase()}.</span>
@@ -1935,6 +1942,10 @@ function renderCombat() {
       <span>${cait ? `${cait.hp}/${cait.maxHp} HP` : 'syncing'}</span>
     </div>
   `;
+  const sideModuleDock = rightRail.querySelector('.tech-module-dock');
+  if (sideModuleDock) {
+    sideModuleDock.appendChild(sideModuleTray);
+  }
   section.appendChild(rightRail);
 
   // ─── 3. CLEAN BOTTOM HUD (dialogue/lore only) ───
