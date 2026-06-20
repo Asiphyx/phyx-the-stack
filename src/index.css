@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Share+Tech+Mono&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Share+Tech+Mono&family=Orbitron:wght@500;700;900&family=Chakra+Petch:wght@400;500;600;700&display=swap');
 
 /* ══════════════════════════════════════════════
    PHYX THE STACK — Design System
@@ -36,10 +36,10 @@
   --hero-xadnib: #ffcc00;
   --hero-bindax: #ff66cc;
 
-  /* Text */
-  --text-primary: #f0f0f8;
-  --text-secondary: #9090b0;
-  --text-muted: #505070;
+  /* Text — luminance bumped for readability over busy neon art */
+  --text-primary: #f4f4fb;
+  --text-secondary: #c2c2dc;
+  --text-muted: #8e8eb2;
   --text-damage: #ff3344;
   --text-heal: #33ff99;
   --text-block: #00ccff;
@@ -68,7 +68,9 @@
   /* Fonts */
   --font-pixel: 'Press Start 2P', monospace;
   --font-display: 'VT323', monospace;
-  --font-body: 'Share Tech Mono', monospace;
+  --font-body: 'Chakra Petch', 'Share Tech Mono', monospace;
+  --font-heading: 'Orbitron', 'VT323', monospace;
+  --font-term: 'Share Tech Mono', monospace;
 
   /* Transitions */
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
@@ -120,13 +122,15 @@ html, body {
   position: relative;
 }
 
-/* CRT Screen Effect - Vignette Curve */
+/* CRT Screen Effect - Vignette Curve
+   ellipse (matches widescreen aspect) + gentle falloff so corners darken for
+   curvature feel without crushing readable content. Was a hard circle→0.7 black. */
 body::before {
   content: " ";
   display: block;
   position: fixed;
   top: 0; left: 0; bottom: 0; right: 0;
-  background: radial-gradient(circle, rgba(16, 20, 30, 0) 50%, rgba(0, 0, 0, 0.7) 100%);
+  background: radial-gradient(ellipse 130% 130% at 50% 50%, rgba(16, 20, 30, 0) 62%, rgba(0, 0, 0, 0.34) 100%);
   z-index: 99998;
   pointer-events: none;
 }
@@ -4591,9 +4595,12 @@ body::after {
 }
 
 .map-title {
-  font-family: var(--font-display);
-  font-size: 1.2rem;
-  color: var(--text-secondary);
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: 0.04em;
+  color: var(--text-primary);
+  text-shadow: 0 0 10px rgba(0, 229, 255, 0.35);
 }
 
 .map-nodes {
@@ -9483,10 +9490,10 @@ body::after {
 
 .hero-preview-panel {
   position: absolute;
-  left: 5.35%;
-  top: 13.1%;
-  width: 16.35%;
-  height: 51.2%;
+  left: 5.6%;
+  top: 13.9%;
+  width: 15.0%;
+  height: 48.6%;
   overflow: hidden;
   display: grid;
   place-items: center;
@@ -9514,10 +9521,10 @@ body::after {
 
 .cait-regent-preview {
   position: absolute;
-  left: 78.85%;
-  top: 13.8%;
-  width: 16.35%;
-  height: 51.1%;
+  left: 78.8%;
+  top: 13.9%;
+  width: 15.2%;
+  height: 48.6%;
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -9543,9 +9550,9 @@ body::after {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center 43%;
+  object-position: center center;
   image-rendering: auto;
-  filter: saturate(1.25) contrast(1.08) drop-shadow(0 0 18px rgba(255, 51, 153, 0.5));
+  filter: saturate(1.12) contrast(1.04) drop-shadow(0 0 14px rgba(255, 51, 153, 0.45));
   transform: none;
 }
 
@@ -9565,10 +9572,10 @@ body::after {
 
 .cait-variant-summary {
   position: absolute;
-  left: 83.45%;
-  top: 65.3%;
-  width: 12.8%;
-  height: 25.3%;
+  left: 82.0%;
+  top: 63.2%;
+  width: 16.4%;
+  height: 25.6%;
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto auto;
   gap: min(0.55vw, 8px);
@@ -9595,10 +9602,12 @@ body::after {
 }
 
 .cait-variant-summary strong {
-  color: #ff4fb8;
-  font-family: var(--font-display);
-  font-size: clamp(0.78rem, 1.08vw, 1.12rem);
-  line-height: 0.95;
+  color: #ff66c4;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: clamp(0.62rem, 0.92vw, 0.96rem);
+  line-height: 1.05;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
   text-shadow: 0 0 10px rgba(255,51,153,0.55);
 }
@@ -9659,7 +9668,7 @@ body::after {
   left: var(--slot-left);
   top: var(--slot-top);
   width: 10.05%;
-  height: 14.1%;
+  height: 16.8%;
   display: grid;
   place-items: center;
   padding: 0;
@@ -9669,6 +9678,18 @@ body::after {
   color: white;
   cursor: pointer;
   pointer-events: auto;
+}
+
+/* Highlight the hero currently being browsed via the nav arrows */
+.hero-select-slot.is-focused img {
+  border-color: var(--slot-color);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--slot-color) 70%, transparent),
+    inset 0 0 12px color-mix(in srgb, var(--slot-color) 30%, transparent);
+  transform: translateX(-50%) translateY(-2px) scale(1.03);
+}
+
+.hero-select-slot.is-focused::after {
+  border-color: color-mix(in srgb, var(--slot-color) 80%, #ffffff 10%);
 }
 
 .hero-select-slot img {
@@ -9903,28 +9924,99 @@ body::after {
 
 .hero-board-start {
   position: absolute;
-  left: 83.55%;
-  top: 92.25%;
+  left: 82.0%;
+  top: 89.4%;
   z-index: 7;
-  width: 12.6%;
+  width: 16.4%;
   min-width: 0;
+  height: 6.9%;
   min-height: clamp(24px, 2.35vw, 36px);
   border: 1px solid rgba(0,229,255,0.72);
   background: linear-gradient(90deg, rgba(0,0,0,0.88), rgba(0,229,255,0.18), rgba(0,0,0,0.88));
   color: var(--neon-cyan);
   cursor: pointer;
-  font-family: var(--font-pixel);
-  font-size: clamp(0.42rem, 0.58vw, 0.68rem);
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: clamp(0.5rem, 0.72vw, 0.82rem);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   box-shadow: 0 0 20px rgba(0,229,255,0.22);
+  transition: background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
 }
 
 .hero-board-start:hover,
 .hero-board-start:focus-visible {
   color: #041014;
   background: linear-gradient(90deg, var(--neon-cyan), #9dffcb);
+  box-shadow: 0 0 26px rgba(0,229,255,0.5);
 }
+
+/* Disabled when a locked hero is being browsed */
+.hero-board-start.is-disabled {
+  border-color: rgba(255,143,77,0.6);
+  background: linear-gradient(90deg, rgba(0,0,0,0.9), rgba(255,143,77,0.14), rgba(0,0,0,0.9));
+  color: #ff9f5d;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.hero-board-start.is-disabled:hover {
+  color: #ff9f5d;
+  background: linear-gradient(90deg, rgba(0,0,0,0.9), rgba(255,143,77,0.14), rgba(0,0,0,0.9));
+  box-shadow: none;
+}
+
+/* ── Interactive overlays for painted backdrop controls ──
+   The arrows, corner glyphs and 'C' emblem are baked into the art; these are
+   transparent hit-zones sitting exactly on top, lighting up on hover/focus. */
+.hero-board-control {
+  position: absolute;
+  z-index: 8;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  color: transparent;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+}
+
+.hero-board-control:hover,
+.hero-board-control:focus-visible {
+  border-color: rgba(0, 229, 255, 0.55);
+  background: radial-gradient(ellipse at center, rgba(0, 229, 255, 0.16), transparent 70%);
+  box-shadow: 0 0 18px rgba(0, 229, 255, 0.3);
+  outline: none;
+}
+
+.hero-board-nav { top: 41%; width: 5.6%; height: 12%; }
+.hero-board-nav.prev { left: 1.1%; }
+.hero-board-nav.next { left: 93.3%; }
+.hero-board-nav:hover,
+.hero-board-nav:focus-visible {
+  background: radial-gradient(ellipse at center, rgba(255, 51, 153, 0.2), transparent 72%);
+  border-color: rgba(255, 51, 153, 0.6);
+  box-shadow: 0 0 18px rgba(255, 51, 153, 0.34);
+}
+
+.hero-board-home {
+  left: 45.7%;
+  top: 92.4%;
+  width: 8.6%;
+  height: 6.6%;
+  border-radius: 50%;
+}
+.hero-board-home:hover,
+.hero-board-home:focus-visible {
+  background: radial-gradient(circle at center, rgba(255, 204, 0, 0.22), transparent 70%);
+  border-color: rgba(255, 204, 0, 0.6);
+  box-shadow: 0 0 18px rgba(255, 204, 0, 0.34);
+}
+
+.hero-board-corner { top: 1.2%; width: 4.2%; height: 7.4%; }
+.hero-board-corner.left { left: 0.3%; }
+.hero-board-corner.right { left: 95.5%; }
 
 @media (max-width: 900px) {
   .hero-select-board {

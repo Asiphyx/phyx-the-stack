@@ -87,6 +87,8 @@ let systemMenuOpen = false;
 let titleWindowOffset = { x: 0, y: 0 };
 let titleLauncherOpen = false;
 let caitCodecOffset = { x: 0, y: 0 };
+// Which roster card the hero-select nav arrows are currently browsing.
+let heroSelectFocusIndex = 0;
 // Declared before the initial render() below — prepareMusicForPhase touches it
 // via updateMusicControlBar, and `vite dev` enforces the TDZ that esbuild relaxes.
 let musicCtrlBar = null;
@@ -1343,54 +1345,73 @@ function renderHeroSelect() {
     ...heroes.filter(hero => hero.id !== asiphyx.id && hero.id !== 'cait'),
     mysteryHero,
   ].slice(0, 6);
-  const theme = getHeroTheme(asiphyx.id);
-  const cait = buildCaitCompanion(asiphyx.id);
-  const caitRegentSprite = '/assets/heroes/kinetic-regent-cait/animations/from-sheet/frame_02_wink_back.png';
+
+  // Roster card anchors — left edges centred on the painted backdrop frames,
+  // top matches the painted frame top (height comes from CSS).
   const slots = [
-    { left: 18.8, top: 74.0 },
-    { left: 29.9, top: 74.0 },
-    { left: 41.0, top: 74.0 },
-    { left: 52.1, top: 74.0 },
-    { left: 63.2, top: 74.0 },
-    { left: 74.4, top: 74.0 },
+    { left: 18.8, top: 73.6 },
+    { left: 29.9, top: 73.6 },
+    { left: 40.7, top: 73.6 },
+    { left: 51.9, top: 73.6 },
+    { left: 62.5, top: 73.6 },
+    { left: 73.1, top: 73.6 },
   ];
 
-  section.dataset.selectedHero = asiphyx.id;
-  section.style.setProperty('--selected-hero-color', theme.accent ?? asiphyx.color);
+  // The nav arrows browse this roster; clamp the persisted index into range.
+  heroSelectFocusIndex = ((heroSelectFocusIndex % roster.length) + roster.length) % roster.length;
+  const focusHero = roster[heroSelectFocusIndex];
+  const focusPlayable = PLAYABLE_HERO_IDS.has(focusHero.id);
+  const focusMystery = !!focusHero.mystery;
+
+  const theme = getHeroTheme(focusHero.id);
+  // Cait's regent form for the focused bond (falls back to asiphyx loadout for
+  // unknown ids). The right-hand splash art stays the Kinetic Regent showcase.
+  const cait = focusMystery ? null : buildCaitCompanion(focusHero.id);
+  const caitRegentSplash = '/assets/heroes/kinetic-regent-cait/kinetic-regent-splash.png';
+
+  section.dataset.selectedHero = focusHero.id;
+  section.style.setProperty('--selected-hero-color', theme.accent ?? focusHero.color);
   section.style.setProperty('--selected-hero-accent-2', theme.accent2 ?? '#00e5ff');
   section.style.setProperty('--selected-hero-danger', theme.danger ?? '#ff3344');
-  section.style.setProperty('--selected-hero-glow', `${theme.accent ?? asiphyx.color}55`);
+  section.style.setProperty('--selected-hero-glow', `${theme.accent ?? focusHero.color}55`);
+
+  const previewSrc = focusHero.selectionPortrait ?? focusHero.portrait ?? focusHero.battlePortrait ?? focusHero.avatar;
+  const crownModule = cait?.modules?.[0]?.name ?? '—';
+  const variantName = focusMystery ? 'Signal Hidden' : cait.bondName;
 
   const board = el('div', 'hero-select-board');
   board.innerHTML = `
     <div class="hero-preview-panel" aria-label="Selected hero preview">
-      <img src="${asiphyx.selectionPortrait ?? asiphyx.portrait}" alt="${escapeHtml(asiphyx.name)} hero select card" />
+      ${focusMystery
+        ? '<span class="mystery-portrait" aria-hidden="true">??</span>'
+        : `<img src="${previewSrc}" alt="${escapeHtml(focusHero.name)} hero select card" />`}
     </div>
-    <div class="cait-regent-preview" aria-label="Kinetic Regent Cait preview">
-      <img src="${escapeHtml(caitRegentSprite)}" alt="Kinetic Regent Cait pixel art" />
-      <span>${escapeHtml(cait.bondName)}</span>
+    <div class="cait-regent-preview" aria-label="Kinetic Regent Cait splash">
+      <img src="${escapeHtml(caitRegentSplash)}" alt="Kinetic Regent Cait splash art" />
     </div>
     <aside class="cait-variant-summary" aria-label="Selected Cait variant summary">
       <span>Cait Variant</span>
-      <strong>${escapeHtml(cait.bondName)}</strong>
-      <p>${escapeHtml(cait.bondLine)}</p>
+      <strong>${escapeHtml(variantName)}</strong>
+      <p>${escapeHtml(focusMystery ? 'This bond is still sealed. Clear the run to unlock more variants.' : cait.bondLine)}</p>
       <dl>
-        <div><dt>Mask</dt><dd>Heart Regent</dd></div>
-        <div><dt>Vector</dt><dd>Gravity Lock</dd></div>
-        <div><dt>Output</dt><dd>${Math.round(cait.reliability * 100)}% Sync</dd></div>
+        <div><dt>Crown</dt><dd>${escapeHtml(crownModule)}</dd></div>
+        <div><dt>Sync</dt><dd>${focusMystery ? '??' : Math.round(cait.reliability * 100) + '%'}</dd></div>
+        <div><dt>Risk</dt><dd>${escapeHtml(focusMystery ? '???' : (cait.risk ?? '—'))}</dd></div>
       </dl>
-      <small>${escapeHtml(cait.role)}</small>
+      <small>${escapeHtml(focusMystery ? 'Unknown bond' : cait.role)}</small>
     </aside>
     <div class="hero-roster-slots" aria-label="Hero roster">
       ${roster.map((hero, index) => {
         const isPlayable = PLAYABLE_HERO_IDS.has(hero.id);
         const heroTheme = getHeroTheme(hero.id);
-        const previewSrc = hero.portrait ?? hero.battlePortrait ?? hero.avatar ?? hero.selectionPortrait;
+        const slotSrc = hero.portrait ?? hero.battlePortrait ?? hero.avatar ?? hero.selectionPortrait;
         const slot = slots[index] ?? slots[slots.length - 1];
+        const heroBond = (!hero.mystery && isPlayable) ? buildCaitCompanion(hero.id).bondName : null;
         return `
           <button
-            class="hero-select-slot ${isPlayable ? 'is-open' : 'is-locked'} ${hero.mystery ? 'is-mystery' : ''}"
+            class="hero-select-slot ${isPlayable ? 'is-open' : 'is-locked'} ${hero.mystery ? 'is-mystery' : ''} ${index === heroSelectFocusIndex ? 'is-focused' : ''}"
             type="button"
+            data-slot-index="${index}"
             data-start-hero="${escapeHtml(hero.id)}"
             style="--slot-left:${slot.left}%; --slot-top:${slot.top}%; --slot-color:${heroTheme.accent ?? hero.color ?? '#9933ff'};"
             aria-disabled="${isPlayable ? 'false' : 'true'}"
@@ -1398,34 +1419,71 @@ function renderHeroSelect() {
           >
             ${hero.mystery
               ? '<span class="mystery-portrait" aria-hidden="true">??</span>'
-              : `<img src="${previewSrc}" alt="" />`}
+              : `<img src="${slotSrc}" alt="" />`}
             <b>${escapeHtml(hero.name)}</b>
             <i>${isPlayable ? 'OPEN' : 'LOCKED'}</i>
             <span class="hero-lock-mark">${isPlayable ? 'RUN' : 'LOCK'}</span>
             <span class="hero-hover-panel">
               <strong>${escapeHtml(hero.name)}</strong>
               <small>${escapeHtml(hero.title)}</small>
-              <em>${isPlayable ? escapeHtml(cait.bondName) : (hero.mystery ? 'Hidden route' : 'Locked for jam build')}</em>
+              <em>${heroBond ? escapeHtml(heroBond) : (hero.mystery ? 'Hidden route' : 'Locked for jam build')}</em>
               <span>${escapeHtml(hero.passive?.name ?? 'Variant pending')}</span>
             </span>
           </button>
         `;
       }).join('')}
     </div>
-    <button class="hero-board-start" type="button" data-start-hero="${escapeHtml(asiphyx.id)}">
-      Start Duo Run
+    <button
+      class="hero-board-start ${focusPlayable ? '' : 'is-disabled'}"
+      type="button"
+      data-start-hero="${escapeHtml(focusHero.id)}"
+      aria-disabled="${focusPlayable ? 'false' : 'true'}"
+    >
+      ${focusPlayable ? 'Start Duo Run' : 'Locked Variant'}
     </button>
+    <button class="hero-board-control hero-board-nav prev" type="button" data-board-nav="-1" aria-label="Previous bond"></button>
+    <button class="hero-board-control hero-board-nav next" type="button" data-board-nav="1" aria-label="Next bond"></button>
+    <button class="hero-board-control hero-board-home" type="button" data-board-home aria-label="Back to title"></button>
+    <button class="hero-board-control hero-board-corner left" type="button" data-board-mute aria-label="Toggle score"></button>
+    <button class="hero-board-control hero-board-corner right" type="button" data-board-menu aria-label="System menu"></button>
   `;
 
-  board.querySelectorAll('[data-start-hero]').forEach((button) => {
+  const startRun = (hero) => {
+    game.selectHero(hero);
+    game.startRun(JAM_RUN_FLOORS, cardPool, enemyCatalogue);
+  };
+
+  // Roster cards: playable hero launches immediately; locked cards browse.
+  board.querySelectorAll('.hero-select-slot').forEach((button) => {
     button.onclick = () => {
-      if (button.dataset.startHero !== asiphyx.id) return;
-      game.selectHero(asiphyx);
-      game.startRun(JAM_RUN_FLOORS, cardPool, enemyCatalogue);
+      const index = Number(button.dataset.slotIndex);
+      if (PLAYABLE_HERO_IDS.has(button.dataset.startHero)) { startRun(roster[index]); return; }
+      heroSelectFocusIndex = index;
+      render();
     };
   });
 
+  // START button launches the focused hero when it is playable.
+  board.querySelector('.hero-board-start').onclick = () => {
+    if (focusPlayable) startRun(focusHero);
+  };
+
+  // Nav arrows browse the roster (wrap-around).
+  board.querySelectorAll('[data-board-nav]').forEach((button) => {
+    button.onclick = () => {
+      const dir = Number(button.dataset.boardNav);
+      heroSelectFocusIndex = ((heroSelectFocusIndex + dir) % roster.length + roster.length) % roster.length;
+      render();
+    };
+  });
+
+  // 'C' emblem → title; corner glyphs → mute / system menu.
+  board.querySelector('[data-board-home]').onclick = () => game.setPhase('title');
+  board.querySelector('[data-board-mute]').onclick = () => toggleIntroMusic(section);
+  board.querySelector('[data-board-menu]').onclick = () => openSystemMenu(false);
+
   section.appendChild(board);
+  appendSystemMenuOverlay(section, false);
   root.appendChild(section);
 }
 
