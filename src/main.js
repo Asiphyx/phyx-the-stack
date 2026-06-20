@@ -1,4 +1,5 @@
 import './index.css';
+import { inject } from '@vercel/analytics';
 import { GameState } from './engine/GameState.js';
 import { HEROES } from './data/heroes.js';
 import { getHeroTheme } from './data/heroThemes.js';
@@ -9,6 +10,9 @@ import { SOUNDTRACK_TRACKS, tracksForDomain } from './data/soundtrack.js';
 import { TUTORIAL_GUIDE } from './data/tutorialGuide.js';
 import bus from './engine/EventBus.js';
 import { initPhaserGame, destroyPhaserGame } from './phaser/PhaserGame.js';
+
+// Initialize Vercel Web Analytics
+inject();
 
 const cardPool = Object.values(CARDS).filter(c => c.rarity !== 'starter');
 const game = new GameState();
