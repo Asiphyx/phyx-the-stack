@@ -1346,15 +1346,16 @@ function renderHeroSelect() {
     mysteryHero,
   ].slice(0, 6);
 
-  // Roster card anchors — left edges centred on the painted backdrop frames,
-  // top matches the painted frame top (height comes from CSS).
+  // Roster card anchors snapped to each painted backdrop frame (measured
+  // individually — the frames narrow slightly left-to-right, so width is
+  // per-slot). top/height come from CSS.
   const slots = [
-    { left: 18.8, top: 73.6 },
-    { left: 29.9, top: 73.6 },
-    { left: 40.7, top: 73.6 },
-    { left: 51.9, top: 73.6 },
-    { left: 62.5, top: 73.6 },
-    { left: 73.1, top: 73.6 },
+    { left: 19.3, width: 9.1, top: 73.6 },
+    { left: 30.3, width: 9.2, top: 73.6 },
+    { left: 41.5, width: 9.0, top: 73.6 },
+    { left: 52.4, width: 9.0, top: 73.6 },
+    { left: 63.3, width: 8.4, top: 73.6 },
+    { left: 73.6, width: 7.9, top: 73.6 },
   ];
 
   // The nav arrows browse this roster; clamp the persisted index into range.
@@ -1413,7 +1414,7 @@ function renderHeroSelect() {
             type="button"
             data-slot-index="${index}"
             data-start-hero="${escapeHtml(hero.id)}"
-            style="--slot-left:${slot.left}%; --slot-top:${slot.top}%; --slot-color:${heroTheme.accent ?? hero.color ?? '#9933ff'};"
+            style="--slot-left:${slot.left}%; --slot-width:${slot.width}%; --slot-top:${slot.top}%; --slot-color:${heroTheme.accent ?? hero.color ?? '#9933ff'};"
             aria-disabled="${isPlayable ? 'false' : 'true'}"
             aria-label="${escapeHtml(hero.name)} ${isPlayable ? 'available' : 'locked'}"
           >
