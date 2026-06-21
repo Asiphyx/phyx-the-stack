@@ -340,10 +340,23 @@ export class CombatScene extends Phaser.Scene {
     this.updateHeroHp();
   }
 
+  getCaitVitals() {
+    const snap = this.gameRef?.getSnapshot();
+    const cait = snap?.cait ?? this.gameRef?.state?.cait;
+    if (!cait) return null;
+
+    const maxHp = Math.max(1, Math.round(Number(cait.maxHp) || 1));
+    return {
+      hp: Math.max(0, Math.round(Number(cait.hp) || 0)),
+      maxHp,
+      block: Math.max(0, Math.round(Number(cait.block) || 0)),
+    };
+  }
+
   updateHeroHp() {
     if (!this.heroHpBar || !this.heroHpBar.active) return;
-    const snap = this.gameRef?.getSnapshot();
-    if (!snap) return;
+    const vitals = this.getCaitVitals();
+    if (!vitals) return;
 
     this.heroHpBar.clear();
 
@@ -357,24 +370,24 @@ export class CombatScene extends Phaser.Scene {
     this.heroHpBar.fillRect(startX, startY, hpWidth, hpHeight);
 
     // HP Fill
-    const pct = Math.max(0, Math.min(1.0, snap.hp / snap.maxHp));
-    const fillCol = snap.hp / snap.maxHp <= 0.35 ? 0xff3344 : (snap.hp / snap.maxHp <= 0.70 ? 0xffcc00 : 0x33ff99);
+    const pct = Math.max(0, Math.min(1.0, vitals.hp / vitals.maxHp));
+    const fillCol = pct <= 0.35 ? 0xff3344 : (pct <= 0.70 ? 0xffcc00 : 0x33ff99);
     this.heroHpBar.fillStyle(fillCol, 1);
     this.heroHpBar.fillRect(startX, startY, hpWidth * pct, hpHeight);
 
     // HP text
     if (this.heroHpText) this.heroHpText.destroy();
-    this.heroHpText = this.add.text(startX + hpWidth / 2, startY - 10, `${snap.hp}/${snap.maxHp} HP`, {
+    this.heroHpText = this.add.text(startX + hpWidth / 2, startY - 10, `Cait ${vitals.hp}/${vitals.maxHp} HP`, {
       fontFamily: 'VT323, monospace',
       fontSize: '12px',
-      color: '#ff3344',
+      color: '#33ff99',
       fontWeight: 'bold'
     }).setOrigin(0.5);
     this.heroSprite.add(this.heroHpText);
 
     // Shield/Block badge
     if (this.heroBlockBadge) this.heroBlockBadge.destroy();
-    if (snap.block > 0) {
+    if (vitals.block > 0) {
       this.heroBlockBadge = this.add.container(startX - 15, startY + 4);
       
       const badgeG = this.add.graphics();
@@ -389,7 +402,7 @@ export class CombatScene extends Phaser.Scene {
       badgeG.closePath();
       badgeG.fillPath();
       
-      const badgeT = this.add.text(0, 0, snap.block.toString(), {
+      const badgeT = this.add.text(0, 0, vitals.block.toString(), {
         fontFamily: 'VT323, monospace',
         fontSize: '10px',
         color: '#000000',
