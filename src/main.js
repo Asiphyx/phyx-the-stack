@@ -90,6 +90,8 @@ let musicBlockedToastShown = false;
 let interactionPulse = 0;
 let interactionPulseTimer = null;
 let systemMenuOpen = false;
+let feedbackOpen = false;
+let feedbackSent = false;
 let titleWindowOffset = { x: 0, y: 0 };
 let titleLauncherOpen = false;
 let caitCodecOffset = { x: 0, y: 0 };
@@ -230,19 +232,20 @@ function render() {
   }
 
   switch (snapshot.phase) {
-    case 'title': renderTitle(); return;
+    case 'title': renderTitle(); appendFeedbackWidget(root); return;
     case 'heroSelect': renderHeroSelect(); break;
-    case 'caitdex': renderCaitdex(); return;
+    case 'caitdex': renderCaitdex(); appendFeedbackWidget(root); return;
     case 'map': renderMap(); break;
     case 'combat': renderCombat(); break;
     case 'draft': renderDraft(); break;
     case 'gameOver': renderGameOver(); break;
     case 'victory': renderVictory(); break;
-    default: renderTitle(); return;
+    default: renderTitle(); appendFeedbackWidget(root); return;
   }
 
   // Attach persistent music controls for non-title phases
   appendMusicControlBar();
+  appendFeedbackWidget(root);
 }
 
 function pruneStagedCommands() {
@@ -2567,6 +2570,96 @@ function openSystemMenu(canSave = true) {
 function closeSystemMenu() {
   systemMenuOpen = false;
   render();
+}
+
+const FEEDBACK_STORAGE_KEY = 'phyx_feedback_log';
+
+function storeFeedbackLocally(entry) {
+  try {
+    const existing = JSON.parse(localStorage.getItem(FEEDBACK_STORAGE_KEY) ?? '[]');
+    existing.push(entry);
+    localStorage.setItem(FEEDBACK_STORAGE_KEY, JSON.stringify(existing));
+  } catch {
+    // localStorage unavailable (private mode, quota) — the GitHub tab is the durable copy.
+  }
+}
+
+function openFeedbackForm() {
+  feedbackOpen = true;
+  feedbackSent = false;
+  render();
+}
+
+function closeFeedbackForm() {
+  feedbackOpen = false;
+  render();
+}
+
+function submitFeedback(text) {
+  const trimmed = text.trim();
+  if (!trimmed) return;
+  const snapshot = game.getSnapshot();
+  const entry = {
+    text: trimmed,
+    phase: snapshot.phase,
+    floor: snapshot.floor ?? null,
+    timestamp: new Date().toISOString(),
+    userAgent: navigator.userAgent,
+  };
+  storeFeedbackLocally(entry);
+
+  const title = `Player feedback: ${trimmed.slice(0, 60)}`;
+  const body = [
+    trimmed,
+    '',
+    '---',
+    `Phase: ${entry.phase}`,
+    `Floor: ${entry.floor ?? 'n/a'}`,
+    `Sent: ${entry.timestamp}`,
+  ].join('\n');
+  const issueUrl = `https://github.com/Asiphyx/phyx-the-stack/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`;
+  window.open(issueUrl, '_blank', 'noopener');
+
+  feedbackSent = true;
+  render();
+}
+
+function appendFeedbackWidget(container) {
+  const button = el('button', 'feedback-button');
+  button.type = 'button';
+  button.innerHTML = '<span>FEEDBACK</span>';
+  button.onclick = () => openFeedbackForm();
+  container.appendChild(button);
+
+  if (!feedbackOpen) return;
+
+  container.insertAdjacentHTML('beforeend', `
+    <div class="feedback-overlay" role="dialog" aria-modal="true" aria-label="Send feedback">
+      <div class="feedback-backdrop" data-close-feedback></div>
+      <div class="feedback-panel">
+        <div class="feedback-header">
+          <span>// SEND FEEDBACK</span>
+          <button class="feedback-close" data-close-feedback aria-label="Close feedback">x</button>
+        </div>
+        ${feedbackSent
+          ? `<p class="feedback-sent">Thanks! Your comment was saved and a GitHub issue tab was opened — submit it to file the report.</p>
+             <button class="feedback-submit" data-close-feedback type="button">Close</button>`
+          : `<textarea class="feedback-textarea" placeholder="What's broken, confusing, or missing?" autofocus></textarea>
+             <button class="feedback-submit" data-submit-feedback type="button">Send</button>`}
+      </div>
+    </div>
+  `);
+
+  container.querySelectorAll('[data-close-feedback]').forEach(node => {
+    node.onclick = () => closeFeedbackForm();
+  });
+  const submitBtn = container.querySelector('[data-submit-feedback]');
+  if (submitBtn) {
+    submitBtn.onclick = () => {
+      const textarea = container.querySelector('.feedback-textarea');
+      submitFeedback(textarea?.value ?? '');
+    };
+  }
 }
 
 function wireSaveStateControls(scope) {

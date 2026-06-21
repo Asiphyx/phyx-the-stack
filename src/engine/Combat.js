@@ -1221,7 +1221,8 @@ export class Combat {
 
       if (damageDealt > 0 && (kineticBonus > 0 || potentialDrain > 0)) {
         this.combatState.latentKineticPotential -= potentialDrain;
-        bus.emit('toast', { text: `Kinetic Regent: +${kineticBonus + potentialDrain} from combo (${this.combatState.kineticComboStacks}) & potential (${potentialDrain}).`, type: 'passive' });
+        const strikeTag = attackCount > 1 ? ` (strike ${action + 1}/${attackCount})` : '';
+        bus.emit('toast', { text: `Kinetic Regent: +${kineticBonus + potentialDrain} from combo (${this.combatState.kineticComboStacks}) & potential (${potentialDrain})${strikeTag}.`, type: 'passive' });
       }
 
       if (damageDealt <= 0) {
