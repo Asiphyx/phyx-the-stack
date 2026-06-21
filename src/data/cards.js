@@ -114,7 +114,7 @@ export const CARDS = {
   memory_leak: {
     id: 'memory_leak',
     name: 'Memory Leak',
-    description: 'Unplayable. When drawn, lose 1 Energy.',
+    description: 'Unplayable fault module. Clogs the active hand until the stack cycles.',
     flavor: 'Where did the RAM go?',
     cost: 1,
     rarity: 'debt',
@@ -412,13 +412,14 @@ export const CARDS = {
   microservices: {
     id: 'microservices',
     name: 'Microservices',
-    description: 'All modules cost 1 less for the rest of combat.',
+    description: 'At the start of each turn, draw 1 extra module.',
     flavor: 'Distributed everything.',
     cost: 3,
     rarity: 'rare',
     type: 'power',
+    unique: true,
     effects: [
-      { type: 'reduce_all_costs', value: 1 },
+      { type: 'start_of_turn_draw', value: 1 },
     ],
     heroOnly: null,
     emoji: '🏗️',
@@ -599,7 +600,7 @@ export const CARDS = {
   cait_momentum: {
     id: 'cait_momentum',
     name: 'Cait Momentum',
-    description: 'Cait attacks one extra time on her next turn. Gain 4 block.',
+    description: 'Cait attacks one extra time during the next stack payoff. Gain 4 block.',
     flavor: 'Asiphyx does not swing. He changes the fall.',
     cost: 1,
     rarity: 'uncommon',

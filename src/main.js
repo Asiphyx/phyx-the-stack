@@ -49,6 +49,7 @@ if (audioModuleSprite) {
   audioModuleSprite.src = AUDIO_MODULE_SPRITE.src;
 }
 
+const gameRoot = document.querySelector('#game-root');
 const root = document.querySelector('#screen-container');
 const damageLayer = document.querySelector('#damage-numbers-layer');
 const toastLayer = document.querySelector('#toast-layer');
@@ -58,6 +59,9 @@ let activeDraft = [];
 let selectedTarget = 0;
 let stagedCommands = [];
 let stagedCommandSequence = 0;
+let turnBannerShowTimer = null;
+let turnBannerHideTimer = null;
+let turnBannerToken = 0;
 const MODULE_SIDE_LIMIT = 3;
 const COMBAT_TOP_MODULE_PREVIEW = 10;
 let battleLog = [];
@@ -168,16 +172,7 @@ bus.on('enemyAction', ({ enemy, action }) => {
   setTimeout(() => root.classList.remove('screen-shake'), 300);
 });
 
-bus.on('turnPhase', ({ phase }) => {
-  const labels = {
-    cait: 'CAIT STRIKES',
-    module: 'MODULE RESOLVE',
-    enemy: 'ENEMY TURN',
-    player: 'PLAYER TURN',
-  };
-  const label = labels[phase];
-  if (!label) return;
-  // Use persistent body-level banner that survives re-renders
+function showTurnPhaseBanner(phase, label) {
   let banner = document.getElementById('phyx-turn-banner');
   if (!banner) {
     banner = document.createElement('div');
@@ -187,13 +182,42 @@ bus.on('turnPhase', ({ phase }) => {
   }
   banner.textContent = label;
   banner.dataset.phase = phase;
+  banner.classList.toggle('is-combat-phase', game.getSnapshot().phase === 'combat');
   banner.classList.add('is-visible');
+  if (turnBannerHideTimer) clearTimeout(turnBannerHideTimer);
+  turnBannerHideTimer = setTimeout(() => {
+    banner.classList.remove('is-visible');
+  }, 900);
+}
+
+bus.on('turnPhase', ({ phase, delayMs = 0 }) => {
+  const labels = {
+    cait: 'CAIT STRIKES',
+    module: 'MODULE RESOLVE',
+    enemy: 'ENEMY TURN',
+    player: 'PLAYER TURN',
+  };
+  const label = labels[phase];
+  if (!label) return;
+  const token = ++turnBannerToken;
+  if (turnBannerShowTimer) {
+    clearTimeout(turnBannerShowTimer);
+    turnBannerShowTimer = null;
+  }
+  if (delayMs > 0) {
+    turnBannerShowTimer = setTimeout(() => {
+      if (token === turnBannerToken) showTurnPhaseBanner(phase, label);
+    }, delayMs);
+    return;
+  }
+  showTurnPhaseBanner(phase, label);
 });
 
 render();
 
 function render() {
   const snapshot = game.getSnapshot();
+  if (gameRoot) gameRoot.dataset.phase = snapshot.phase;
   root.innerHTML = '';
   prepareMusicForPhase(snapshot.phase);
 
@@ -221,11 +245,32 @@ function render() {
 
 function pruneStagedCommands() {
   const handIds = new Set(game.state.hand.map(card => card.instanceId));
+  const enemyIds = new Set(game.state.enemies.map(enemy => enemy.id));
   stagedCommands = stagedCommands.filter(command => handIds.has(command.instanceId));
+  stagedCommands = stagedCommands.map(command => {
+    if ((command.side ?? 'enemy') !== 'enemy') return command;
+    if (command.targetId && enemyIds.has(command.targetId)) {
+      return {
+        ...command,
+        targetIndex: game.state.enemies.findIndex(enemy => enemy.id === command.targetId),
+      };
+    }
+    const fallbackIndex = Math.max(0, Math.min(command.targetIndex ?? 0, game.state.enemies.length - 1));
+    return {
+      ...command,
+      targetIndex: fallbackIndex,
+      targetId: game.state.enemies[fallbackIndex]?.id ?? null,
+    };
+  });
+  if (selectedTarget >= game.state.enemies.length) {
+    selectedTarget = Math.max(0, game.state.enemies.length - 1);
+  }
 }
 
 function commandTargetName(command) {
-  const target = game.state.enemies[command.targetIndex];
+  const target = command.targetId
+    ? game.state.enemies.find(enemy => enemy.id === command.targetId)
+    : game.state.enemies[command.targetIndex];
   return target?.name ?? 'Auto Target';
 }
 
@@ -276,8 +321,9 @@ function stageCommand(instanceId, targetIndex = selectedTarget ?? 0, requestedSi
     logBattleEvent('Socket occupied // choose an open slot', 'danger');
     return;
   }
-  const finalTargetIndex = side === 'enemy' ? targetIndex : selectedTarget ?? 0;
-  stagedCommands.push({ instanceId, targetIndex: finalTargetIndex, side, slotIndex, order: stagedCommandSequence++ });
+  const finalTargetIndex = Math.max(0, Math.min(side === 'enemy' ? targetIndex : selectedTarget ?? 0, game.state.enemies.length - 1));
+  const targetId = side === 'enemy' ? game.state.enemies[finalTargetIndex]?.id ?? null : null;
+  stagedCommands.push({ instanceId, targetIndex: finalTargetIndex, targetId, side, slotIndex, order: stagedCommandSequence++ });
   logBattleEvent(`PLUGGED ${commandVerb(card)} :: ${card.name} -> ${side === 'self' ? 'Cait' : 'User Path'} ${slotIndex + 1}`, 'info');
   render();
 }
@@ -1658,8 +1704,16 @@ function renderCombat() {
   if ((combatSnapshot?.caitDamageMult ?? 1) > 1) {
     statusChips.push(`FOLLOWUP x${Number(combatSnapshot.caitDamageMult).toFixed(2)}`);
   }
+  if ((combatSnapshot?.currentTurnDrawPenalty ?? 0) > 0) {
+    statusChips.push(`DRAW JAM -${combatSnapshot.currentTurnDrawPenalty}`);
+  }
+  if ((combatSnapshot?.startOfTurnDraw ?? 0) > 0) {
+    statusChips.push(`DRAW +${combatSnapshot.startOfTurnDraw}`);
+  }
   if ((combatSnapshot?.markedTargetIndex ?? null) != null) {
-    const markedTargetName = state.enemies[combatSnapshot.markedTargetIndex]?.name;
+    const markedTargetName = combatSnapshot.markedTargetId
+      ? state.enemies.find(enemy => enemy.id === combatSnapshot.markedTargetId)?.name
+      : state.enemies[combatSnapshot.markedTargetIndex]?.name;
     statusChips.push(`MARK ${markedTargetName ?? 'ENEMY'}`);
   }
   const statusChipMarkup = statusChips.length > 0
@@ -2316,6 +2370,11 @@ function renderDraft() {
       for (const [i, card] of draft.offeredCards.entries()) {
         const wrap = el('div', 'draft-card-wrapper');
         const cardEl = renderCard(card, i, true);
+        cardEl.classList.add('draft-module-card');
+        cardEl.insertAdjacentHTML('beforeend', `
+          <div class="draft-module-description">${escapeHtml(card.description ?? 'No description available.')}</div>
+          <div class="draft-module-meta">${escapeHtml((card.rarity ?? 'common').toUpperCase())} // ${escapeHtml((card.tags ?? []).slice(0, 2).join(' / ') || card.type || 'module')}</div>
+        `);
         cardEl.onclick = (e) => {
           e.stopPropagation();
           draft.pickCard(i);
@@ -2577,10 +2636,15 @@ function onDamageEvent(event) {
 
 function emitToast(text, type = 'info') {
   logBattleEvent(text, type);
-  const t = el('div', `toast ${type}`);
+  const isCombat = game.getSnapshot().phase === 'combat';
+  if (isCombat) {
+    const combatToasts = [...toastLayer.querySelectorAll('.toast.combat-toast')];
+    for (const toast of combatToasts.slice(2)) toast.remove();
+  }
+  const t = el('div', `toast ${type}${isCombat ? ' combat-toast' : ''}`);
   t.textContent = text;
   toastLayer.appendChild(t);
-  setTimeout(() => t.remove(), 2500);
+  setTimeout(() => t.remove(), isCombat ? 1450 : 2500);
 }
 
 // ──────────────────────────────────────────────────────────
@@ -2652,6 +2716,7 @@ function intentLabel(intent) {
     case 'attack': return `Attack ${intent.value}`;
     case 'block': return `Block +${intent.value}`;
     case 'buff': return `Buff +${intent.value ?? 0}`;
+    case 'heal': return `Heal ${intent.value ?? 0} HP`;
     case 'debuff': return `Debuff${intent.value ? ` -${intent.value}` : ''}`;
     case 'summon': return 'Summon';
     default: return intent.type;
@@ -2664,12 +2729,22 @@ function nodeLabel(type) {
 }
 
 function buildEnemyCatalogue() {
-  const normalIds = new Set([...ENCOUNTERS.easy.flat(), ...ENCOUNTERS.medium.flat()]);
+  const easyIds = new Set(ENCOUNTERS.easy.flat());
+  const mediumIds = new Set(ENCOUNTERS.medium.flat());
+  const hardIds = new Set(ENCOUNTERS.hard.flat());
+  const normalIds = new Set([...easyIds, ...mediumIds]);
   // legacy_codebase is tier:'boss' (120 HP) — NOT an elite. Leaving it in the
   // elite pool caused a 173 HP / 17-turn cliff at floor 5. Use true elites only.
   const eliteIds = ['tech_debt', 'race_condition'];
   const bossIds = ['budder_sphinx'];
   return {
+    byId: ENEMIES,
+    easyGroups: ENCOUNTERS.easy.map(group => [...group]),
+    mediumGroups: ENCOUNTERS.medium.map(group => [...group]),
+    hardGroups: ENCOUNTERS.hard.map(group => [...group]),
+    easy: [...easyIds].map(id => ENEMIES[id]).filter(Boolean),
+    medium: [...mediumIds].map(id => ENEMIES[id]).filter(Boolean),
+    hard: [...hardIds].map(id => ENEMIES[id]).filter(Boolean),
     normal: [...normalIds].map(id => ENEMIES[id]).filter(Boolean),
     elite: eliteIds.map(id => ENEMIES[id]).filter(Boolean),
     boss: bossIds.map(id => ENEMIES[id]).filter(Boolean),
@@ -2720,6 +2795,10 @@ function renderGameToText() {
   const selectedHeroId = heroSelectScreen?.dataset?.selectedHero ?? state.hero?.id ?? 'asiphyx';
   const selectedHero = HEROES[selectedHeroId] ?? HEROES.asiphyx;
   const cait = state.cait ?? buildCaitCompanion(selectedHeroId);
+  const combatSnapshot = game.combat && typeof game.combat._snapshot === 'function' ? game.combat._snapshot() : null;
+  const markedEnemy = combatSnapshot?.markedTargetId
+    ? state.enemies.find(enemy => enemy.id === combatSnapshot.markedTargetId)
+    : (combatSnapshot?.markedTargetIndex != null ? state.enemies[combatSnapshot.markedTargetIndex] : null);
   const payload = {
     mode: snap.phase,
     selectedHero: selectedHero ? {
@@ -2757,12 +2836,21 @@ function renderGameToText() {
         user: `${stagedCommands.filter(command => (command.side ?? 'enemy') === 'enemy').length}/${MODULE_SIDE_LIMIT}`,
         cait: `${stagedCommands.filter(command => (command.side ?? 'enemy') === 'self').length}/${MODULE_SIDE_LIMIT}`,
       },
+      flow: {
+        caitPayoffAfterModules: state.hero?.id === 'asiphyx',
+        caitExtraActions: combatSnapshot?.caitExtraActions ?? 0,
+        kineticComboStacks: combatSnapshot?.kineticComboStacks ?? 0,
+        currentTurnDrawPenalty: combatSnapshot?.currentTurnDrawPenalty ?? 0,
+        startOfTurnDraw: combatSnapshot?.startOfTurnDraw ?? 0,
+        markedTarget: markedEnemy ? { id: markedEnemy.id, name: markedEnemy.name } : null,
+      },
       stagedCommands: stagedCommands.map(command => {
         const card = state.hand.find(c => c.instanceId === command.instanceId);
         return {
           id: card?.id ?? null,
           name: card?.name ?? null,
           target: commandTargetName(command),
+          targetId: command.targetId ?? null,
           path: card ? speedLabel(card) : null,
           side: (command.side ?? 'enemy') === 'self' ? 'cait' : 'user',
         };

@@ -147,17 +147,57 @@ export class FloorManager {
 
       case NODE_TYPE.COMBAT:
       default: {
+        const groupPool = this._normalGroupPoolForDifficulty(catalogue, difficulty);
+        if (groupPool.length > 0) {
+          const group = this._pick(groupPool);
+          return group
+            .map(id => this._resolveTemplate(catalogue, id))
+            .filter(Boolean)
+            .map((template, index) => this._instantiateEnemy(template, hpScale, index))
+            .filter(Boolean);
+        }
+
         // 1-3 normal enemies depending on difficulty
-        const count = Math.min(difficulty, catalogue.normal.length);
+        const pool = this._normalPoolForDifficulty(catalogue, difficulty);
+        const count = Math.min(difficulty, pool.length);
         const enemies = [];
         for (let i = 0; i < count; i++) {
-          const template = this._pick(catalogue.normal);
+          const template = this._pick(pool);
           enemies.push(this._instantiateEnemy(template, hpScale, i));
         }
         return enemies;
       }
     }
   }
+
+  _normalGroupPoolForDifficulty(catalogue, difficulty) {
+    if (difficulty <= 1 && catalogue.easyGroups?.length) return catalogue.easyGroups;
+    if (difficulty === 2 && catalogue.mediumGroups?.length) return catalogue.mediumGroups;
+    if (difficulty >= 3 && catalogue.hardGroups?.length) return catalogue.hardGroups;
+    return [];
+  }
+
+  _normalPoolForDifficulty(catalogue, difficulty) {
+    if (difficulty <= 1 && catalogue.easy?.length) return catalogue.easy;
+    if (difficulty === 2 && catalogue.medium?.length) return catalogue.medium;
+    if (difficulty >= 3 && catalogue.hard?.length) return catalogue.hard;
+    return catalogue.normal ?? [];
+  }
+
+  _resolveTemplate(catalogue, id) {
+    if (!id) return null;
+    if (catalogue.byId?.[id]) return catalogue.byId[id];
+    const all = [
+      ...(catalogue.easy ?? []),
+      ...(catalogue.medium ?? []),
+      ...(catalogue.hard ?? []),
+      ...(catalogue.normal ?? []),
+      ...(catalogue.elite ?? []),
+      ...(catalogue.boss ?? []),
+    ];
+    return all.find(template => template?.id === id || template?.templateId === id) ?? null;
+  }
+
 
   /**
    * Create a concrete enemy instance from a template.

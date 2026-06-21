@@ -6,6 +6,42 @@
 
 import bus from './EventBus.js';
 
+function isCompileRewardEligible(card) {
+  if (!card) return false;
+  if (card.rarity === 'debt') return false;
+  if (card.tags?.includes('curse')) return false;
+  return true;
+}
+
+function compileOfferWeight(card) {
+  switch (card?.rarity) {
+    case 'rare':
+      return 1;
+    case 'uncommon':
+      return 3;
+    case 'starter':
+      return 2;
+    case 'common':
+    default:
+      return 6;
+  }
+}
+
+function pickWeightedOffers(cards, count) {
+  const pool = [...cards];
+  const offers = [];
+  while (pool.length > 0 && offers.length < count) {
+    const totalWeight = pool.reduce((sum, card) => sum + compileOfferWeight(card), 0);
+    let roll = Math.random() * totalWeight;
+    const index = pool.findIndex((card) => {
+      roll -= compileOfferWeight(card);
+      return roll <= 0;
+    });
+    offers.push(pool.splice(index >= 0 ? index : pool.length - 1, 1)[0]);
+  }
+  return offers;
+}
+
 export class DraftSystem {
   /**
    * @param {import('./GameState.js').GameState} gameState
@@ -73,9 +109,10 @@ export class DraftSystem {
       this.draftType = 'compile_select';
       // Pick 3 random modules to show.
       const owned = new Set(this.gs.state.deck.map(c => c.id));
-      const eligible = this.cardPool.filter(c => !c.unique || !owned.has(c.id));
-      const shuffled = [...eligible].sort(() => Math.random() - 0.5);
-      this.offeredCards = shuffled.slice(0, 3).map(c => ({ ...c }));
+      const eligible = this.cardPool
+        .filter(isCompileRewardEligible)
+        .filter(c => !c.unique || !owned.has(c.id));
+      this.offeredCards = pickWeightedOffers(eligible, 3).map(c => ({ ...c }));
     }
 
     bus.emit('draftOffered', {

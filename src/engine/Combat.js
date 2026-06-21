@@ -13,6 +13,9 @@ import { ENEMIES } from '../data/enemies.js';
 
 const STARTING_CARDS_PER_TURN = 2;
 const MAX_HAND_SIZE = 8;
+const MAX_ACTIVE_ENEMIES = 3;
+const SUMMON_HP_MULTIPLIER = 0.6;
+const POST_COMBAT_REPAIR_RATIO = 0.05;
 
 // ── Helpers ────────────────────────────────────────────────
 
@@ -69,6 +72,7 @@ export class Combat {
       // Costs / card flow
       costReduction: 0,
       startOfTurnBlock: 0,
+      startOfTurnDraw: 0,
       endOfTurnBlock: 0,
       retainPlayerBlock: false,
       doubleNextCard: false,
@@ -77,6 +81,8 @@ export class Combat {
       isFirstCardThisTurn: true,
       asiphyxShuffleThisTurn: false,
       asiphyxStunned: false,
+      nextTurnDrawPenalty: 0,
+      currentTurnDrawPenalty: 0,
       playerSpeedDelta: 0,
       enemySpeedDelta: 0,
       endTurnExhaustIds: new Set(),
@@ -94,6 +100,7 @@ export class Combat {
       // Gravity Well system (Asiphyx tank mechanic)
       gravityWellActive: false,       // when true, all enemy damage hits player instead of Cait
       markedTargetIndex: null,        // forces Cait to target a specific enemy
+      markedTargetId: null,           // stable enemy id so stack target locks survive enemy deaths/reordering
       markedTargetCritMult: 1.0,      // one-shot Cait crit multiplier against the marked target
       caitDamageMult: 1.0,            // multiplier for Cait's next attack
       caitExtraActions: 0,            // extra Cait attacks queued by duo-control cards
@@ -130,6 +137,7 @@ export class Combat {
       lastAttackCard: this.combatState.lastAttackCard ? { ...this.combatState.lastAttackCard } : null,
       gravityWellActive: this.combatState.gravityWellActive,
       markedTargetIndex: this.combatState.markedTargetIndex,
+      markedTargetId: this.combatState.markedTargetId,
       markedTargetCritMult: this.combatState.markedTargetCritMult,
       caitDamageMult: this.combatState.caitDamageMult,
       caitExtraActions: this.combatState.caitExtraActions,
@@ -198,9 +206,9 @@ export class Combat {
   // ────────────────────────────────────────────────────────
 
   /** Begin a new player turn. */
-  startPlayerTurn() {
+  startPlayerTurn(options = {}) {
     const s = this.gs.state;
-    bus.emit('turnPhase', { phase: 'player' });
+    bus.emit('turnPhase', { phase: 'player', delayMs: options.phaseDelayMs ?? 0 });
 
     // Apply block reset / retention rules
     if (!this.combatState.retainPlayerBlock) {
@@ -218,6 +226,7 @@ export class Combat {
     // Reset gravity well flags (one-turn duration)
     this.combatState.gravityWellActive = false;
     this.combatState.markedTargetIndex = null;
+    this.combatState.markedTargetId = null;
     this.combatState.markedTargetCritMult = 1.0;
     this.combatState.caitDamageMult = 1.0;
     this.combatState.caitExtraActions = 0;
@@ -247,7 +256,18 @@ export class Combat {
       }
     }
 
-    this.drawCards(STARTING_CARDS_PER_TURN);
+    const drawPenalty = Math.max(0, this.combatState.nextTurnDrawPenalty ?? 0);
+    const drawBonus = Math.max(0, this.combatState.startOfTurnDraw ?? 0);
+    const drawCount = Math.max(1, STARTING_CARDS_PER_TURN + drawBonus - drawPenalty);
+    this.combatState.nextTurnDrawPenalty = 0;
+    this.combatState.currentTurnDrawPenalty = drawPenalty;
+    if (drawPenalty > 0) {
+      bus.emit('toast', { text: `Stack jammed: -${drawPenalty} module draw.`, type: 'enemy' });
+    }
+    if (drawBonus > 0) {
+      bus.emit('toast', { text: `Distributed stack: +${drawBonus} module draw.`, type: 'passive' });
+    }
+    this.drawCards(drawCount);
     bus.emit('combatUpdate', this._snapshot());
   }
 
@@ -305,9 +325,10 @@ export class Combat {
    * Attempt to play a card from hand.
    * @param {number} handIndex
    * @param {number|null} targetIndex
+   * @param {{deferWinCheck?: boolean}} options
    * @returns {boolean}
    */
-  playCard(handIndex, targetIndex = 0) {
+  playCard(handIndex, targetIndex = 0, options = {}) {
     const s = this.gs.state;
     const card = s.hand[handIndex];
     if (!card) return false;
@@ -350,8 +371,7 @@ export class Combat {
 
     if (hasGravityTarget) {
       this.combatState.kineticComboStacks = Math.min(5, this.combatState.kineticComboStacks + 1);
-      this.combatState.caitExtraActions += 1;
-      bus.emit('toast', { text: `Kinetic Combo ${this.combatState.kineticComboStacks}/5 — Cait follow-up queued.`, type: 'passive' });
+      bus.emit('toast', { text: `Kinetic Combo ${this.combatState.kineticComboStacks}/5 — Cait payoff primed.`, type: 'passive' });
     }
 
     if (hasDefense) {
@@ -370,7 +390,7 @@ export class Combat {
     s.enemies = s.enemies.filter(e => e.hp > 0);
     bus.emit('combatUpdate', this._snapshot());
     if (s.enemies.length === 0) {
-      this._combatWon();
+      if (!options.deferWinCheck) this._combatWon();
       return true;
     }
 
@@ -401,9 +421,6 @@ export class Combat {
 
     const timeline = [];
     const heroIsKineticRegent = s.hero?.id === 'asiphyx' && this.combatState.kineticRegentFirstStrike;
-    if (heroIsKineticRegent && !this.combatState.asiphyxStunned && s.cait) {
-      timeline.push({ kind: 'cait', lane: 'first', priority: -999, order: -999 });
-    }
 
     for (const command of commands) {
       const card = s.hand.find(c => c.instanceId === command.instanceId);
@@ -415,6 +432,15 @@ export class Combat {
         priority: this._speedPriority(lane, this.combatState.playerSpeedDelta),
         order: command.order ?? command.slotIndex ?? 0,
         command,
+      });
+    }
+
+    if (heroIsKineticRegent && !this.combatState.asiphyxStunned && s.cait) {
+      timeline.push({
+        kind: 'cait',
+        lane: 'payoff',
+        priority: this._speedPriority('normal', this.combatState.playerSpeedDelta),
+        order: 99,
       });
     }
 
@@ -443,17 +469,22 @@ export class Combat {
         lastPhase = action.kind;
       }
       if (action.kind === 'cait') {
-        this._executeCaitTurn({ decayCombo: false, resetExtraActions: false });
+        this._executeCaitTurn({ decayCombo: false, resetExtraActions: false, deferWinCheck: true });
         continue;
       }
       if (action.kind === 'module') {
+        if (action.command.targetId) {
+          const liveTargetIndex = s.enemies.findIndex(enemy => enemy.id === action.command.targetId);
+          if (liveTargetIndex >= 0) action.command.targetIndex = liveTargetIndex;
+        }
         const handIndex = s.hand.findIndex(card => card.instanceId === action.command.instanceId);
-        if (handIndex >= 0) this.playCard(handIndex, action.command.targetIndex ?? 0);
+        if (handIndex >= 0) this.playCard(handIndex, action.command.targetIndex ?? 0, { deferWinCheck: true });
         continue;
       }
       if (action.kind === 'enemy') {
         if (!s.enemies.includes(action.enemy) || action.enemy.hp <= 0) continue;
-        this._executeEnemyIntent(action.enemy, action.intent);
+        const liveIntent = action.enemy.pattern[action.enemy.patternIndex] ?? action.intent;
+        this._executeEnemyIntent(action.enemy, liveIntent);
         action.enemy.patternIndex = (action.enemy.patternIndex + 1) % Math.max(1, action.enemy.pattern.length);
       }
     }
@@ -477,7 +508,7 @@ export class Combat {
     this.combatState.caitExtraActions = 0;
     this.combatState.kineticComboStacks = Math.max(0, this.combatState.kineticComboStacks - 1);
     bus.emit('combatUpdate', this._snapshot());
-    this.startPlayerTurn();
+    this.startPlayerTurn({ phaseDelayMs: 3400 });
     return true;
   }
 
@@ -493,7 +524,7 @@ export class Combat {
   _speedLaneForEnemyIntent(intent) {
     if (intent.speed) return intent.speed;
     if (intent.type === 'block' || intent.type === 'debuff') return 'fast';
-    if (intent.type === 'buff' || intent.type === 'summon') return 'slow';
+    if (intent.type === 'buff' || intent.type === 'heal' || intent.type === 'summon') return 'slow';
     return 'normal';
   }
 
@@ -655,6 +686,11 @@ export class Combat {
           this.combatState.startOfTurnBlock += toDisplayInt(effect.value ?? 0);
           break;
         }
+        case 'start_of_turn_draw': {
+          this.combatState.startOfTurnDraw += toDisplayInt(effect.value ?? 0);
+          bus.emit('toast', { text: `${card.name}: +${toDisplayInt(effect.value ?? 0)} module draw each turn.`, type: 'passive' });
+          break;
+        }
         case 'end_of_turn_block': {
           this.combatState.endOfTurnBlock += toDisplayInt(effect.value ?? 0);
           break;
@@ -773,6 +809,7 @@ export class Combat {
           this.combatState.markedTargetIndex = targetIndex;
           const enemy = s.enemies[targetIndex];
           if (enemy) {
+            this.combatState.markedTargetId = enemy.id;
             bus.emit('toast', { text: `${enemy.name} marked for Cait.`, type: 'passive' });
           }
           break;
@@ -782,6 +819,7 @@ export class Combat {
           this.combatState.markedTargetCritMult = Math.max(1, effect.value ?? 1.75);
           const enemy = s.enemies[targetIndex];
           if (enemy) {
+            this.combatState.markedTargetId = enemy.id;
             const crit = Math.round(this.combatState.markedTargetCritMult * 100);
             bus.emit('toast', { text: `${enemy.name}'s center of gravity marked. Cait crit ${crit}%.`, type: 'passive' });
           }
@@ -819,13 +857,26 @@ export class Combat {
               switch (intent.type) {
                 case 'attack':
                 case 'attackAll':
-                  enemy.pattern[enemy.patternIndex] = { ...intent, type: 'block' };
+                  enemy.pattern[enemy.patternIndex] = {
+                    ...intent,
+                    type: 'block',
+                    description: `Redirected Guard — Gain ${toDisplayInt(intent.value ?? 0)} block.`,
+                  };
                   break;
                 case 'buff':
-                  enemy.pattern[enemy.patternIndex] = { ...intent, type: 'debuff' };
+                  enemy.pattern[enemy.patternIndex] = {
+                    ...intent,
+                    type: 'debuff',
+                    description: `Redirected Fault — Jam next draw by ${toDisplayInt(intent.value ?? 1)} module.`,
+                  };
                   break;
                 case 'debuff':
-                  enemy.pattern[enemy.patternIndex] = { ...intent, type: 'block', value: 0 };
+                  enemy.pattern[enemy.patternIndex] = {
+                    ...intent,
+                    type: 'block',
+                    value: 0,
+                    description: 'Redirected Null Guard — no effect.',
+                  };
                   break;
                 default:
                   break;
@@ -1120,7 +1171,8 @@ export class Combat {
     if (allowCait) {
       // Cait acts autonomously between player and enemy turns only after a committed stack.
       bus.emit('turnPhase', { phase: 'cait' });
-      this._executeCaitTurn();
+      const caitEndedCombat = this._executeCaitTurn();
+      if (caitEndedCombat || s.phase !== 'combat' || s.enemies.length === 0 || s.hp <= 0) return;
     } else if (reason === 'wait') {
       bus.emit('toast', { text: 'WAIT // no routed modules, Cait holds fire.', type: 'enemy' });
     }
@@ -1139,9 +1191,9 @@ export class Combat {
    * Siphon heals Asiphyx based on damage dealt.
    */
   _executeCaitTurn(options = {}) {
-    const { decayCombo = true, resetExtraActions = true } = options;
+    const { decayCombo = true, resetExtraActions = true, deferWinCheck = false } = options;
     const s = this.gs.state;
-    if (!s.cait || s.enemies.length === 0) return;
+    if (!s.cait || s.enemies.length === 0) return false;
 
     const reliability = Math.min(0.98, Math.max(0.75, s.cait.reliability ?? 0.6));
     const baseDamage = 6 + Math.floor(s.floor * 0.66);
@@ -1180,7 +1232,9 @@ export class Combat {
       // Pick target: marked target first, else random
       let target;
       const markedIndex = this.combatState.markedTargetIndex;
-      const markedTarget = markedIndex !== null ? s.enemies[markedIndex] : null;
+      const markedTarget = this.combatState.markedTargetId
+        ? s.enemies.find(enemy => enemy.id === this.combatState.markedTargetId)
+        : (markedIndex !== null ? s.enemies[markedIndex] : null);
       if (markedTarget) {
         target = markedTarget;
       } else {
@@ -1224,6 +1278,7 @@ export class Combat {
       this.combatState.caitDamageMult = 1.0;
       this.combatState.siphonBoostNextHit = 0.0;
       this.combatState.markedTargetIndex = null;
+      this.combatState.markedTargetId = null;
       this.combatState.markedTargetCritMult = 1.0;
 
       s.enemies = s.enemies.filter(e => e.hp > 0);
@@ -1246,13 +1301,15 @@ export class Combat {
     // Purge dead enemies from Cait's attack
     s.enemies = s.enemies.filter(e => e.hp > 0);
     if (s.enemies.length === 0) {
-      this._combatWon();
-      return;
+      if (!deferWinCheck) this._combatWon();
+      return true;
     }
 
     if (!landedAny && attackCount > 1) {
       bus.emit('toast', { text: 'Cait burned the extra vector but found no opening.', type: 'info' });
     }
+
+    return false;
   }
 
   // ────────────────────────────────────────────────────────
@@ -1305,10 +1362,17 @@ export class Combat {
         enemy.strength = (enemy.strength ?? 0) + toDisplayInt(intent.value ?? 0);
         break;
       }
+      case 'heal': {
+        const heal = toDisplayInt(intent.value ?? 0);
+        enemy.hp = Math.min(enemy.maxHp, enemy.hp + heal);
+        bus.emit('toast', { text: `${enemy.name} repairs ${heal} HP.`, type: 'enemy' });
+        break;
+      }
       case 'debuff': {
+        const value = toDisplayInt(intent.value ?? 1);
         if (intent.value) {
-          s.maxEnergy = Math.max(0, s.maxEnergy - toDisplayInt(intent.value));
-          s.energy = Math.min(s.energy, s.maxEnergy);
+          this.combatState.nextTurnDrawPenalty = Math.min(1, this.combatState.nextTurnDrawPenalty + value);
+          bus.emit('toast', { text: `${enemy.name} jams next draw by ${Math.min(1, value)}.`, type: 'enemy' });
         }
         if (intent.status === 'stun' || intent.stun) {
           this.combatState.asiphyxStunned = true;
@@ -1319,10 +1383,18 @@ export class Combat {
         break;
       }
       case 'summon': {
+        if (s.enemies.length >= MAX_ACTIVE_ENEMIES) {
+          const block = toDisplayInt(intent.blockOnFail ?? 6);
+          enemy.block += block;
+          bus.emit('toast', { text: `${enemy.name}'s summon lane is full. It braces for ${block}.`, type: 'enemy' });
+          break;
+        }
         const summonName = intent.summonId ?? this._summonIdFromIntent(intent);
         if (summonName) {
           const template = this._resolveEnemyTemplate(summonName);
           if (template) {
+            const summonMaxHp = Math.max(1, template.maxHp ?? template.baseHp ?? 1);
+            const summonHp = Math.max(8, Math.round(summonMaxHp * SUMMON_HP_MULTIPLIER));
             s.enemies.push({
               id: `${template.id ?? summonName}_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
               templateId: template.templateId ?? template.id,
@@ -1333,8 +1405,8 @@ export class Combat {
               idleFrames: template.idleFrames,
               tier: template.tier,
               flavor: template.flavor,
-              hp: Math.max(1, template.maxHp ?? template.baseHp ?? 1),
-              maxHp: Math.max(1, template.maxHp ?? template.baseHp ?? 1),
+              hp: summonHp,
+              maxHp: summonHp,
               block: 0,
               pattern: (template.pattern ?? [{ type: 'attack', value: 0 }]).map(p => ({ ...p })),
               patternIndex: 0,
@@ -1395,8 +1467,7 @@ export class Combat {
   _dealDamageToEnemy(enemy, rawDamage, meta = {}) {
     const s = this.gs.state;
     const source = meta.source ?? 'asiphyx';
-    const strengthMultiplier = 1 + (enemy.strength ?? 0) / 100;
-    const raw = Math.max(0, rawDamage * strengthMultiplier);
+    const raw = Math.max(0, rawDamage);
     let remaining = raw;
 
     const absorbed = Math.min(enemy.block, remaining);
@@ -1494,6 +1565,13 @@ export class Combat {
       return;
     }
 
+    const repair = Math.max(2, Math.floor(s.maxHp * POST_COMBAT_REPAIR_RATIO));
+    const repaired = Math.min(repair, s.maxHp - s.hp);
+    if (repaired > 0) {
+      s.hp += repaired;
+      bus.emit('toast', { text: `Cait sync repair: +${repaired} HP.`, type: 'passive' });
+    }
+
     this.gs.startDraft(this.gs.state.cardPool);
     this.gs.setPhase('draft');
   }
@@ -1502,7 +1580,7 @@ export class Combat {
     const description = intent.description ?? '';
     const match = description.match(/Summon (?:a|an) (.+)\.?/i);
     if (!match || !match[1]) return null;
-    return match[1].trim().toLowerCase();
+    return match[1].trim().replace(/[.!?]+$/, '').toLowerCase();
   }
 
   _resolveEnemyTemplate(rawId) {
@@ -1549,9 +1627,15 @@ export class Combat {
       paradoxChain: this.combatState.paradoxChain,
       gravityWellActive: this.combatState.gravityWellActive,
       markedTargetIndex: this.combatState.markedTargetIndex,
+      markedTargetId: this.combatState.markedTargetId,
       markedTargetCritMult: this.combatState.markedTargetCritMult,
       caitDamageMult: this.combatState.caitDamageMult,
       caitExtraActions: this.combatState.caitExtraActions,
+      kineticComboStacks: this.combatState.kineticComboStacks,
+      latentKineticPotential: this.combatState.latentKineticPotential,
+      nextTurnDrawPenalty: this.combatState.nextTurnDrawPenalty,
+      currentTurnDrawPenalty: this.combatState.currentTurnDrawPenalty,
+      startOfTurnDraw: this.combatState.startOfTurnDraw,
     };
   }
 }

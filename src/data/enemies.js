@@ -30,7 +30,7 @@ export const ENEMIES = {
     maxHp: 20,
     pattern: [
       { type: 'attack', value: 4, description: 'Nag — Deal 4 damage.' },
-      { type: 'buff', value: 6, description: 'Procrastinate — Heal 6 HP.' },
+      { type: 'heal', value: 6, description: 'Procrastinate — Heal 6 HP.' },
     ],
     flavor: '// fix this later',
     tier: 'common',
@@ -141,7 +141,7 @@ export const ENEMIES = {
     maxHp: 55,
     pattern: [
       { type: 'attack', value: 10, description: 'Interest — Deal 10 damage.' },
-      { type: 'debuff', description: 'Compound — You lose 1 max energy next turn.' },
+      { type: 'debuff', value: 1, description: 'Compound — Jam next draw by 1 module.' },
       { type: 'attack', value: 15, description: 'Collections — Deal 15 damage.' },
       { type: 'block', value: 12, description: 'Restructure — Gain 12 block.' },
     ],
@@ -180,7 +180,7 @@ export const ENEMIES = {
       { type: 'block', value: 18, description: 'Gold Wobble — Gain 18 block.' },
       { type: 'attack', value: 14, description: 'Toast-Cat Pounce — Deal 14 damage.' },
       { type: 'buff', value: 4, description: 'Corkscrew Aura — Gain 4 enrage (strength).' },
-      { type: 'debuff', value: 1, description: 'Biblical Head Roll — Reduce max energy by 1.' },
+      { type: 'debuff', value: 1, description: 'Biblical Head Roll — Jam next draw by 1 module.' },
       { type: 'attack', value: 22, description: 'Perpetual Motion Toast — Deal 22 damage.' },
     ],
     flavor: 'A biblically weird hairless sphinx cat floating on a corkscrew aura.',
@@ -231,7 +231,7 @@ export const ENEMIES = {
       { type: 'attack', value: 10, description: 'Deadline — Deal 10 damage.' },
       { type: 'block', value: 15, description: 'Stakeholder Shield — Gain 15 block.' },
       { type: 'attack', value: 20, description: 'Priority Shift — Deal 20 damage.' },
-      { type: 'buff', value: 15, description: 'Pivot — Heal 15 HP.' },
+      { type: 'heal', value: 15, description: 'Pivot — Heal 15 HP.' },
     ],
     flavor: 'Actually, can we pivot?',
     tier: 'boss',
@@ -274,7 +274,7 @@ export const ENCOUNTERS = {
     ['dependency_hell', 'spaghetti_code'],
   ],
 
-  // Floors 11–14: elites and tough uncommon combos
+  // Reserve pool for longer routes: elites and tough uncommon combos
   hard: [
     ['tech_debt'],
     ['race_condition'],
@@ -284,25 +284,31 @@ export const ENCOUNTERS = {
     ['dependency_hell', 'merge_conflict'],
   ],
 
-  // Boss floors
-  boss_1: [['production_outage']],
-  boss_2: [['legacy_codebase']],
-  boss_3: [['the_product_manager']],
+  // Elite floors in the current jam route
+  elite: [
+    ['tech_debt'],
+    ['race_condition'],
+  ],
+
+  // Current jam-route final boss
+  boss: [['budder_sphinx']],
 };
 
 /**
- * Returns the encounter pool for a given floor number (1–15).
+ * Returns the encounter pool for the current jam route.
  * @param {number} floor - The current floor (1-indexed).
+ * @param {number} [totalFloors=11] - The run length; final floor is always boss.
  * @returns {{ pool: string, isBoss: boolean }}
  */
-export function getEncounterPool(floor) {
-  if (floor >= 1 && floor <= 4) return { pool: 'easy', isBoss: false };
-  if (floor === 5) return { pool: 'boss_1', isBoss: true };
-  if (floor >= 6 && floor <= 9) return { pool: 'medium', isBoss: false };
-  if (floor === 10) return { pool: 'boss_2', isBoss: true };
-  if (floor >= 11 && floor <= 14) return { pool: 'hard', isBoss: false };
-  if (floor === 15) return { pool: 'boss_3', isBoss: true };
-  throw new Error(`Invalid floor number: ${floor}. Must be 1–15.`);
+export function getEncounterPool(floor, totalFloors = 11) {
+  if (!Number.isInteger(floor) || floor < 1 || floor > totalFloors) {
+    throw new Error(`Invalid floor number: ${floor}. Must be 1–${totalFloors}.`);
+  }
+  if (floor === totalFloors) return { pool: 'boss', isBoss: true };
+  if (floor === 5 || floor === 10) return { pool: 'elite', isBoss: false };
+  if (floor <= 4) return { pool: 'easy', isBoss: false };
+  if (floor <= 9) return { pool: 'medium', isBoss: false };
+  return { pool: 'hard', isBoss: false };
 }
 
 export default { ENEMIES, ENCOUNTERS, getEncounterPool };

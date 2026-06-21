@@ -12,6 +12,10 @@ const ASIPHYX_PULL_TEAL_TEXTURE = 'asiphyx_gravity_pull_teal';
 const ASIPHYX_PULL_RED_TEXTURE = 'asiphyx_gravity_pull_red';
 const CAYT_IDLE_TEXTURE = 'combat_cait_idle';
 const ENABLE_CAYT_COMBAT_IDLE_ANIMATION = false;
+const ASIPHYX_FORWARD_ORANGE = 0xff8a1f;
+const ASIPHYX_FORWARD_GOLD = 0xffd166;
+const ASIPHYX_BACKWARD_BLUE = 0x3aa7ff;
+const ASIPHYX_BACKWARD_DEEP_BLUE = 0x174cff;
 
 export class CombatScene extends Phaser.Scene {
   constructor() {
@@ -1084,9 +1088,10 @@ export class CombatScene extends Phaser.Scene {
     };
 
     const onCaitAttackWindup = (event) => {
-      this.queueFx(() => {
+      this.time.delayedCall(80, () => {
+        if (!this.scene.isActive()) return;
         this.spawnCaitMomentumBlackHole(event);
-      }, 520);
+      });
     };
 
     // 2. Combat update listener
@@ -1199,21 +1204,22 @@ export class CombatScene extends Phaser.Scene {
   showTurnBanner(text, color = '#ffffff') {
     if (this.turnBannerText?.active) this.turnBannerText.destroy();
     if (this.turnBannerBg?.active) this.turnBannerBg.destroy();
-    const cx = this.scale.width / 2;
-    const cy = 42;
+    const chipWidth = Math.min(220, Math.max(150, this.scale.width * 0.22));
+    const cx = 18 + chipWidth / 2;
+    const cy = 30;
     const bgColor = Phaser.Display.Color.HexStringToColor(color).color;
-    this.turnBannerBg = this.add.rectangle(cx, cy, 340, 34, bgColor, 0.12);
+    this.turnBannerBg = this.add.rectangle(cx, cy, chipWidth, 22, bgColor, 0.10);
     this.turnBannerBg.setStrokeStyle(2, bgColor, 0.7);
     this.turnBannerBg.setDepth(50);
     this.turnBannerBg.setBlendMode('ADD');
     this.turnBannerBg.setAlpha(0);
-    this.turnBannerText = this.add.text(cx, cy, text, {
+    this.turnBannerText = this.add.text(28, cy, text, {
       fontFamily: 'Press Start 2P, monospace',
-      fontSize: '14px',
+      fontSize: '10px',
       color,
       stroke: '#000000',
-      strokeThickness: 4,
-    }).setOrigin(0.5).setDepth(51).setAlpha(0);
+      strokeThickness: 3,
+    }).setOrigin(0, 0.5).setDepth(51).setAlpha(0);
     this.tweens.add({
       targets: [this.turnBannerText, this.turnBannerBg],
       alpha: 1,
@@ -1304,23 +1310,31 @@ export class CombatScene extends Phaser.Scene {
       hole.setDepth(18);
 
       const shadow = this.add.circle(0, 0, 24, 0x000000, 1);
-      shadow.setStrokeStyle(3, event.crit ? 0xff66ff : 0x66fff0, 0.96);
+      shadow.setStrokeStyle(3, event.crit ? ASIPHYX_FORWARD_GOLD : ASIPHYX_FORWARD_ORANGE, 0.96);
       shadow.setBlendMode('MULTIPLY');
       hole.add(shadow);
 
+      const forwardGlow = this.add.circle(0, 0, 46, ASIPHYX_FORWARD_ORANGE, 0.16);
+      forwardGlow.setBlendMode('ADD');
+      hole.addAt(forwardGlow, 0);
+
+      const returnGlow = this.add.circle(0, 0, 62, ASIPHYX_BACKWARD_BLUE, 0.10);
+      returnGlow.setBlendMode('ADD');
+      hole.addAt(returnGlow, 0);
+
       const eventHorizon = this.add.circle(0, 0, 34, 0x000000, 0);
-      eventHorizon.setStrokeStyle(4, 0xff4fa8, 0.92);
+      eventHorizon.setStrokeStyle(4, ASIPHYX_FORWARD_ORANGE, 0.92);
       eventHorizon.setBlendMode('ADD');
       hole.add(eventHorizon);
 
       const accretion = this.add.ellipse(0, 0, 78, 24);
-      accretion.setStrokeStyle(3, 0x66fff0, 0.88);
+      accretion.setStrokeStyle(3, ASIPHYX_FORWARD_GOLD, 0.88);
       accretion.setAngle(strikeAngle);
       accretion.setBlendMode('ADD');
       hole.add(accretion);
 
       const inner = this.add.ellipse(0, 0, 46, 16);
-      inner.setStrokeStyle(2, 0xffffff, 0.72);
+      inner.setStrokeStyle(2, ASIPHYX_BACKWARD_BLUE, 0.72);
       inner.setAngle(strikeAngle + 14);
       inner.setBlendMode('ADD');
       hole.add(inner);
@@ -1337,8 +1351,8 @@ export class CombatScene extends Phaser.Scene {
             angle: hole.angle - 220,
             scale: 0.78,
             alpha: 0,
-            delay: 520,
-            duration: 320,
+            delay: 720,
+            duration: 420,
             ease: 'Cubic.easeIn',
             onComplete: () => hole.destroy()
           });
@@ -1351,7 +1365,7 @@ export class CombatScene extends Phaser.Scene {
           Phaser.Math.Linear(sourceX, holeX, t * 0.56) + Math.sin(i * 1.7) * 18,
           Phaser.Math.Linear(sourceY, holeY, t * 0.56) + Math.cos(i * 1.3) * 14,
           i % 4 === 0 ? 2.8 : 1.7,
-          i % 2 === 0 ? 0x66fff0 : 0xff4fa8,
+          i % 2 === 0 ? ASIPHYX_FORWARD_ORANGE : ASIPHYX_FORWARD_GOLD,
           0.78
         );
         particle.setDepth(17);
@@ -1372,9 +1386,9 @@ export class CombatScene extends Phaser.Scene {
       const pullLine = this.add.graphics();
       pullLine.setDepth(16);
       pullLine.setBlendMode('ADD');
-      pullLine.lineStyle(5, 0xff4fa8, 0.42);
+      pullLine.lineStyle(5, ASIPHYX_FORWARD_ORANGE, 0.46);
       pullLine.lineBetween(sourceX, sourceY, holeX, holeY);
-      pullLine.lineStyle(2, 0x66fff0, 0.86);
+      pullLine.lineStyle(2, ASIPHYX_FORWARD_GOLD, 0.86);
       pullLine.lineBetween(sourceX + 12, sourceY - 8, holeX - 10, holeY + 8);
       this.tweens.add({
         targets: pullLine,
@@ -1386,14 +1400,14 @@ export class CombatScene extends Phaser.Scene {
 
       const caitVector = this.add.container(sourceX, sourceY);
       caitVector.setDepth(19);
-      const caitCore = this.add.ellipse(0, 0, 34, 22, 0xff4fa8, 0.76);
+      const caitCore = this.add.ellipse(0, 0, 34, 22, ASIPHYX_FORWARD_ORANGE, 0.78);
       caitCore.setStrokeStyle(2, 0xffffff, 0.82);
       caitCore.setBlendMode('ADD');
       const caitText = this.add.text(0, 0, 'C', {
         fontFamily: 'Press Start 2P, monospace',
         fontSize: '12px',
         color: '#ffffff',
-        stroke: '#ff4fa8',
+        stroke: '#ff8a1f',
         strokeThickness: 3,
       }).setOrigin(0.5);
       caitVector.add([caitCore, caitText]);
@@ -1410,6 +1424,11 @@ export class CombatScene extends Phaser.Scene {
         ease: 'Cubic.easeIn',
         onComplete: () => {
           this.spawnCaitMomentumImpact(holeX, holeY, targetX, targetY, event.crit);
+          this.spawnAsiphyxReturnWake(holeX, holeY, sourceX, sourceY, strikeAngle);
+          caitCore.setFillStyle(ASIPHYX_BACKWARD_BLUE, 0.84);
+          caitCore.setStrokeStyle(2, ASIPHYX_BACKWARD_DEEP_BLUE, 0.95);
+          caitText.setStroke('#174cff', 4);
+          caitText.setTint(0xd9f1ff);
           this.tweens.add({
             targets: caitVector,
             x: sourceX,
@@ -1427,8 +1446,113 @@ export class CombatScene extends Phaser.Scene {
     });
   }
 
+  spawnAsiphyxReturnWake(fromX, fromY, toX, toY, angle = 0) {
+    const distance = Phaser.Math.Distance.Between(fromX, fromY, toX, toY);
+    const midX = Phaser.Math.Linear(fromX, toX, 0.5);
+    const midY = Phaser.Math.Linear(fromY, toY, 0.5);
+
+    const resetWash = this.add.rectangle(midX, midY, Math.max(180, distance), 86, ASIPHYX_BACKWARD_BLUE, 0.34);
+    resetWash.setDepth(23);
+    resetWash.setAngle(angle);
+    resetWash.setBlendMode('ADD');
+    this.tweens.add({
+      targets: resetWash,
+      scaleY: 0.2,
+      alpha: 0,
+      duration: 980,
+      ease: 'Quad.out',
+      onComplete: () => resetWash.destroy()
+    });
+
+    const resetBeam = this.add.graphics();
+    resetBeam.setDepth(24);
+    resetBeam.lineStyle(18, ASIPHYX_BACKWARD_BLUE, 1);
+    resetBeam.lineBetween(fromX, fromY, toX, toY);
+    resetBeam.lineStyle(9, ASIPHYX_BACKWARD_DEEP_BLUE, 0.98);
+    resetBeam.lineBetween(fromX - 8, fromY + 8, toX + 10, toY - 8);
+    resetBeam.lineStyle(5, 0xd9f1ff, 0.82);
+    resetBeam.lineBetween(fromX + 10, fromY - 8, toX - 8, toY + 8);
+    this.tweens.add({
+      targets: resetBeam,
+      alpha: 0,
+      duration: 1400,
+      ease: 'Quad.out',
+      onComplete: () => resetBeam.destroy()
+    });
+
+    const returnLine = this.add.graphics();
+    returnLine.setDepth(18);
+    returnLine.setBlendMode('ADD');
+    returnLine.lineStyle(22, ASIPHYX_BACKWARD_BLUE, 0.98);
+    returnLine.lineBetween(fromX, fromY, toX, toY);
+    returnLine.lineStyle(12, ASIPHYX_BACKWARD_DEEP_BLUE, 0.98);
+    returnLine.lineBetween(fromX - 8, fromY + 8, toX + 10, toY - 8);
+    returnLine.lineStyle(6, ASIPHYX_BACKWARD_BLUE, 0.88);
+    returnLine.lineBetween(fromX + 14, fromY - 10, toX - 12, toY + 10);
+    this.tweens.add({
+      targets: returnLine,
+      alpha: 0,
+      duration: 680,
+      ease: 'Quad.out',
+      onComplete: () => returnLine.destroy()
+    });
+
+    for (let i = 0; i < 86; i++) {
+      const t = i / 85;
+      const mote = this.add.circle(
+        Phaser.Math.Linear(fromX, toX, t) + Math.sin(i * 1.9) * 26,
+        Phaser.Math.Linear(fromY, toY, t) + Math.cos(i * 1.4) * 22,
+        i % 3 === 0 ? 5.2 : 3.4,
+        i % 2 === 0 ? ASIPHYX_BACKWARD_BLUE : ASIPHYX_BACKWARD_DEEP_BLUE,
+        0.94
+      );
+      mote.setDepth(19);
+      mote.setBlendMode('ADD');
+      this.tweens.add({
+        targets: mote,
+        x: Phaser.Math.Linear(fromX, toX, Math.min(1, t + 0.18)),
+        y: Phaser.Math.Linear(fromY, toY, Math.min(1, t + 0.18)) - Math.sin(Phaser.Math.DegToRad(angle)) * 16,
+        scale: 0.24,
+        alpha: 0,
+        duration: 360 + i * 22,
+        delay: 40 + i * 10,
+        ease: 'Cubic.easeOut',
+        onComplete: () => mote.destroy()
+      });
+    }
+
+    const returnBurst = this.add.circle(fromX, fromY, 42, ASIPHYX_BACKWARD_BLUE, 0.22);
+    returnBurst.setDepth(17);
+    returnBurst.setBlendMode('ADD');
+    this.tweens.add({
+      targets: returnBurst,
+      scale: 2.2,
+      alpha: 0,
+      duration: 540,
+      ease: 'Quad.out',
+      onComplete: () => returnBurst.destroy()
+    });
+
+    for (let i = 0; i < 5; i++) {
+      const resetRing = this.add.ellipse(toX, toY, 28 + i * 22, 12 + i * 9);
+      resetRing.setDepth(18);
+      resetRing.setBlendMode('ADD');
+      resetRing.setStrokeStyle(3, i % 2 === 0 ? ASIPHYX_BACKWARD_BLUE : ASIPHYX_BACKWARD_DEEP_BLUE, 0.78);
+      resetRing.setAngle(angle + i * 18);
+      this.tweens.add({
+        targets: resetRing,
+        scaleX: 1.9,
+        scaleY: 1.5,
+        alpha: 0,
+        duration: 460 + i * 90,
+        ease: 'Quad.out',
+        onComplete: () => resetRing.destroy()
+      });
+    }
+  }
+
   spawnCaitMomentumImpact(holeX, holeY, targetX, targetY, crit = false) {
-    const color = crit ? 0xff66ff : 0x66fff0;
+    const color = crit ? ASIPHYX_FORWARD_GOLD : ASIPHYX_FORWARD_ORANGE;
     const slash = this.add.graphics();
     slash.setDepth(20);
     slash.setBlendMode('ADD');
@@ -1446,7 +1570,7 @@ export class CombatScene extends Phaser.Scene {
 
     for (let i = 0; i < 4; i++) {
       const ring = this.add.ellipse(targetX, targetY, 32 + i * 14, 16 + i * 7);
-      ring.setStrokeStyle(2, i % 2 === 0 ? color : 0xff4fa8, 0.72);
+      ring.setStrokeStyle(2, i % 2 === 0 ? color : ASIPHYX_BACKWARD_BLUE, 0.72);
       ring.setAngle(-16 + i * 13);
       ring.setDepth(20);
       ring.setBlendMode('ADD');
@@ -1490,9 +1614,9 @@ export class CombatScene extends Phaser.Scene {
     const field = this.add.graphics();
     field.setDepth(13);
     field.setBlendMode('ADD');
-    field.lineStyle(3, 0x66fff0, 0.16);
+    field.lineStyle(3, ASIPHYX_FORWARD_ORANGE, 0.18);
     field.lineBetween(heroX, heroY - 44, targetX, targetY - 24);
-    field.lineStyle(2, 0xff4fa8, 0.13);
+    field.lineStyle(2, ASIPHYX_BACKWARD_BLUE, 0.15);
     field.lineBetween(heroX, heroY + 44, targetX, targetY + 24);
     field.lineStyle(1, 0xffffff, 0.075);
     field.lineBetween(heroX + 18, heroY, targetX - 18, targetY);
@@ -1505,7 +1629,7 @@ export class CombatScene extends Phaser.Scene {
     });
 
     const ring = this.add.ellipse(heroX, heroY, 46, 24);
-    ring.setStrokeStyle(2, 0x66fff0, 0.24);
+    ring.setStrokeStyle(2, ASIPHYX_FORWARD_ORANGE, 0.26);
     ring.setBlendMode('ADD');
     ring.setDepth(13);
     this.tweens.add({
@@ -1519,7 +1643,7 @@ export class CombatScene extends Phaser.Scene {
     });
 
     const targetRing = this.add.ellipse(targetX, targetY, 54, 28);
-    targetRing.setStrokeStyle(2, 0xff4fa8, 0.21);
+    targetRing.setStrokeStyle(2, ASIPHYX_BACKWARD_BLUE, 0.24);
     targetRing.setBlendMode('ADD');
     targetRing.setDepth(13);
     this.tweens.add({
@@ -1541,6 +1665,7 @@ export class CombatScene extends Phaser.Scene {
       vector.setBlendMode('ADD');
       vector.setDepth(14);
       vector.setFlipX(reverse);
+      vector.setTint(reverse ? ASIPHYX_BACKWARD_BLUE : ASIPHYX_FORWARD_ORANGE);
 
       this.tweens.add({
         targets: vector,
@@ -1564,15 +1689,15 @@ export class CombatScene extends Phaser.Scene {
       });
     };
 
-    if (tealReady) spawnVector(ASIPHYX_PULL_TEAL_TEXTURE, `${ASIPHYX_PULL_TEAL_TEXTURE}_loop`, -38, 0, false, 3);
-    if (redReady) spawnVector(ASIPHYX_PULL_RED_TEXTURE, `${ASIPHYX_PULL_RED_TEXTURE}_loop`, 34, 130, true, 8);
+    if (redReady) spawnVector(ASIPHYX_PULL_RED_TEXTURE, `${ASIPHYX_PULL_RED_TEXTURE}_loop`, -38, 0, false, 3);
+    if (tealReady) spawnVector(ASIPHYX_PULL_TEAL_TEXTURE, `${ASIPHYX_PULL_TEAL_TEXTURE}_loop`, 34, 130, true, 8);
     this.spawnAsiphyxGravitySparks(heroX, heroY, targetX, targetY, angle);
   }
 
   spawnAsiphyxGravitySparks(heroX, heroY, targetX, targetY, angle) {
     for (let i = 0; i < 14; i++) {
       const t = 0.08 + i * 0.065;
-      const color = i % 2 === 0 ? 0x66fff0 : 0xff4fa8;
+      const color = i % 2 === 0 ? ASIPHYX_FORWARD_ORANGE : ASIPHYX_BACKWARD_BLUE;
       const spark = this.add.circle(
         Phaser.Math.Linear(heroX, targetX, t),
         Phaser.Math.Linear(heroY, targetY, t) + Math.sin(i * 1.7) * 34,
