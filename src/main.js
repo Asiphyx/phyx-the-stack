@@ -23,6 +23,7 @@ const game = new GameState();
 const SAVE_STORAGE_KEY = 'phyx-the-stack:saves:v1';
 const SAVE_SLOT_COUNT = 3;
 const CAIT_LABS_ICON = '/assets/brand/cait-labs-icon.png';
+const BOND_START_SOUND = '/assets/audio/ui/bondstartbutton.wav';
 const DEFAULT_TRACK = SOUNDTRACK_TRACKS.find(track => track.id === 'cait-intro') ?? SOUNDTRACK_TRACKS[0];
 const JAM_RUN_FLOORS = 11;
 const PLAYABLE_HERO_IDS = new Set(['asiphyx']);
@@ -69,6 +70,7 @@ const MODULE_SIDE_LIMIT = 3;
 const COMBAT_TOP_MODULE_PREVIEW = 10;
 let battleLog = [];
 let introAudio = null;
+let bondStartAudio = null;
 let introMusicEnabled = false;
 // Set when the user explicitly pauses. The pointerdown autoplay-unlock below
 // must never override a deliberate pause, or the toggle button fights itself
@@ -576,6 +578,22 @@ function ensureIntroAudio() {
     if (introMusicEnabled) switchMusicTrack(1);
   });
   return introAudio;
+}
+
+function ensureBondStartAudio() {
+  if (bondStartAudio || typeof Audio === 'undefined') return bondStartAudio;
+  bondStartAudio = new Audio(BOND_START_SOUND);
+  bondStartAudio.preload = 'auto';
+  bondStartAudio.volume = 0.86;
+  return bondStartAudio;
+}
+
+function playBondStartSound() {
+  const audio = ensureBondStartAudio();
+  if (!audio) return;
+  audio.currentTime = 0;
+  const playAttempt = audio.play();
+  if (playAttempt?.catch) playAttempt.catch(() => {});
 }
 
 function ensureIntroAnalyser() {
@@ -1530,6 +1548,7 @@ function renderHeroSelect() {
   `;
 
   const startRun = (hero) => {
+    playBondStartSound();
     game.selectHero(hero);
     game.startRun(JAM_RUN_FLOORS, cardPool, enemyCatalogue);
   };
