@@ -62,6 +62,8 @@ let stagedCommandSequence = 0;
 let turnBannerShowTimer = null;
 let turnBannerHideTimer = null;
 let turnBannerToken = 0;
+let combatLogRenderFrame = null;
+let combatVerboseOpen = false;
 const MODULE_SIDE_LIMIT = 3;
 const COMBAT_TOP_MODULE_PREVIEW = 10;
 let battleLog = [];
@@ -367,7 +369,17 @@ function logBattleEvent(text, type = 'info') {
     type,
     ts: new Date().toLocaleTimeString([], { hour12: false, minute: '2-digit', second: '2-digit' }),
   });
-  battleLog = battleLog.slice(0, 10);
+  battleLog = battleLog.slice(0, 120);
+  scheduleCombatLogRender();
+}
+
+function scheduleCombatLogRender() {
+  if (game.getSnapshot().phase !== 'combat') return;
+  if (combatLogRenderFrame) return;
+  combatLogRenderFrame = requestAnimationFrame(() => {
+    combatLogRenderFrame = null;
+    if (game.getSnapshot().phase === 'combat') render();
+  });
 }
 
 // ──────────────────────────────────────────────────────────
@@ -1660,6 +1672,24 @@ function renderCombat() {
       ${escapeHtml(entry.text ?? '')}
     </p>
   `).join('');
+  const activityRows = (battleLog.length ? battleLog.slice(0, 18) : [
+    { type: 'info', text: 'Awaiting module stack input.', ts: '--:--' },
+  ]).map(entry => `
+    <p class="combat-activity-line ${escapeHtml(entry.type ?? 'info')}">
+      <span>${escapeHtml(entry.ts ?? '--:--')}</span>
+      <b>[${escapeHtml(entry.type ?? 'SYS')}]</b>
+      <em>${escapeHtml(entry.text ?? '')}</em>
+    </p>
+  `).join('');
+  const verboseRows = (battleLog.length ? battleLog : [
+    { type: 'info', text: 'No combat history yet.', ts: '--:--' },
+  ]).map(entry => `
+    <p class="combat-verbose-line ${escapeHtml(entry.type ?? 'info')}">
+      <span>${escapeHtml(entry.ts ?? '--:--')}</span>
+      <b>[${escapeHtml(entry.type ?? 'SYS')}]</b>
+      <em>${escapeHtml(entry.text ?? '')}</em>
+    </p>
+  `).join('');
   const artifactChips = (cait?.modules ?? []).map(module => `
     <span class="tech-artifact-chip" title="${escapeHtml(module.text ?? '')}">
       <b>${escapeHtml(module.slot ?? 'MODULE')}</b>
@@ -1967,6 +1997,55 @@ function renderCombat() {
   }
   section.appendChild(rightRail);
 
+  const activityStream = el('aside', 'combat-activity-stream');
+  activityStream.innerHTML = `
+    <div class="combat-activity-header">
+      <b>ACTION STREAM</b>
+      <button type="button" data-open-combat-verbose>[FULL VERBOSE]</button>
+    </div>
+    <div class="combat-activity-lines">${activityRows}</div>
+  `;
+  section.appendChild(activityStream);
+
+  if (combatVerboseOpen) {
+    const verboseOverlay = el('div', 'combat-verbose-overlay');
+    verboseOverlay.setAttribute('role', 'dialog');
+    verboseOverlay.setAttribute('aria-modal', 'true');
+    verboseOverlay.setAttribute('aria-label', 'Full combat history');
+    verboseOverlay.innerHTML = `
+      <div class="combat-verbose-backdrop" data-close-combat-verbose></div>
+      <div class="combat-verbose-panel">
+        <div class="combat-verbose-header">
+          <span>FULL VERBOSE // COMBAT HISTORY</span>
+          <button type="button" data-close-combat-verbose aria-label="Close full verbose log">x</button>
+        </div>
+        <div class="combat-verbose-summary">
+          <section>
+            <b>PLAYER NOTES</b>
+            ${combatHintLines.map(line => `<p>${line}</p>`).join('')}
+          </section>
+          <section>
+            <b>COUNTERS</b>
+            <p>Draw ${snap.drawPileCount} // Discard ${snap.discardPileCount} // Void ${snap.exhaustPileCount}</p>
+            <p>Hand ${state.hand.length} // User ${userCommands}/${MODULE_SIDE_LIMIT} // Cait ${selfCommands}/${MODULE_SIDE_LIMIT}</p>
+          </section>
+          <section>
+            <b>CAIT PLAN</b>
+            <p>${escapeHtml(caitIntent.name)} // ${cait ? `${cait.hp}/${cait.maxHp} HP` : 'syncing'}</p>
+            <p>Target ${escapeHtml(caitTargetName)} // Full hit ~${caitPlannedDamage} // Strikes ${caitAttackCount} // Sync ${caitReliability}%</p>
+          </section>
+          <section>
+            <b>TACTICAL READOUT</b>
+            <p>${escapeHtml(selectedEnemy?.name ?? 'NO TARGET')} is about to ${escapeHtml(targetIntent ? intentLabel(targetIntent) : 'wait').toLowerCase()}.</p>
+            <p>${escapeHtml(statusText)}</p>
+          </section>
+        </div>
+        <div class="combat-verbose-log">${verboseRows}</div>
+      </div>
+    `;
+    section.appendChild(verboseOverlay);
+  }
+
   // ─── 3. CLEAN BOTTOM HUD (dialogue/lore only) ───
   const bottomDashboard = el('div', 'combat-bottom-dashboard clean-combat-hud');
   const recentLog = battleLog[0]?.text ?? 'Route up to three User modules and three Cait modules, then send the stack from the top command rail.';
@@ -2048,6 +2127,20 @@ function renderCombat() {
     if (clearBtn) {
       clearBtn.onclick = () => clearStagedCommands();
     }
+
+    section.querySelectorAll('[data-open-combat-verbose]').forEach(button => {
+      button.onclick = () => {
+        combatVerboseOpen = true;
+        render();
+      };
+    });
+
+    section.querySelectorAll('[data-close-combat-verbose]').forEach(button => {
+      button.onclick = () => {
+        combatVerboseOpen = false;
+        render();
+      };
+    });
 
     section.querySelectorAll('[data-unstage]').forEach(slot => {
       slot.onclick = () => unstageCommand(slot.dataset.unstage);
@@ -2603,13 +2696,13 @@ function emitToast(text, type = 'info') {
   logBattleEvent(text, type);
   const isCombat = game.getSnapshot().phase === 'combat';
   if (isCombat) {
-    const combatToasts = [...toastLayer.querySelectorAll('.toast.combat-toast')];
-    for (const toast of combatToasts.slice(2)) toast.remove();
+    toastLayer.querySelectorAll('.toast.combat-toast').forEach(toast => toast.remove());
+    return;
   }
   const t = el('div', `toast ${type}${isCombat ? ' combat-toast' : ''}`);
   t.textContent = text;
   toastLayer.appendChild(t);
-  setTimeout(() => t.remove(), isCombat ? 1450 : 2500);
+  setTimeout(() => t.remove(), 2500);
 }
 
 // ──────────────────────────────────────────────────────────
