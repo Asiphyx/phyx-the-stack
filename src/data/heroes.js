@@ -44,12 +44,15 @@ export const HEROES = {
     battlePortrait: '/assets/heroes/battle/asiphyx2.png',
     maxHp: 70,
     startingDeck: [
-      'try_catch', 'try_catch', 'try_catch',
-      'null_check', 'null_check',
+      'try_catch', 'try_catch',
+      'null_check',
+      'sync_buffer',
+      'phase_latch',
       'mass_increase',
       'redirect',
       'singularity_target',
       'cait_momentum',
+      'vector_lens',
     ],
     passive: {
       name: 'Locked Duo: Kinetic Regent',

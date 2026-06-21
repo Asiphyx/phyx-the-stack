@@ -2209,7 +2209,7 @@ function classifyCardTarget(card) {
   const effects = card.effects ?? [];
   const hasEnemy = effects.some(e =>
     e.target === 'enemy' || e.target === 'all_enemies' ||
-    ['damage', 'damageAll', 'mark_target', 'mark_target_crit', 'swap_intent'].includes(e.type)
+    ['damage', 'damageAll', 'mark_target', 'mark_target_crit', 'slow_enemy', 'stun', 'swap_intent'].includes(e.type)
   );
   return hasEnemy ? 'enemy' : 'self';
 }
@@ -2218,7 +2218,7 @@ function moduleSpeedLane(card) {
   if (card.speed) return card.speed;
   if (card.tags?.includes('speed') || card.tags?.includes('interrupt')) return 'fast';
   if (card.tags?.includes('slow') || card.tags?.includes('heavy')) return 'slow';
-  if ((card.effects ?? []).some(e => ['block', 'cait_block', 'mark_target', 'mark_target_crit', 'swap_intent'].includes(e.type))) return 'fast';
+  if ((card.effects ?? []).some(e => ['block', 'cait_block', 'mark_target', 'mark_target_crit', 'slow_enemy', 'stun', 'swap_intent'].includes(e.type))) return 'fast';
   if (card.type === 'attack') return 'normal';
   return 'normal';
 }

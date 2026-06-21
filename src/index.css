@@ -12188,14 +12188,14 @@ body::after {
 }
 
 .technomancy-combat .combat-right-rail {
-  padding: 18px 16px !important;
-  gap: 8px !important;
+  padding: 14px 12px !important;
+  gap: 6px !important;
 }
 
 .tech-right-metrics {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 5px;
+  gap: 4px;
 }
 
 .tech-right-metrics span {
@@ -12203,8 +12203,8 @@ body::after {
   border: 1px solid rgba(57, 255, 20, 0.34);
   background: rgba(57, 255, 20, 0.055);
   color: rgba(229, 226, 225, 0.84);
-  padding: 4px 5px;
-  font-size: 0.52rem;
+  padding: 3px 4px;
+  font-size: 0.5rem;
   letter-spacing: 0.06em;
   text-align: center;
   white-space: nowrap;
@@ -12218,10 +12218,10 @@ body::after {
   min-height: 0;
   border: 1px solid rgba(0, 240, 255, 0.36);
   background: rgba(5, 5, 5, 0.78);
-  padding: 9px;
+  padding: 7px;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  gap: 8px;
+  gap: 6px;
   box-shadow: inset 0 0 18px rgba(0, 240, 255, 0.055);
 }
 
@@ -12430,9 +12430,9 @@ body::after {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
   border-bottom: 1px solid rgba(0, 240, 255, 0.24);
-  padding-bottom: 6px;
+  padding-bottom: 5px;
 }
 
 .tech-module-dock-title b {
@@ -12453,7 +12453,7 @@ body::after {
   grid-template-columns: 1fr !important;
   justify-self: stretch;
   width: 100%;
-  gap: 10px !important;
+  gap: 6px !important;
   min-height: 0;
   padding: 0 !important;
   background: transparent !important;
@@ -12465,7 +12465,7 @@ body::after {
   min-height: 0;
   width: 100%;
   display: grid;
-  gap: 5px;
+  gap: 4px;
 }
 
 .technomancy-combat .right-module-tray .hud-module-group-label {
@@ -12481,7 +12481,7 @@ body::after {
 .technomancy-combat .right-module-tray .hud-module-row {
   display: grid !important;
   grid-template-columns: 1fr !important;
-  gap: 6px !important;
+  gap: 4px !important;
   min-height: 0;
   overflow: visible;
   align-items: stretch;
@@ -12493,14 +12493,14 @@ body::after {
   min-width: 0 !important;
   max-width: none !important;
   height: auto !important;
-  min-height: 48px !important;
+  min-height: 42px !important;
   max-height: none !important;
-  padding: 6px 9px !important;
+  padding: 4px 7px !important;
   position: relative;
   display: grid !important;
-  grid-template-columns: 38px minmax(0, 1fr) auto !important;
+  grid-template-columns: 30px minmax(0, 1fr) auto !important;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   text-align: left;
   border: 1px solid var(--tech-blue) !important;
   border-radius: 0 !important;
@@ -12535,8 +12535,8 @@ body::after {
 
 .technomancy-combat .right-module-tray .module-icon-art img,
 .technomancy-combat .right-module-tray .module-icon-emoji {
-  width: 32px !important;
-  height: 32px !important;
+  width: 28px !important;
+  height: 28px !important;
 }
 
 .technomancy-combat .right-module-tray .module-icon-name,
@@ -12565,15 +12565,15 @@ body::after {
   width: auto;
   max-width: none;
   align-content: center;
-  gap: 2px;
+  gap: 1px;
   padding: 0;
   border: 0;
   background: transparent;
   color: rgba(229, 226, 225, 0.95);
   box-shadow: none;
   z-index: auto !important;
-  font-size: 10px;
-  line-height: 1.28;
+  font-size: 9px;
+  line-height: 1.2;
   pointer-events: none;
   opacity: 1 !important;
   transform: none !important;
@@ -12581,7 +12581,7 @@ body::after {
 
 .technomancy-combat .right-module-tray .module-icon-detail b {
   color: var(--tech-green);
-  font-size: 0.62rem;
+  font-size: 0.58rem;
   letter-spacing: 0.04em;
   white-space: nowrap;
   overflow: hidden;
@@ -12590,10 +12590,10 @@ body::after {
 
 .technomancy-combat .right-module-tray .module-icon-detail span {
   color: rgba(229, 226, 225, 0.8);
-  font-size: 0.5rem;
+  font-size: 0.46rem;
   overflow: hidden;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
 }
 
@@ -12620,16 +12620,16 @@ body::after {
 
 .combat-activity-stream {
   position: absolute;
-  right: 18px;
-  top: 366px;
-  bottom: 112px;
+  right: 14px;
+  top: clamp(430px, 47vh, 500px);
+  bottom: 124px;
   z-index: 58;
-  width: calc(clamp(294px, 18vw, 354px) - 36px);
+  width: calc(clamp(294px, 18vw, 354px) - 28px);
   min-height: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  gap: 7px;
-  padding: 9px;
+  gap: 5px;
+  padding: 7px;
   border: 1px solid rgba(0, 240, 255, 0.32);
   background:
     linear-gradient(180deg, rgba(5, 5, 5, 0.82), rgba(5, 5, 5, 0.42)),
@@ -12643,14 +12643,14 @@ body::after {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding-bottom: 6px;
+  gap: 6px;
+  padding-bottom: 5px;
   border-bottom: 1px solid rgba(0, 240, 255, 0.22);
 }
 
 .combat-activity-header b {
   color: var(--tech-blue);
-  font-size: 0.58rem;
+  font-size: 0.54rem;
   letter-spacing: 0.12em;
 }
 
@@ -12658,9 +12658,9 @@ body::after {
   border: 1px solid rgba(57, 255, 20, 0.38);
   background: rgba(57, 255, 20, 0.055);
   color: var(--tech-green);
-  padding: 3px 5px;
+  padding: 2px 4px;
   font-family: "JetBrains Mono", monospace;
-  font-size: 0.44rem;
+  font-size: 0.4rem;
   letter-spacing: 0.04em;
   cursor: pointer;
 }
@@ -12674,7 +12674,7 @@ body::after {
   min-height: 0;
   display: grid;
   align-content: start;
-  gap: 4px;
+  gap: 3px;
   overflow-y: auto;
   padding-right: 3px;
   mask-image: linear-gradient(to bottom, #000 0%, #000 72%, rgba(0,0,0,0.74) 86%, transparent 100%);
@@ -12684,12 +12684,12 @@ body::after {
   margin: 0;
   min-width: 0;
   display: grid;
-  grid-template-columns: 42px 52px minmax(0, 1fr);
-  gap: 5px;
+  grid-template-columns: 38px 48px minmax(0, 1fr);
+  gap: 4px;
   align-items: start;
   color: rgba(229, 226, 225, 0.72);
-  font-size: 0.49rem;
-  line-height: 1.28;
+  font-size: 0.47rem;
+  line-height: 1.22;
 }
 
 .combat-activity-line span {

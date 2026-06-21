@@ -614,6 +614,74 @@ export const CARDS = {
     tags: ['utility', 'gravity', 'cait'],
   },
 
+  sync_buffer: {
+    id: 'sync_buffer',
+    name: 'Sync Buffer',
+    description: 'Gain 5 block. Cait gains 3 block.',
+    flavor: 'Two timelines, one guard frame.',
+    cost: 1,
+    rarity: 'common',
+    type: 'skill',
+    effects: [
+      { type: 'block', value: 5, target: 'self' },
+      { type: 'cait_block', value: 3 },
+    ],
+    heroOnly: 'asiphyx',
+    emoji: '[]',
+    tags: ['defensive', 'cait'],
+  },
+
+  phase_latch: {
+    id: 'phase_latch',
+    name: 'Phase Latch',
+    description: 'Slow enemy intent. Cait gains 3 block.',
+    flavor: 'Hold the target still long enough for her to move first.',
+    cost: 1,
+    rarity: 'common',
+    type: 'skill',
+    effects: [
+      { type: 'slow_enemy', target: 'enemy', value: 1 },
+      { type: 'cait_block', value: 3 },
+    ],
+    heroOnly: 'asiphyx',
+    emoji: '<>',
+    tags: ['control', 'gravity', 'cait', 'interrupt'],
+  },
+
+  vector_lens: {
+    id: 'vector_lens',
+    name: 'Vector Lens',
+    description: 'Mark an enemy. Cait crits that target for 150%. Gain 2 block.',
+    flavor: 'Not a strike. A sightline.',
+    cost: 1,
+    rarity: 'uncommon',
+    type: 'skill',
+    effects: [
+      { type: 'mark_target_crit', target: 'enemy', value: 1.5 },
+      { type: 'block', value: 2, target: 'self' },
+    ],
+    heroOnly: 'asiphyx',
+    emoji: '◇',
+    tags: ['utility', 'gravity', 'cait'],
+  },
+
+  return_channel: {
+    id: 'return_channel',
+    name: 'Return Channel',
+    description: 'Gain 3 block. For 1 turn, reflect 25% of incoming damage.',
+    flavor: 'Every hit gets a receipt.',
+    cost: 1,
+    rarity: 'uncommon',
+    type: 'skill',
+    effects: [
+      { type: 'block', value: 3, target: 'self' },
+      { type: 'damage_reflect', value: 0.25 },
+    ],
+    heroOnly: 'asiphyx',
+    emoji: '↺',
+    tags: ['defensive', 'control', 'gravity'],
+  },
+
   void_sacrifice: {
     id: 'void_sacrifice',
     name: 'Event Vector',

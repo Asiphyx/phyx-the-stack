@@ -363,7 +363,7 @@ export class Combat {
     // Kinetic Regent: gravity modules build combo + queue Cait follow-ups
     const effects = card.effects ?? [];
     const hasGravityTarget = effects.some(e =>
-      ['mark_target', 'mark_target_crit', 'swap_intent', 'redirectEnemiesToEnemy'].includes(e.type)
+      ['mark_target', 'mark_target_crit', 'slow_enemy', 'stun', 'swap_intent', 'redirectEnemiesToEnemy'].includes(e.type)
     );
     const hasDefense = effects.some(e =>
       ['block', 'cait_block'].includes(e.type)
@@ -524,7 +524,7 @@ export class Combat {
     if (card.speed) return card.speed;
     if (card.tags?.includes('speed') || card.tags?.includes('interrupt')) return 'fast';
     if (card.tags?.includes('slow') || card.tags?.includes('heavy')) return 'slow';
-    if (card.effects?.some(e => ['block', 'cait_block', 'mark_target', 'mark_target_crit', 'swap_intent'].includes(e.type))) return 'fast';
+    if (card.effects?.some(e => ['block', 'cait_block', 'mark_target', 'mark_target_crit', 'slow_enemy', 'stun', 'swap_intent'].includes(e.type))) return 'fast';
     if (card.type === 'attack') return 'normal';
     return 'normal';
   }
