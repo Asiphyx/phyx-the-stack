@@ -11,6 +11,10 @@ const BUDDER_BLACK_PLANET_TEXTURE = 'budder_blackplanet_orbit';
 const ASIPHYX_PULL_TEAL_TEXTURE = 'asiphyx_gravity_pull_teal';
 const ASIPHYX_PULL_RED_TEXTURE = 'asiphyx_gravity_pull_red';
 const CAYT_IDLE_TEXTURE = 'combat_cait_idle';
+const CAYT_ATTACK_TEXTURE = 'combat_cait_attack';
+const CAYT_DASH_TEXTURE = 'combat_cait_dash';
+const CAYT_JUMP_TEXTURE = 'combat_cait_jump';
+const CAYT_RUN_TEXTURE = 'combat_cait_run';
 const ENABLE_CAYT_COMBAT_IDLE_ANIMATION = true;
 const ASIPHYX_FORWARD_ORANGE = 0xff8a1f;
 const ASIPHYX_FORWARD_GOLD = 0xffd166;
@@ -25,6 +29,8 @@ export class CombatScene extends Phaser.Scene {
     this.enemySprites = [];
     this.eventListeners = [];
     this.budderCat = null;
+    this.caitCombatSprite = null;
+    this.caitActionResetTimer = null;
     this.fxQueueAt = 0;
   }
 
@@ -56,12 +62,21 @@ export class CombatScene extends Phaser.Scene {
     }
 
     const cait = state?.cait;
-    if (ENABLE_CAYT_COMBAT_IDLE_ANIMATION && cait?.sprite?.idleStrip) {
-      const frameWidth = Number(cait.sprite.idleFrameWidth) || 46;
-      const frameHeight = Number(cait.sprite.idleFrameHeight) || 55;
-      const frameCount = Number(cait.sprite.idleFrames) || 1;
-      if (frameWidth > 0 && frameHeight > 0 && frameCount > 0) {
-        this.load.spritesheet(CAYT_IDLE_TEXTURE, cait.sprite.idleStrip, {
+    if (ENABLE_CAYT_COMBAT_IDLE_ANIMATION && cait?.sprite) {
+      const sheets = [
+        { texture: CAYT_IDLE_TEXTURE, path: cait.sprite.idleStrip, frameWidth: cait.sprite.idleFrameWidth, frameHeight: cait.sprite.idleFrameHeight, frames: cait.sprite.idleFrames },
+        { texture: CAYT_ATTACK_TEXTURE, path: cait.sprite.attackStrip, frameWidth: cait.sprite.attackFrameWidth, frameHeight: cait.sprite.attackFrameHeight, frames: cait.sprite.attackFrames },
+        { texture: CAYT_DASH_TEXTURE, path: cait.sprite.dashStrip, frameWidth: cait.sprite.dashFrameWidth, frameHeight: cait.sprite.dashFrameHeight, frames: cait.sprite.dashFrames },
+        { texture: CAYT_JUMP_TEXTURE, path: cait.sprite.jumpStrip, frameWidth: cait.sprite.jumpFrameWidth, frameHeight: cait.sprite.jumpFrameHeight, frames: cait.sprite.jumpFrames },
+        { texture: CAYT_RUN_TEXTURE, path: cait.sprite.runStrip, frameWidth: cait.sprite.runFrameWidth, frameHeight: cait.sprite.runFrameHeight, frames: cait.sprite.runFrames },
+      ];
+
+      for (const sheet of sheets) {
+        const frameWidth = Number(sheet.frameWidth) || 0;
+        const frameHeight = Number(sheet.frameHeight) || 0;
+        const frameCount = Number(sheet.frames) || 0;
+        if (!sheet.path || frameWidth <= 0 || frameHeight <= 0 || frameCount <= 0) continue;
+        this.load.spritesheet(sheet.texture, sheet.path, {
           frameWidth,
           frameHeight,
           startFrame: 0,
@@ -281,6 +296,7 @@ export class CombatScene extends Phaser.Scene {
     const idleFrameW = Number(cait?.sprite?.idleFrameWidth) || 46;
     const idleFrameH = Number(cait?.sprite?.idleFrameHeight) || 55;
     const idleFrames = Number(cait?.sprite?.idleFrames) || 1;
+    this.caitCombatSprite = null;
 
     this.heroGlow = this.add.container(180, 220);
     for (let i = 0; i < 5; i++) {
@@ -319,6 +335,7 @@ export class CombatScene extends Phaser.Scene {
       const displayH = Math.round(112 * (idleFrameH / idleFrameW));
       sprite.setDisplaySize(displayW, displayH);
       sprite.play(animKey);
+      this.caitCombatSprite = sprite;
       this.heroSprite.add(sprite);
     } else if (caitPortraitReady) {
       const portrait = this.add.image(0, -10, 'combat_cait_portrait');
@@ -338,6 +355,127 @@ export class CombatScene extends Phaser.Scene {
     this.heroSprite.add(this.heroHpBar);
 
     this.updateHeroHp();
+  }
+
+  getCaitActionConfig(action) {
+    const sprite = this.gameRef?.state?.cait?.sprite;
+    const configs = {
+      idle: {
+        texture: CAYT_IDLE_TEXTURE,
+        frames: Number(sprite?.idleFrames) || 1,
+        frameWidth: Number(sprite?.idleFrameWidth) || 160,
+        frameHeight: Number(sprite?.idleFrameHeight) || 160,
+        frameRate: Number(sprite?.idleFrameRate) || 8,
+        repeat: -1,
+        displayWidth: 112,
+      },
+      attack: {
+        texture: CAYT_ATTACK_TEXTURE,
+        frames: Number(sprite?.attackFrames) || 1,
+        frameWidth: Number(sprite?.attackFrameWidth) || 176,
+        frameHeight: Number(sprite?.attackFrameHeight) || 176,
+        frameRate: Number(sprite?.attackFrameRate) || 18,
+        repeat: 0,
+        displayWidth: 132,
+      },
+      dash: {
+        texture: CAYT_DASH_TEXTURE,
+        frames: Number(sprite?.dashFrames) || 1,
+        frameWidth: Number(sprite?.dashFrameWidth) || 176,
+        frameHeight: Number(sprite?.dashFrameHeight) || 176,
+        frameRate: Number(sprite?.dashFrameRate) || 20,
+        repeat: 0,
+        displayWidth: 132,
+      },
+      jump: {
+        texture: CAYT_JUMP_TEXTURE,
+        frames: Number(sprite?.jumpFrames) || 1,
+        frameWidth: Number(sprite?.jumpFrameWidth) || 160,
+        frameHeight: Number(sprite?.jumpFrameHeight) || 160,
+        frameRate: Number(sprite?.jumpFrameRate) || 16,
+        repeat: 0,
+        displayWidth: 122,
+      },
+      run: {
+        texture: CAYT_RUN_TEXTURE,
+        frames: Number(sprite?.runFrames) || 1,
+        frameWidth: Number(sprite?.runFrameWidth) || 160,
+        frameHeight: Number(sprite?.runFrameHeight) || 160,
+        frameRate: Number(sprite?.runFrameRate) || 14,
+        repeat: -1,
+        displayWidth: 118,
+      },
+    };
+
+    return configs[action] ?? configs.idle;
+  }
+
+  ensureCaitActionAnimation(action) {
+    const config = this.getCaitActionConfig(action);
+    if (!this.textures.exists(config.texture)) return null;
+    const animKey = `combat_cait_${action}_${config.frameWidth}x${config.frameHeight}_n${config.frames}_r${config.frameRate}`;
+    if (!this.anims.exists(animKey)) {
+      this.anims.create({
+        key: animKey,
+        frames: this.anims.generateFrameNumbers(config.texture),
+        frameRate: config.frameRate,
+        repeat: config.repeat,
+      });
+    }
+    return { ...config, animKey };
+  }
+
+  playCaitAction(action, { returnToIdle = true } = {}) {
+    if (!this.caitCombatSprite?.active) return false;
+    const config = this.ensureCaitActionAnimation(action);
+    if (!config) return false;
+
+    this.caitCombatSprite.setTexture(config.texture);
+    this.caitCombatSprite.setDisplaySize(
+      config.displayWidth,
+      Math.round(config.displayWidth * (config.frameHeight / config.frameWidth)),
+    );
+    this.caitCombatSprite.play(config.animKey, true);
+
+    if (this.caitActionResetTimer) {
+      this.caitActionResetTimer.remove(false);
+      this.caitActionResetTimer = null;
+    }
+
+    if (returnToIdle && action !== 'idle') {
+      const durationMs = Math.ceil((config.frames / Math.max(1, config.frameRate)) * 1000) + 40;
+      this.caitActionResetTimer = this.time.delayedCall(durationMs, () => {
+        this.playCaitAction('idle', { returnToIdle: false });
+      });
+    }
+
+    return true;
+  }
+
+  lungeCaitAtTarget(event) {
+    if (!this.heroSprite?.active) return;
+    const target = this.enemySprites.find(sprite => sprite.getData('enemyId') === event.targetId)
+      ?? this.enemySprites[event.targetIndex]
+      ?? this.enemySprites[0];
+    if (!target?.active) return;
+
+    const startX = this.heroSprite.x;
+    const startY = this.heroSprite.y;
+    const lungeX = Phaser.Math.Linear(startX, target.x, 0.28);
+    const lungeY = Phaser.Math.Linear(startY, target.y, 0.12);
+    this.tweens.add({
+      targets: this.heroSprite,
+      x: lungeX,
+      y: lungeY,
+      duration: 150,
+      ease: 'Power2',
+      yoyo: true,
+      onComplete: () => {
+        if (!this.heroSprite?.active) return;
+        this.heroSprite.x = startX;
+        this.heroSprite.y = startY;
+      },
+    });
   }
 
   getCaitVitals() {
@@ -1103,6 +1241,8 @@ export class CombatScene extends Phaser.Scene {
     const onCaitAttackWindup = (event) => {
       this.time.delayedCall(80, () => {
         if (!this.scene.isActive()) return;
+        this.playCaitAction('attack');
+        this.lungeCaitAtTarget(event);
         this.spawnCaitMomentumBlackHole(event);
       });
     };
@@ -1158,6 +1298,7 @@ export class CombatScene extends Phaser.Scene {
 
     const onCardPlayed = ({ card, targetIndex }) => {
       if (this.isAsiphyxGravityCard(card)) {
+        this.playCaitAction('dash');
         this.queueFx(() => {
           this.spawnAsiphyxGravityPull(targetIndex);
         }, 380);
@@ -1167,6 +1308,7 @@ export class CombatScene extends Phaser.Scene {
     const onToast = ({ text }) => {
       const message = String(text ?? '');
       if (message.includes('Cait momentum') || message.includes('Center of Gravity')) {
+        this.playCaitAction(message.includes('Center of Gravity') ? 'jump' : 'run');
         this.queueFx(() => {
           this.spawnAsiphyxGravityPull(this.selectedTargetIndex ?? 0);
         }, 320);
@@ -1191,6 +1333,8 @@ export class CombatScene extends Phaser.Scene {
     const onTurnPhase = ({ phase }) => {
       const cfg = PHASE_LABELS[phase];
       if (!cfg) return;
+      if (phase === 'cait') this.playCaitAction('run');
+      if (phase === 'player') this.playCaitAction('idle', { returnToIdle: false });
       this.queueFx(() => {
         this.showTurnBanner(cfg.text, cfg.color);
       }, cfg.gap);

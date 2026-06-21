@@ -1,0 +1,75 @@
+{
+  "generatedAt": "2026-06-21T22:01:49.010Z",
+  "animations": [
+    {
+      "key": "idle",
+      "source": "idle_right",
+      "path": "/assets/heroes/kinetic-regent-cait/stream-cait-idle-strip.png",
+      "frames": 16,
+      "frameWidth": 160,
+      "frameHeight": 160,
+      "frameRate": 8,
+      "repeat": -1
+    },
+    {
+      "key": "isoIdle",
+      "source": "iso_idle_right_right",
+      "path": "/assets/heroes/kinetic-regent-cait/stream-cait-iso-idle-strip.png",
+      "frames": 16,
+      "frameWidth": 160,
+      "frameHeight": 160,
+      "frameRate": 8,
+      "repeat": -1
+    },
+    {
+      "key": "attack",
+      "source": "attack_right",
+      "path": "/assets/heroes/kinetic-regent-cait/stream-cait-attack-strip.png",
+      "frames": 18,
+      "frameWidth": 176,
+      "frameHeight": 176,
+      "frameRate": 18,
+      "repeat": 0
+    },
+    {
+      "key": "dash",
+      "source": "Dash",
+      "path": "/assets/heroes/kinetic-regent-cait/stream-cait-dash-strip.png",
+      "frames": 18,
+      "frameWidth": 176,
+      "frameHeight": 176,
+      "frameRate": 20,
+      "repeat": 0
+    },
+    {
+      "key": "jump",
+      "source": "jump_right",
+      "path": "/assets/heroes/kinetic-regent-cait/stream-cait-jump-strip.png",
+      "frames": 18,
+      "frameWidth": 160,
+      "frameHeight": 160,
+      "frameRate": 16,
+      "repeat": 0
+    },
+    {
+      "key": "run",
+      "source": "run_right",
+      "path": "/assets/heroes/kinetic-regent-cait/stream-cait-run-strip.png",
+      "frames": 16,
+      "frameWidth": 160,
+      "frameHeight": 160,
+      "frameRate": 14,
+      "repeat": -1
+    },
+    {
+      "key": "streamGrid",
+      "source": "streamavatarscaitformat.png",
+      "path": "/assets/heroes/kinetic-regent-cait/stream-avatar-grid-strip.png",
+      "frames": 40,
+      "frameWidth": 160,
+      "frameHeight": 128,
+      "frameRate": 10,
+      "repeat": -1
+    }
+  ]
+}

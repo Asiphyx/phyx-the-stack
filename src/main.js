@@ -3287,6 +3287,13 @@ function renderGameToText() {
       reliability: cait.reliability,
       risk: cait.risk,
       sprite: cait.sprite?.idleStrip ?? null,
+      animations: cait.sprite ? {
+        idle: cait.sprite.idleStrip ?? null,
+        attack: cait.sprite.attackStrip ?? null,
+        dash: cait.sprite.dashStrip ?? null,
+        jump: cait.sprite.jumpStrip ?? null,
+        run: cait.sprite.runStrip ?? null,
+      } : null,
       modules: (cait.modules ?? []).map(module => `${module.slot}:${module.name}`),
       intent: cait.intent?.name ?? 'Regent Priority',
     },

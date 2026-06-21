@@ -6,6 +6,8 @@ import sharp from 'sharp';
 const ROOT = process.cwd();
 const SOURCE_DIR = path.join(ROOT, 'public', 'assets', 'source', 'heroes', 'kinetic_regent_cait');
 const OUT_DIR = path.join(ROOT, 'public', 'assets', 'heroes', 'kinetic-regent-cait');
+const STREAM_PACK_DIR = path.join(SOURCE_DIR, 'stream_avatar_pack');
+const STREAM_SHEET = path.join(SOURCE_DIR, 'stream_avatar_sheet', 'streamavatarscaitformat.png');
 
 const sheets = [
   {
@@ -154,11 +156,149 @@ async function recolorSheet(sheet) {
   return output;
 }
 
+function pickEvenly(items, targetCount) {
+  if (items.length <= targetCount) return items;
+  return Array.from({ length: targetCount }, (_, index) => {
+    const sourceIndex = Math.round(index * (items.length - 1) / (targetCount - 1));
+    return items[sourceIndex];
+  });
+}
+
+function frameEntriesFromAtlas(atlas) {
+  return Object.entries(atlas.frames ?? {})
+    .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
+    .map(([name, frame]) => ({ name, ...frame }));
+}
+
+async function buildAtlasStrip(config) {
+  const atlasPath = path.join(STREAM_PACK_DIR, config.source, 'atlas.json');
+  const sheetPath = path.join(STREAM_PACK_DIR, config.source, 'spritesheet.png');
+  const atlas = JSON.parse(await fs.readFile(atlasPath, 'utf8'));
+  const sourceFrames = pickEvenly(frameEntriesFromAtlas(atlas), config.frames);
+  const frameWidth = config.frameWidth;
+  const frameHeight = config.frameHeight;
+  const cellBuffers = await Promise.all(sourceFrames.map((frame) =>
+    sharp(sheetPath)
+      .extract({ left: frame.x, top: frame.y, width: frame.w, height: frame.h })
+      .resize(frameWidth, frameHeight, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+      .png()
+      .toBuffer()
+  ));
+
+  const output = path.join(OUT_DIR, config.out);
+  await fs.mkdir(path.dirname(output), { recursive: true });
+  await sharp({
+    create: {
+      width: frameWidth * cellBuffers.length,
+      height: frameHeight,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    },
+  })
+    .composite(cellBuffers.map((input, index) => ({ input, left: index * frameWidth, top: 0 })))
+    .png({ compressionLevel: 9, palette: false })
+    .toFile(output);
+
+  return {
+    key: config.key,
+    source: config.source,
+    path: `/assets/heroes/kinetic-regent-cait/${config.out}`,
+    frames: cellBuffers.length,
+    frameWidth,
+    frameHeight,
+    frameRate: config.frameRate,
+    repeat: config.repeat,
+  };
+}
+
+async function buildGridStrip() {
+  try {
+    await fs.access(STREAM_SHEET);
+  } catch {
+    return null;
+  }
+
+  const columns = 10;
+  const rows = 4;
+  const sourceFrameWidth = 640;
+  const sourceFrameHeight = 512;
+  const frameWidth = 160;
+  const frameHeight = 128;
+  const cells = [];
+
+  for (let row = 0; row < rows; row += 1) {
+    for (let col = 0; col < columns; col += 1) {
+      cells.push(
+        sharp(STREAM_SHEET)
+          .extract({
+            left: col * sourceFrameWidth,
+            top: row * sourceFrameHeight,
+            width: sourceFrameWidth,
+            height: sourceFrameHeight,
+          })
+          .resize(frameWidth, frameHeight, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+          .png()
+          .toBuffer()
+      );
+    }
+  }
+
+  const cellBuffers = await Promise.all(cells);
+  const out = 'stream-avatar-grid-strip.png';
+  const output = path.join(OUT_DIR, out);
+  await sharp({
+    create: {
+      width: frameWidth * cellBuffers.length,
+      height: frameHeight,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    },
+  })
+    .composite(cellBuffers.map((input, index) => ({ input, left: index * frameWidth, top: 0 })))
+    .png({ compressionLevel: 9, palette: false })
+    .toFile(output);
+
+  return {
+    key: 'streamGrid',
+    source: 'streamavatarscaitformat.png',
+    path: `/assets/heroes/kinetic-regent-cait/${out}`,
+    frames: cellBuffers.length,
+    frameWidth,
+    frameHeight,
+    frameRate: 10,
+    repeat: -1,
+  };
+}
+
+async function buildStreamAvatarAnimations() {
+  const configs = [
+    { key: 'idle', source: 'idle_right', out: 'stream-cait-idle-strip.png', frames: 16, frameWidth: 160, frameHeight: 160, frameRate: 8, repeat: -1 },
+    { key: 'isoIdle', source: 'iso_idle_right_right', out: 'stream-cait-iso-idle-strip.png', frames: 16, frameWidth: 160, frameHeight: 160, frameRate: 8, repeat: -1 },
+    { key: 'attack', source: 'attack_right', out: 'stream-cait-attack-strip.png', frames: 18, frameWidth: 176, frameHeight: 176, frameRate: 18, repeat: 0 },
+    { key: 'dash', source: 'Dash', out: 'stream-cait-dash-strip.png', frames: 18, frameWidth: 176, frameHeight: 176, frameRate: 20, repeat: 0 },
+    { key: 'jump', source: 'jump_right', out: 'stream-cait-jump-strip.png', frames: 18, frameWidth: 160, frameHeight: 160, frameRate: 16, repeat: 0 },
+    { key: 'run', source: 'run_right', out: 'stream-cait-run-strip.png', frames: 16, frameWidth: 160, frameHeight: 160, frameRate: 14, repeat: -1 },
+  ];
+
+  const generated = [];
+  for (const config of configs) generated.push(await buildAtlasStrip(config));
+  const grid = await buildGridStrip();
+  if (grid) generated.push(grid);
+
+  const manifestPath = path.join(OUT_DIR, 'stream-avatar-animations.json');
+  await fs.writeFile(manifestPath, `${JSON.stringify({ generatedAt: new Date().toISOString(), animations: generated }, null, 2)}\n`);
+  return { generated, manifestPath };
+}
+
 async function run() {
   const generated = [];
   for (const sheet of sheets) generated.push(await recolorSheet(sheet));
+  const streamAnimations = await buildStreamAvatarAnimations();
   console.log(`Generated ${generated.length} Kinetic Regent Cait sheets:`);
   for (const file of generated) console.log(`- ${path.relative(ROOT, file)}`);
+  console.log(`Generated ${streamAnimations.generated.length} stream avatar animation strips:`);
+  for (const animation of streamAnimations.generated) console.log(`- ${animation.key}: ${animation.path}`);
+  console.log(`- manifest: ${path.relative(ROOT, streamAnimations.manifestPath)}`);
 }
 
 run().catch((error) => {
