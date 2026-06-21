@@ -10435,21 +10435,24 @@ body::after {
 }
 
 .technomancy-combat .combat-battlefield::before {
-  content: "INITIATIVE_QUEUE:   FAST   NORM   SLOW   SHIELD";
+  display: none !important;
+}
+
+.combat-field-label {
   position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  z-index: 4;
-  height: 54px;
-  display: grid;
-  place-items: center;
-  border-bottom: 2px solid var(--tech-magenta);
-  background: rgba(5,5,5,0.9);
-  color: var(--tech-magenta);
-  font-size: 0.72rem;
-  letter-spacing: 0.16em;
-  text-shadow: 0 0 10px rgba(255,0,255,0.7);
+  left: 18px;
+  top: 14px;
+  z-index: 9;
+  color: rgba(57, 255, 20, 0.5);
+  font-family: "Anybody", var(--font-display), monospace;
+  font-size: clamp(1.25rem, 2.35vw, 2.7rem);
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  text-shadow: 0 0 14px rgba(57,255,20,0.54), 0 0 28px rgba(0,240,255,0.24);
+  text-transform: uppercase;
 }
 
 .technomancy-combat .combat-battlefield::after {
@@ -10457,9 +10460,9 @@ body::after {
 }
 
 .technomancy-combat #phaser-game-container {
-  inset: 54px 0 0 0 !important;
+  inset: 0 !important;
   width: 100% !important;
-  height: calc(100% - 54px) !important;
+  height: 100% !important;
   min-height: 0 !important;
   z-index: 2 !important;
 }
@@ -11851,7 +11854,7 @@ body::after {
   #screen-container[data-music-domain="combat"] .combat-screen .system-menu-button {
     top: auto !important;
     right: 18px !important;
-    bottom: 196px !important;
+    bottom: 60px !important;
     width: 88px;
     min-width: 0;
     padding: 7px 8px;
@@ -11867,7 +11870,7 @@ body::after {
   #screen-container[data-music-domain="combat"] .music-control-bar {
     top: auto !important;
     right: 18px !important;
-    bottom: 148px !important;
+    bottom: 16px !important;
     width: calc(clamp(294px, 18vw, 354px) - 36px);
     max-width: calc(100vw - 36px);
     justify-content: center;
@@ -11941,19 +11944,17 @@ body::after {
   }
 }
 
-/* Final HUD placement pass: modules live in the Battle Notes rail, leaving the
-   top strip as compact identity/status instead of another crowded tray. */
+/* Final HUD placement pass: remove the unreadable top strip; rails own status. */
 .technomancy-combat {
   grid-template-columns: clamp(286px, 22vw, 390px) minmax(500px, 1fr) clamp(294px, 18vw, 354px) !important;
-  grid-template-rows: 76px minmax(0, 1fr) clamp(112px, 14vh, 146px) !important;
+  grid-template-rows: minmax(0, 1fr) clamp(128px, 15vh, 166px) !important;
+  grid-template-areas:
+    "left arena right"
+    "left log right" !important;
 }
 
 .technomancy-combat .combat-top-bar {
-  height: 76px !important;
-  min-height: 76px !important;
-  max-height: 76px !important;
-  grid-template-columns: minmax(238px, 0.28fr) minmax(0, 1fr) !important;
-  padding: 6px 12px !important;
+  display: none !important;
 }
 
 .technomancy-combat .combat-top-content {
@@ -12000,7 +12001,7 @@ body::after {
 
 .technomancy-combat .combat-right-rail {
   padding: 18px 16px !important;
-  gap: 9px !important;
+  gap: 8px !important;
 }
 
 .tech-right-metrics {
@@ -12034,6 +12035,105 @@ body::after {
   grid-template-rows: auto minmax(0, 1fr);
   gap: 8px;
   box-shadow: inset 0 0 18px rgba(0, 240, 255, 0.055);
+}
+
+.tech-artifact-dock,
+.tech-cait-plan {
+  min-height: 0;
+  border: 1px solid rgba(57, 255, 20, 0.38);
+  background: rgba(5, 5, 5, 0.78);
+  padding: 9px;
+  display: grid;
+  gap: 8px;
+  box-shadow: inset 0 0 18px rgba(57, 255, 20, 0.045);
+}
+
+.tech-artifact-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  min-height: 0;
+}
+
+.tech-artifact-chip {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  padding: 6px;
+  border: 1px solid rgba(255, 0, 255, 0.42);
+  background: rgba(255, 0, 255, 0.055);
+  color: rgba(229, 226, 225, 0.84);
+  overflow: hidden;
+}
+
+.tech-artifact-chip b,
+.tech-artifact-chip strong,
+.tech-mini-chip {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tech-artifact-chip b {
+  color: var(--tech-blue);
+  font-size: 0.42rem;
+  letter-spacing: 0.12em;
+}
+
+.tech-artifact-chip strong {
+  color: var(--tech-magenta);
+  font-size: 0.48rem;
+  letter-spacing: 0.04em;
+}
+
+.tech-cait-plan {
+  border-color: rgba(0, 240, 255, 0.38);
+}
+
+.tech-cait-plan > strong {
+  color: var(--tech-blue);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+
+.tech-cait-plan p {
+  margin: 0;
+  color: rgba(229, 226, 225, 0.78);
+  font-size: 0.54rem;
+  line-height: 1.35;
+}
+
+.tech-cait-plan-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.tech-cait-plan-grid span,
+.tech-mini-chip {
+  border: 1px solid rgba(0, 240, 255, 0.26);
+  background: rgba(0, 240, 255, 0.045);
+  color: rgba(229, 226, 225, 0.8);
+  padding: 4px 5px;
+  font-size: 0.48rem;
+  letter-spacing: 0.06em;
+}
+
+.tech-cait-plan-grid b,
+.tech-mini-chip:not(.empty) {
+  color: var(--tech-green);
+}
+
+.tech-cait-plan-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-height: 0;
+}
+
+.tech-mini-chip.empty {
+  color: rgba(229, 226, 225, 0.55);
 }
 
 .tech-module-dock-title {
@@ -12178,14 +12278,13 @@ body::after {
 }
 
 .technomancy-combat .combat-right-rail .tech-right-log:first-of-type {
-  flex: 1 1 0;
+  flex: 1 1 96px;
 }
 
 @media (max-width: 1180px) {
   .technomancy-combat {
-    grid-template-rows: 72px minmax(240px, 1fr) 188px 168px 132px !important;
+    grid-template-rows: minmax(240px, 1fr) 232px 168px 144px !important;
     grid-template-areas:
-      "top"
       "arena"
       "right"
       "left"
@@ -12219,7 +12318,9 @@ body::after {
   }
 
   .tech-status-title,
-  .tech-right-metrics {
+  .tech-right-metrics,
+  .tech-artifact-dock,
+  .tech-cait-plan {
     grid-column: 1;
   }
 
@@ -12232,6 +12333,25 @@ body::after {
 
   .technomancy-combat .combat-right-rail .tech-right-log {
     display: none;
+  }
+
+  .tech-artifact-dock {
+    display: none;
+  }
+
+  .tech-cait-plan {
+    padding: 7px;
+    gap: 5px;
+  }
+
+  .tech-cait-plan p,
+  .tech-cait-plan-status {
+    display: none;
+  }
+
+  .tech-cait-plan-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 3px;
   }
 
   .tech-status-title {

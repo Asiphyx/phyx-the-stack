@@ -1660,35 +1660,16 @@ function renderCombat() {
       ${escapeHtml(entry.text ?? '')}
     </p>
   `).join('');
-  const leftRailLogRows = (battleLog.length ? battleLog.slice(0, 5) : [
-    { type: 'info', text: 'No combat log entries yet.', ts: '--:--' },
-  ]).map(entry => `
-    <p class="tech-log-line ${escapeHtml(entry.type ?? 'info')}">
-      <span>[${escapeHtml(entry.type ?? 'SYS')}]</span>
-      ${escapeHtml(entry.text ?? '')}
-    </p>
-  `).join('');
-
-  const moduleTypeEntries = Object.entries(state.hand.reduce((acc, card) => {
-    const type = commandVerb(card);
-    acc[type] = (acc[type] ?? 0) + 1;
-    return acc;
-  }, {}));
-  const itemTypeChips = moduleTypeEntries
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .slice(0, 6)
-    .map(([type, count]) => `
-      <span class="combat-top-chip">
-        <b>${escapeHtml(type)}</b>
-        <small>${count}</small>
-      </span>
-    `).join('');
   const artifactChips = (cait?.modules ?? []).map(module => `
-    <span class="combat-top-chip artifact" title="${escapeHtml(module.text ?? '')}">
-      ${escapeHtml(module.name)} <small>· ${escapeHtml(module.slot ?? 'MODULE')}</small>
+    <span class="tech-artifact-chip" title="${escapeHtml(module.text ?? '')}">
+      <b>${escapeHtml(module.slot ?? 'MODULE')}</b>
+      <strong>${escapeHtml(module.name)}</strong>
     </span>
   `).join('');
   const statusChips = [];
+  const markedEnemy = combatSnapshot?.markedTargetId
+    ? state.enemies.find(enemy => enemy.id === combatSnapshot.markedTargetId)
+    : (combatSnapshot?.markedTargetIndex != null ? state.enemies[combatSnapshot.markedTargetIndex] : null);
   if ((combatSnapshot?.paradoxChain ?? 0) > 0) {
     statusChips.push(`PARADOX ${combatSnapshot.paradoxChain}/3`);
   }
@@ -1710,19 +1691,26 @@ function renderCombat() {
   if ((combatSnapshot?.startOfTurnDraw ?? 0) > 0) {
     statusChips.push(`DRAW +${combatSnapshot.startOfTurnDraw}`);
   }
-  if ((combatSnapshot?.markedTargetIndex ?? null) != null) {
-    const markedTargetName = combatSnapshot.markedTargetId
-      ? state.enemies.find(enemy => enemy.id === combatSnapshot.markedTargetId)?.name
-      : state.enemies[combatSnapshot.markedTargetIndex]?.name;
-    statusChips.push(`MARK ${markedTargetName ?? 'ENEMY'}`);
+  if (markedEnemy) {
+    statusChips.push(`MARK ${markedEnemy.name ?? 'ENEMY'}`);
   }
   const statusChipMarkup = statusChips.length > 0
-    ? statusChips.map(effect => `<span class="combat-top-chip">${escapeHtml(effect)}</span>`).join('')
-    : '<span class="combat-top-chip empty">STATUS STABLE</span>';
+    ? statusChips.map(effect => `<span class="tech-mini-chip">${escapeHtml(effect)}</span>`).join('')
+    : '<span class="tech-mini-chip empty">STATUS STABLE</span>';
+  const statusText = statusChips.length > 0 ? statusChips.join(' // ') : 'None';
+  const caitBaseDamage = 6 + Math.floor((snap.floor ?? 1) * 0.66);
+  const caitAttackCount = 1 + Math.max(0, combatSnapshot?.caitExtraActions ?? 0);
+  const caitKineticBonus = (combatSnapshot?.kineticComboStacks ?? 0) * 2;
+  const caitPotentialDrain = Math.min(combatSnapshot?.latentKineticPotential ?? 0, Math.round(caitBaseDamage * 0.8));
+  const caitFullHitDamage = Math.round(caitBaseDamage * (combatSnapshot?.caitDamageMult ?? 1)) + caitKineticBonus + caitPotentialDrain;
+  const caitCritMult = markedEnemy ? (combatSnapshot?.markedTargetCritMult ?? 1) : 1;
+  const caitPlannedDamage = Math.round(caitFullHitDamage * Math.max(1, caitCritMult));
+  const caitReliability = Math.round(Math.min(0.98, Math.max(0.75, cait?.reliability ?? 0.6)) * 100);
+  const caitTargetName = markedEnemy?.name ?? 'random enemy';
   const combatHintLines = [
     `Target: ${escapeHtml(selectedEnemy?.name ?? 'No target')}`,
     `Player intent: ${combatSnapshot?.lastPlayerIntent ? escapeHtml(combatSnapshot.lastPlayerIntent) : 'Stable'}`,
-    `Active effects: ${statusChipMarkup.includes('STATUS STABLE') ? 'None' : statusChipMarkup.replace(/<[^>]+>/g, '').slice(0, 72)}`,
+    `Active effects: ${escapeHtml(statusText).slice(0, 72)}`,
   ];
 
   const appendModuleGroup = (tray, label, entries, className) => {
@@ -1750,50 +1738,6 @@ function renderCombat() {
     sideModuleTray.innerHTML = '<span class="combat-top-empty-modules">NO MODULES IN HAND</span>';
   }
 
-  // ─── 1. TOP STATS BAR ───
-  const topBar = el('div', 'combat-top-bar');
-  topBar.style.setProperty('--hero-color', hero?.color ?? '#9933ff');
-  topBar.innerHTML = `
-    <div class="combat-top-hero-identity tech-os-title">
-      <span class="combat-top-hero-name glitch-text" data-text="PHYX_HUD_V1.0">PHYX_HUD_V1.0</span>
-      <span class="combat-top-hero-title">${escapeHtml(hero?.name ?? 'HERO')} // ${escapeHtml(hero?.title ?? '')}</span>
-      <span class="combat-top-duo">${escapeHtml(cait?.bondName ?? theme.duo)} // SESSION ACTIVE</span>
-    </div>
-
-    <div class="combat-top-content">
-      <div class="combat-top-chips">
-        <div class="combat-top-chip-cluster">
-          <span class="combat-top-chip-title">ITEM TYPES</span>
-          <div class="combat-top-chip-row">
-            ${itemTypeChips || '<span class="combat-top-chip empty">NO MODULES</span>'}
-          </div>
-        </div>
-        <div class="combat-top-chip-cluster">
-          <span class="combat-top-chip-title">ARTIFACTS</span>
-          <div class="combat-top-chip-row">
-            ${artifactChips || '<span class="combat-top-chip empty">NONE</span>'}
-          </div>
-        </div>
-        <div class="combat-top-chip-cluster">
-          <span class="combat-top-chip-title">STATUS</span>
-          <div class="combat-top-chip-row">
-            ${statusChipMarkup}
-          </div>
-        </div>
-      </div>
-      <div class="combat-top-metrics">
-        <span>DRAW <b>${snap.drawPileCount}</b></span>
-        <span>DISCARD <b>${snap.discardPileCount}</b></span>
-        <span>VOID <b>${snap.exhaustPileCount}</b></span>
-        <span>USER PATH ${userCommands}/${MODULE_SIDE_LIMIT}</span>
-        <span>CAIT PATH ${selfCommands}/${MODULE_SIDE_LIMIT}</span>
-        <span>HAND <b>${state.hand.length}</b></span>
-        <span>ENEMIES <b>${state.enemies.length}</b></span>
-      </div>
-    </div>
-  `;
-  section.appendChild(topBar);
-
   const leftRail = el('aside', 'combat-left-rail tech-hud-panel');
   leftRail.innerHTML = `
     <div class="tech-portrait-frame">
@@ -1818,9 +1762,6 @@ function renderCombat() {
       <b>PLAYER NOTES</b>
       <div class="tech-left-log-body">
         ${combatHintLines.map(line => `<p class="tech-left-log-line">${line}</p>`).join('')}
-      </div>
-      <div class="tech-left-log-loglines">
-        ${leftRailLogRows}
       </div>
     </div>
   `;
@@ -1885,6 +1826,10 @@ function renderCombat() {
     `;
     battlefield.appendChild(heroSpriteContainer);
   }
+
+  const fieldLabel = el('div', 'combat-field-label');
+  fieldLabel.textContent = 'Phyxian-Hud';
+  battlefield.appendChild(fieldLabel);
 
   if (engineMode !== 'phaser') {
     const presenceArt = hero?.selectionPortrait ?? hero?.battlePortrait ?? cait?.battlePortrait ?? CAIT_IDOL.battlePortrait;
@@ -1984,16 +1929,36 @@ function renderCombat() {
         <span>${state.hand.length} READY</span>
       </div>
     </div>
+    <div class="tech-artifact-dock">
+      <div class="tech-module-dock-title">
+        <b>CAIT ARTIFACTS</b>
+        <span>${(cait?.modules ?? []).length} LOCKED</span>
+      </div>
+      <div class="tech-artifact-grid">
+        ${artifactChips || '<span class="tech-mini-chip empty">NONE</span>'}
+      </div>
+    </div>
+    <div class="tech-cait-plan">
+      <div class="tech-module-dock-title">
+        <b>CAIT PLAN</b>
+        <span>${cait ? `${cait.hp}/${cait.maxHp} HP` : 'SYNCING'}</span>
+      </div>
+      <strong>${escapeHtml(caitIntent.name)}</strong>
+      <p>${escapeHtml(caitIntent.description)}</p>
+      <div class="tech-cait-plan-grid">
+        <span>TARGET <b>${escapeHtml(caitTargetName)}</b></span>
+        <span>FULL HIT <b>~${caitPlannedDamage}</b></span>
+        <span>STRIKES <b>${caitAttackCount}</b></span>
+        <span>SYNC <b>${caitReliability}%</b></span>
+      </div>
+      <div class="tech-cait-plan-status">${statusChipMarkup}</div>
+    </div>
     <div class="tech-right-log">
       <b>TACTICAL READOUT</b>
       <span>${escapeHtml(selectedEnemy?.name ?? 'NO TARGET')} is about to ${escapeHtml(targetIntent ? intentLabel(targetIntent) : 'wait').toLowerCase()}.</span>
       <div class="tech-right-log-entries">
         ${battleLogRows}
       </div>
-    </div>
-    <div class="tech-right-log">
-      <b>${escapeHtml(cait?.name ?? 'Cait')} // ${escapeHtml(cait?.bondName ?? theme.duo)}</b>
-      <span>${cait ? `${cait.hp}/${cait.maxHp} HP` : 'syncing'}</span>
     </div>
   `;
   const sideModuleDock = rightRail.querySelector('.tech-module-dock');
