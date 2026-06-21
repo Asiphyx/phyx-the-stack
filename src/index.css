@@ -281,6 +281,35 @@ body::after {
 
 #screen-container > section {
   z-index: 1;
+  opacity: 1;
+  transform: translateZ(0) scale(1);
+  transition:
+    opacity 240ms ease,
+    transform 280ms var(--ease-out-expo),
+    filter 280ms ease;
+}
+
+#screen-container.phase-fade-out > section {
+  opacity: 0;
+  transform: translateZ(0) scale(0.985);
+  filter: brightness(0.52) saturate(0.86) !important;
+}
+
+#screen-container.phase-fade-in > section {
+  animation: screenFadeIn 360ms var(--ease-out-expo) both;
+}
+
+@keyframes screenFadeIn {
+  0% {
+    opacity: 0;
+    transform: translateZ(0) scale(1.012);
+    filter: brightness(0.68) saturate(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: translateZ(0) scale(1);
+    filter: brightness(1) saturate(1);
+  }
 }
 
 #screen-container[data-music-active="true"] > section {

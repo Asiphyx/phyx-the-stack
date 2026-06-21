@@ -71,6 +71,8 @@ const COMBAT_TOP_MODULE_PREVIEW = 10;
 let battleLog = [];
 let introAudio = null;
 let bondStartAudio = null;
+let bondStartBuffer = null;
+let bondStartBufferPromise = null;
 let introMusicEnabled = false;
 // Set when the user explicitly pauses. The pointerdown autoplay-unlock below
 // must never override a deliberate pause, or the toggle button fights itself
@@ -89,6 +91,8 @@ let currentMusicTrack = DEFAULT_TRACK;
 let currentMusicDomain = 'title';
 let musicDomainCursor = {};
 let musicNodes = null;
+let musicDuckFactor = 1;
+let musicDuckTimer = null;
 let musicBlockedToastShown = false;
 let interactionPulse = 0;
 let interactionPulseTimer = null;
@@ -103,6 +107,7 @@ let enrichmentTimer = null;
 let currentEnrichmentCaption = '';
 // Which roster card the hero-select nav arrows are currently browsing.
 let heroSelectFocusIndex = 0;
+let screenTransitionActive = false;
 // Declared before the initial render() below — prepareMusicForPhase touches it
 // via updateMusicControlBar, and `vite dev` enforces the TDZ that esbuild relaxes.
 let musicCtrlBar = null;
@@ -128,6 +133,7 @@ function getPhaserContainer() {
 root.addEventListener('pointerdown', (event) => {
   const interactive = event.target.closest('button, .game-card, .hero-card, .map-node, .terminal-opt-btn, .save-slot');
   if (!interactive) return;
+  void loadBondStartBuffer();
   triggerInteractionPulse(event.clientX, event.clientY, interactive.matches('.btn-primary, .ult-btn-ready') ? 1 : 0.72);
   if (!introMusicEnabled && !musicUserPaused && game.getSnapshot().phase !== 'title') startIntroMusic();
 }, { capture: true });
@@ -226,6 +232,22 @@ bus.on('turnPhase', ({ phase, delayMs = 0 }) => {
 
 render();
 startEnrichmentTimer();
+
+function runWithScreenFade(action, { sound = false } = {}) {
+  if (screenTransitionActive) return;
+  screenTransitionActive = true;
+  if (sound) playBondStartSound();
+  root.classList.add('phase-fade-out');
+  setTimeout(() => {
+    action();
+    root.classList.remove('phase-fade-out');
+    root.classList.add('phase-fade-in');
+    screenTransitionActive = false;
+    setTimeout(() => {
+      root.classList.remove('phase-fade-in');
+    }, 360);
+  }, 260);
+}
 
 function render() {
   const snapshot = game.getSnapshot();
@@ -437,8 +459,10 @@ function renderTitle() {
     section.querySelector('#title-cat-button').setAttribute('aria-expanded', titleLauncherOpen ? 'true' : 'false');
   };
   section.querySelector('#start-btn').onclick = () => {
-    game.setPhase('heroSelect');
-    startIntroMusic();
+    runWithScreenFade(() => {
+      game.setPhase('heroSelect');
+      startIntroMusic();
+    }, { sound: true });
   };
   section.querySelector('#music-btn').onclick = () => toggleIntroMusic(section);
   section.querySelector('#title-caitdex-btn').onclick = () => { game.setPhase('caitdex'); };
@@ -584,11 +608,77 @@ function ensureBondStartAudio() {
   if (bondStartAudio || typeof Audio === 'undefined') return bondStartAudio;
   bondStartAudio = new Audio(BOND_START_SOUND);
   bondStartAudio.preload = 'auto';
-  bondStartAudio.volume = 0.86;
+  bondStartAudio.volume = 0.96;
+  bondStartAudio.playbackRate = 1.035;
   return bondStartAudio;
 }
 
+function ensureAudioContext() {
+  if (introAudioContext) return introAudioContext;
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContext) return null;
+  introAudioContext = new AudioContext();
+  return introAudioContext;
+}
+
+function loadBondStartBuffer() {
+  if (bondStartBuffer || bondStartBufferPromise) return bondStartBufferPromise;
+  const ctx = ensureAudioContext();
+  if (!ctx) return null;
+  bondStartBufferPromise = fetch(BOND_START_SOUND)
+    .then(response => response.arrayBuffer())
+    .then(data => ctx.decodeAudioData(data))
+    .then(buffer => {
+      bondStartBuffer = buffer;
+      return buffer;
+    })
+    .catch(() => null);
+  return bondStartBufferPromise;
+}
+
+function duckMusic(durationMs = 1150) {
+  musicDuckFactor = 0.34;
+  applyMusicVolume();
+  applyMusicDomainFilter(currentMusicDomain);
+  if (musicDuckTimer) clearTimeout(musicDuckTimer);
+  musicDuckTimer = setTimeout(() => {
+    musicDuckFactor = 1;
+    applyMusicVolume();
+    applyMusicDomainFilter(currentMusicDomain);
+  }, durationMs);
+}
+
 function playBondStartSound() {
+  duckMusic();
+  const ctx = ensureAudioContext();
+  if (ctx?.state === 'suspended') {
+    void ctx.resume();
+  }
+  if (ctx && bondStartBuffer) {
+    const now = ctx.currentTime;
+    const source = ctx.createBufferSource();
+    const highpass = ctx.createBiquadFilter();
+    const presence = ctx.createBiquadFilter();
+    const gain = ctx.createGain();
+    source.buffer = bondStartBuffer;
+    source.playbackRate.value = 1.035;
+    highpass.type = 'highpass';
+    highpass.frequency.value = 140;
+    presence.type = 'peaking';
+    presence.frequency.value = 3600;
+    presence.Q.value = 0.8;
+    presence.gain.value = 4.8;
+    gain.gain.setValueAtTime(0.92, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + Math.min(1.25, bondStartBuffer.duration + 0.08));
+    source.connect(highpass);
+    highpass.connect(presence);
+    presence.connect(gain);
+    gain.connect(ctx.destination);
+    source.start(now);
+    return;
+  }
+
+  void loadBondStartBuffer();
   const audio = ensureBondStartAudio();
   if (!audio) return;
   audio.currentTime = 0;
@@ -600,10 +690,8 @@ function ensureIntroAnalyser() {
   const audio = ensureIntroAudio();
   if (introAnalyser) return introAnalyser;
 
-  const AudioContext = window.AudioContext || window.webkitAudioContext;
-  if (!AudioContext) return null;
-
-  introAudioContext = new AudioContext();
+  introAudioContext = ensureAudioContext();
+  if (!introAudioContext) return null;
   const source = introAudioContext.createMediaElementSource(audio);
   introAnalyser = introAudioContext.createAnalyser();
   introAnalyser.fftSize = 256;
@@ -748,7 +836,7 @@ function applyMusicDomainFilter(domain) {
   rampAudioParam(musicNodes.lowpass.frequency, preset.lowpass, now);
   rampAudioParam(musicNodes.presence.frequency, preset.peakFrequency, now);
   rampAudioParam(musicNodes.presence.gain, preset.peakGain, now);
-  rampAudioParam(musicNodes.output.gain, preset.gain, now);
+  rampAudioParam(musicNodes.output.gain, preset.gain * musicDuckFactor, now);
   rampAudioParam(musicNodes.compressor.threshold, preset.threshold, now);
   rampAudioParam(musicNodes.compressor.ratio, preset.ratio, now);
 }
@@ -806,7 +894,7 @@ function setMusicVolume(value) {
 function applyMusicVolume() {
   if (!introAudio) return;
   const domainGain = MUSIC_DOMAIN_FILTERS[currentMusicDomain]?.gain ?? 0.72;
-  introAudio.volume = getMusicVolume() * (musicNodes ? 1 : domainGain);
+  introAudio.volume = getMusicVolume() * (musicNodes ? 1 : domainGain * musicDuckFactor);
 }
 
 function appendMusicControlBar() {
@@ -1548,9 +1636,10 @@ function renderHeroSelect() {
   `;
 
   const startRun = (hero) => {
-    playBondStartSound();
-    game.selectHero(hero);
-    game.startRun(JAM_RUN_FLOORS, cardPool, enemyCatalogue);
+    runWithScreenFade(() => {
+      game.selectHero(hero);
+      game.startRun(JAM_RUN_FLOORS, cardPool, enemyCatalogue);
+    }, { sound: true });
   };
 
   // Roster cards: playable hero launches immediately; locked cards browse.
