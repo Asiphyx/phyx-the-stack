@@ -12049,8 +12049,24 @@ body::after {
     z-index: 62;
   }
 
+  #screen-container:has(.technomancy-combat) .combat-screen .enrichment-key-button,
+  #screen-container[data-music-domain="combat"] .combat-screen .enrichment-key-button {
+    top: auto !important;
+    right: 114px !important;
+    bottom: 60px !important;
+    width: 88px;
+    min-width: 0;
+    padding: 7px 8px;
+    z-index: 62;
+  }
+
   #screen-container:has(.technomancy-combat) .combat-screen .system-menu-button strong,
   #screen-container[data-music-domain="combat"] .combat-screen .system-menu-button strong {
+    font-size: 0.62rem;
+  }
+
+  #screen-container:has(.technomancy-combat) .combat-screen .enrichment-key-button strong,
+  #screen-container[data-music-domain="combat"] .combat-screen .enrichment-key-button strong {
     font-size: 0.62rem;
   }
 
