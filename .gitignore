@@ -9,4 +9,11 @@ tmp/
 tmp_asset_contact/
 .serena/
 .superpowers/
+.neuralmemory/
+.remember/
+CLAUDE.md
+TODO.md
+progress.md
+asset-guide/
+comfy/
 scripts/*.mjs
