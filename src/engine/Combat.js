@@ -371,7 +371,15 @@ export class Combat {
 
     if (hasGravityTarget) {
       this.combatState.kineticComboStacks = Math.min(5, this.combatState.kineticComboStacks + 1);
-      bus.emit('toast', { text: `Kinetic Combo ${this.combatState.kineticComboStacks}/5 — Cait payoff primed.`, type: 'passive' });
+      const stacks = this.combatState.kineticComboStacks;
+      const comboHype = stacks >= 5
+        ? 'MAX COMBO — Cait payoff overcharged!!'
+        : stacks >= 4
+          ? 'Cait payoff surging!'
+          : stacks >= 2
+            ? 'Cait payoff primed.'
+            : 'Cait payoff building.';
+      bus.emit('toast', { text: `Kinetic Combo ${stacks}/5 — ${comboHype}`, type: stacks >= 4 ? 'crit' : 'passive' });
     }
 
     if (hasDefense) {

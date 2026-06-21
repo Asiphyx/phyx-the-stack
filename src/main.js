@@ -64,6 +64,7 @@ let turnBannerHideTimer = null;
 let turnBannerToken = 0;
 let combatLogRenderFrame = null;
 let combatVerboseOpen = false;
+let isPlayerTurnActive = true; // false while Cait/module/enemy phases are resolving — locks END TURN
 const MODULE_SIDE_LIMIT = 3;
 const COMBAT_TOP_MODULE_PREVIEW = 10;
 let battleLog = [];
@@ -195,6 +196,7 @@ function showTurnPhaseBanner(phase, label) {
 }
 
 bus.on('turnPhase', ({ phase, delayMs = 0 }) => {
+  isPlayerTurnActive = phase === 'player';
   const labels = {
     cait: 'CAIT STRIKES',
     module: 'MODULE RESOLVE',
@@ -415,7 +417,7 @@ function renderTitle() {
       </div>
       <button class="btn title-caitdex-btn" id="title-caitdex-btn" type="button">📖 Caitdex</button>
       <button class="btn title-save-menu-btn" id="title-save-menu-btn">Save States</button>
-      <button class="btn title-debug-btn" id="title-debug-boss-btn" type="button" title="Skip to floor 11 boss fight">🐛 BOSS TEST</button>
+      <button class="btn title-debug-btn" id="title-debug-boss-btn" type="button" title="Skip straight to the floor 11 boss with a fun deck">🐛 Just Play Boss</button>
     </div>
       <button class="title-cat-button" id="title-cat-button" type="button" aria-expanded="${titleLauncherOpen ? 'true' : 'false'}" aria-label="Boop the cat's nose to open CaitOS launch controls"></button>
     </div>
@@ -436,7 +438,19 @@ function renderTitle() {
   section.querySelector('#title-caitdex-btn').onclick = () => { game.setPhase('caitdex'); };
   section.querySelector('#title-save-menu-btn').onclick = () => openSystemMenu(false);
   section.querySelector('#title-debug-boss-btn').onclick = () => {
-    const hero = { ...HEROES.asiphyx };
+    // Asiphyx deals no direct damage himself (his passive blocks every
+    // 'attack'-type card and any DIRECT_DAMAGE_EFFECTS card via GameState's
+    // isCardAllowedForHero) — all damage routes through Cait. This curated
+    // starting deck leans into that combo archetype (mark/crit setup, extra
+    // Cait actions, block→Cait-damage conversion) so the quick-play boss
+    // fight is actually winnable and feels strong, not a random grab-bag.
+    const funDeckIds = [
+      'try_catch', 'try_catch', 'unit_test', 'coffee_break', 'coffee_break',
+      'docker_container', 'null_pointer_exception', 'transmute', 'transmute',
+      'gravity_mirror', 'mass_increase', 'singularity_target', 'singularity_target',
+      'cait_momentum', 'cait_momentum', 'void_sacrifice',
+    ];
+    const hero = { ...HEROES.asiphyx, startingDeck: funDeckIds };
     const normalIds = new Set([...ENCOUNTERS.easy.flat(), ...ENCOUNTERS.medium.flat()]);
     const catalogue = {
       normal: [...normalIds].map(id => ENEMIES[id]).filter(Boolean),
@@ -1699,6 +1713,7 @@ function renderCombat() {
       <strong>${escapeHtml(module.name)}</strong>
     </span>
   `).join('');
+  const kineticStacks = combatSnapshot?.kineticComboStacks ?? 0;
   const statusChips = [];
   const markedEnemy = combatSnapshot?.markedTargetId
     ? state.enemies.find(enemy => enemy.id === combatSnapshot.markedTargetId)
@@ -1711,9 +1726,6 @@ function renderCombat() {
   }
   if ((combatSnapshot?.caitExtraActions ?? 0) > 0) {
     statusChips.push(`CAIT +${combatSnapshot.caitExtraActions} FOLLOWUP${combatSnapshot.caitExtraActions > 1 ? 'S' : ''}`);
-  }
-  if ((combatSnapshot?.kineticComboStacks ?? 0) > 0) {
-    statusChips.push(`COMBO ${combatSnapshot.kineticComboStacks}`);
   }
   if ((combatSnapshot?.caitDamageMult ?? 1) > 1) {
     statusChips.push(`FOLLOWUP x${Number(combatSnapshot.caitDamageMult).toFixed(2)}`);
@@ -1789,7 +1801,7 @@ function renderCombat() {
       <button class="btn command-send-btn tech-cast-button" type="button" ${stagedCommands.length === 0 ? 'disabled' : ''}>SEND STACK</button>
       <button class="btn command-clear-btn" type="button" ${stagedCommands.length === 0 ? 'disabled' : ''}>CLEAR</button>
       <button class="btn ult-btn ${ultReady ? 'ult-ready' : ''}" ${ultReady ? '' : 'disabled'}>${hero?.ultimate?.emoji ?? '💥'} ULT</button>
-      <button class="btn btn-end-turn" id="end-turn-btn" ${state.hp <= 0 ? 'disabled' : ''}>END TURN</button>
+      <button class="btn btn-end-turn" id="end-turn-btn" ${state.hp <= 0 || !isPlayerTurnActive ? 'disabled' : ''}>END TURN</button>
     </div>
     <div class="tech-artifact-dock">
       <div class="tech-module-dock-title">
@@ -1807,6 +1819,13 @@ function renderCombat() {
       </div>
       <strong>${escapeHtml(caitIntent.name)}</strong>
       <p>${escapeHtml(caitIntent.description)}</p>
+      <div class="combo-meter combo-meter-${kineticStacks}" title="Kinetic Combo ${kineticStacks}/5">
+        <span class="combo-meter-label">KINETIC COMBO</span>
+        <div class="combo-meter-pips">
+          ${Array.from({ length: 5 }, (_, i) => `<i class="combo-pip ${i < kineticStacks ? 'is-lit' : ''}"></i>`).join('')}
+        </div>
+        <span class="combo-meter-count">${kineticStacks}/5</span>
+      </div>
       <div class="tech-cait-plan-grid">
         <span>TARGET <b>${escapeHtml(caitTargetName)}</b></span>
         <span>FULL HIT <b>~${caitPlannedDamage}</b></span>
@@ -1887,6 +1906,10 @@ function renderCombat() {
   const fieldLabel = el('div', 'combat-field-label');
   fieldLabel.textContent = 'Phyxian-Hud';
   battlefield.appendChild(fieldLabel);
+
+  const earlyAccessNote = el('div', 'combat-early-access-note');
+  earlyAccessNote.textContent = 'Error: proto-type: may break or update randomly! >3< (srsly. send feedback to my dev. OR just say hi to meeee!)';
+  battlefield.appendChild(earlyAccessNote);
 
   if (engineMode !== 'phaser') {
     const presenceArt = hero?.selectionPortrait ?? hero?.battlePortrait ?? cait?.battlePortrait ?? CAIT_IDOL.battlePortrait;
@@ -2110,7 +2133,7 @@ function renderCombat() {
     const endTurnBtn = section.querySelector('#end-turn-btn');
     if (endTurnBtn) {
       endTurnBtn.onclick = () => {
-        if (state.hp <= 0) return;
+        if (state.hp <= 0 || !isPlayerTurnActive) return;
         clearStagedCommands();
         game.combat.endPlayerTurn({ allowCait: false, reason: 'wait' });
       };

@@ -3080,6 +3080,15 @@ body::after {
   transition: transform 0.2s ease;
 }
 
+.enemy-sprite:not(.enemy-sprite-animated) {
+  animation: enemySpriteIdleBob 2.6s ease-in-out infinite;
+}
+
+@keyframes enemySpriteIdleBob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
 .enemy-sprite-animated {
   background-image: var(--enemy-idle-sprite);
   background-repeat: no-repeat;
@@ -3691,7 +3700,9 @@ body::after {
 .module-icon:hover {
   border-color: var(--hero-color, #9933ff);
   box-shadow: 0 0 8px rgba(153, 51, 255, 0.5);
-  transform: translateY(-2px);
+  transform: translateY(-2px) scale(1.08);
+  transform-origin: center bottom;
+  z-index: 5;
 }
 .module-icon:active { transform: translateY(0) scale(0.95); }
 .module-icon.unplayable {
@@ -9083,8 +9094,10 @@ body::after {
 }
 
 .combat-hand-area .module-icon:hover {
-  transform: translateY(-5px);
+  transform: translateY(-5px) scale(1.1);
+  transform-origin: center bottom;
   filter: brightness(1.18) drop-shadow(0 0 12px color-mix(in srgb, var(--hero-color, #9933ff) 42%, transparent));
+  z-index: 5;
 }
 
 .combat-hand-area .module-icon.target-enemy {
@@ -9265,8 +9278,10 @@ body::after {
 }
 
 .hud-module-row .module-icon:hover {
-  transform: translateY(-4px);
+  transform: translateY(-4px) scale(1.08);
+  transform-origin: center bottom;
   filter: brightness(1.18) drop-shadow(0 0 10px color-mix(in srgb, var(--hero-color, #9933ff) 42%, transparent));
+  z-index: 5;
 }
 
 .hud-module-row .module-icon-art {
@@ -10598,6 +10613,34 @@ body::after {
   text-transform: uppercase;
 }
 
+/* Flavor disclaimer in the empty strip above the arena content (top-center,
+   below .combat-field-label's bottom edge at ~7.2% of the battlefield so the
+   two never overlap; verified empirically via Playwright bounding boxes).
+   Percent-anchored per the art-anchoring rule; the battlefield background
+   stretches 100% 100%. */
+.combat-early-access-note {
+  position: absolute;
+  left: 50%;
+  top: 8.4%;
+  width: 56%;
+  transform: translateX(-50%);
+  z-index: 9;
+  text-align: center;
+  color: rgba(255, 64, 64, 0.78);
+  font-family: var(--font-body), monospace;
+  font-size: clamp(0.5rem, 0.62vw, 0.62rem);
+  letter-spacing: 0.02em;
+  line-height: 1.3;
+  pointer-events: none;
+  text-shadow: 0 0 8px rgba(255, 32, 32, 0.5);
+  animation: earlyAccessNotePulse 5s ease-in-out infinite;
+}
+
+@keyframes earlyAccessNotePulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.85; }
+}
+
 .technomancy-combat .combat-battlefield::after {
   display: none !important;
 }
@@ -11369,6 +11412,8 @@ body::after {
 }
 
 .technomancy-combat .left-module-tray .module-icon:hover {
+  transform: scale(1.08);
+  transform-origin: center bottom;
   z-index: 12;
 }
 
@@ -12264,6 +12309,91 @@ body::after {
   line-height: 1.42;
 }
 
+.combo-meter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 2px;
+  padding: 4px 6px;
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  border-radius: 4px;
+  background: rgba(0, 240, 255, 0.04);
+  transition: border-color 0.25s ease, background 0.25s ease, box-shadow 0.25s ease;
+}
+
+.combo-meter-label {
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.55);
+  font-family: var(--font-pixel);
+  font-size: 0.42rem;
+  letter-spacing: 0.08em;
+}
+
+.combo-meter-pips {
+  display: flex;
+  gap: 3px;
+  flex: 1;
+}
+
+.combo-pip {
+  width: 12px;
+  height: 8px;
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.4);
+  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.combo-pip.is-lit {
+  background: var(--tech-blue, #00f0ff);
+  box-shadow: 0 0 6px rgba(0, 240, 255, 0.7);
+}
+
+.combo-meter-count {
+  flex-shrink: 0;
+  color: var(--tech-blue);
+  font-family: var(--font-pixel);
+  font-size: 0.48rem;
+  letter-spacing: 0.04em;
+}
+
+/* Escalating payoff feedback as kinetic combo stacks build toward 5 */
+.combo-meter-4 {
+  border-color: rgba(255, 51, 153, 0.45);
+  background: rgba(255, 51, 153, 0.08);
+  box-shadow: 0 0 10px rgba(255, 51, 153, 0.25);
+}
+
+.combo-meter-4 .combo-pip.is-lit {
+  background: #ff3399;
+  box-shadow: 0 0 7px rgba(255, 51, 153, 0.8);
+}
+
+.combo-meter-4 .combo-meter-count {
+  color: #ff3399;
+}
+
+.combo-meter-5 {
+  border-color: rgba(255, 204, 0, 0.6);
+  background: rgba(255, 204, 0, 0.1);
+  box-shadow: 0 0 16px rgba(255, 204, 0, 0.4);
+  animation: comboMeterMaxPulse 1.1s ease-in-out infinite;
+}
+
+.combo-meter-5 .combo-pip.is-lit {
+  background: var(--neon-gold, #ffcc00);
+  box-shadow: 0 0 9px rgba(255, 204, 0, 0.9);
+}
+
+.combo-meter-5 .combo-meter-count {
+  color: var(--neon-gold, #ffcc00);
+}
+
+@keyframes comboMeterMaxPulse {
+  0%, 100% { box-shadow: 0 0 16px rgba(255, 204, 0, 0.4); }
+  50% { box-shadow: 0 0 24px rgba(255, 204, 0, 0.7); }
+}
+
 .tech-cait-plan-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -12475,6 +12605,9 @@ body::after {
 .technomancy-combat .right-module-tray .module-icon:focus-visible {
   border-color: rgba(255, 255, 255, 0.7) !important;
   box-shadow: inset 0 0 18px rgba(0, 240, 255, 0.14), 0 0 16px rgba(0, 240, 255, 0.22) !important;
+  transform: scale(1.08);
+  transform-origin: center bottom;
+  z-index: 5;
 }
 
 .technomancy-combat .combat-right-rail .tech-right-log {
@@ -12591,6 +12724,13 @@ body::after {
 .combat-activity-line.command em,
 .combat-verbose-line.command em {
   color: rgba(0, 240, 255, 0.86);
+}
+
+.combat-activity-line.crit em,
+.combat-verbose-line.crit em {
+  color: rgba(255, 51, 153, 0.95);
+  font-weight: 700;
+  text-shadow: 0 0 8px rgba(255, 51, 153, 0.55);
 }
 
 .combat-verbose-overlay {
