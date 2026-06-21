@@ -1758,6 +1758,30 @@ function renderCombat() {
       <button class="btn ult-btn ${ultReady ? 'ult-ready' : ''}" ${ultReady ? '' : 'disabled'}>${hero?.ultimate?.emoji ?? '💥'} ULT</button>
       <button class="btn btn-end-turn" id="end-turn-btn" ${state.hp <= 0 ? 'disabled' : ''}>END TURN</button>
     </div>
+    <div class="tech-artifact-dock">
+      <div class="tech-module-dock-title">
+        <b>CAIT ARTIFACTS</b>
+        <span>${(cait?.modules ?? []).length} LOCKED</span>
+      </div>
+      <div class="tech-artifact-grid">
+        ${artifactChips || '<span class="tech-mini-chip empty">NONE</span>'}
+      </div>
+    </div>
+    <div class="tech-cait-plan">
+      <div class="tech-module-dock-title">
+        <b>CAIT PLAN</b>
+        <span>${cait ? `${cait.hp}/${cait.maxHp} HP` : 'SYNCING'}</span>
+      </div>
+      <strong>${escapeHtml(caitIntent.name)}</strong>
+      <p>${escapeHtml(caitIntent.description)}</p>
+      <div class="tech-cait-plan-grid">
+        <span>TARGET <b>${escapeHtml(caitTargetName)}</b></span>
+        <span>FULL HIT <b>~${caitPlannedDamage}</b></span>
+        <span>STRIKES <b>${caitAttackCount}</b></span>
+        <span>SYNC <b>${caitReliability}%</b></span>
+      </div>
+      <div class="tech-cait-plan-status">${statusChipMarkup}</div>
+    </div>
     <div class="tech-left-log">
       <b>PLAYER NOTES</b>
       <div class="tech-left-log-body">
@@ -1928,30 +1952,6 @@ function renderCombat() {
         <b>MODULE ROUTER</b>
         <span>${state.hand.length} READY</span>
       </div>
-    </div>
-    <div class="tech-artifact-dock">
-      <div class="tech-module-dock-title">
-        <b>CAIT ARTIFACTS</b>
-        <span>${(cait?.modules ?? []).length} LOCKED</span>
-      </div>
-      <div class="tech-artifact-grid">
-        ${artifactChips || '<span class="tech-mini-chip empty">NONE</span>'}
-      </div>
-    </div>
-    <div class="tech-cait-plan">
-      <div class="tech-module-dock-title">
-        <b>CAIT PLAN</b>
-        <span>${cait ? `${cait.hp}/${cait.maxHp} HP` : 'SYNCING'}</span>
-      </div>
-      <strong>${escapeHtml(caitIntent.name)}</strong>
-      <p>${escapeHtml(caitIntent.description)}</p>
-      <div class="tech-cait-plan-grid">
-        <span>TARGET <b>${escapeHtml(caitTargetName)}</b></span>
-        <span>FULL HIT <b>~${caitPlannedDamage}</b></span>
-        <span>STRIKES <b>${caitAttackCount}</b></span>
-        <span>SYNC <b>${caitReliability}%</b></span>
-      </div>
-      <div class="tech-cait-plan-status">${statusChipMarkup}</div>
     </div>
     <div class="tech-right-log">
       <b>TACTICAL READOUT</b>
