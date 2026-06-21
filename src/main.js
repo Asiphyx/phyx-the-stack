@@ -96,6 +96,9 @@ let feedbackSent = false;
 let titleWindowOffset = { x: 0, y: 0 };
 let titleLauncherOpen = false;
 let caitCodecOffset = { x: 0, y: 0 };
+let enrichmentKeyModalOpen = false;
+let enrichmentTimer = null;
+let currentEnrichmentCaption = '';
 // Which roster card the hero-select nav arrows are currently browsing.
 let heroSelectFocusIndex = 0;
 // Declared before the initial render() below — prepareMusicForPhase touches it
@@ -220,6 +223,7 @@ bus.on('turnPhase', ({ phase, delayMs = 0 }) => {
 });
 
 render();
+startEnrichmentTimer();
 
 function render() {
   const snapshot = game.getSnapshot();
@@ -465,6 +469,7 @@ function renderTitle() {
     startIntroMusic();
   };
   appendSystemMenuOverlay(section, false);
+  appendEnrichmentKeyOverlay(section);
   applyTitleWindowOffset(section.querySelector('.title-cat-menu'));
   wireTitleWindowDrag(section);
 }
@@ -1560,6 +1565,7 @@ function renderHeroSelect() {
 
   section.appendChild(board);
   appendSystemMenuOverlay(section, false);
+  appendEnrichmentKeyOverlay(section);
   root.appendChild(section);
 }
 
@@ -1620,6 +1626,8 @@ function renderMap() {
   appendSystemMenuButton(section, true);
   root.appendChild(section);
   appendSystemMenuOverlay(section, true);
+  appendEnrichmentKeyOverlay(section);
+  appendCaitEnrichmentWidget(section);
 }
 
 function handleMapNode(node) {
@@ -1937,6 +1945,11 @@ function renderCombat() {
           <span>CAIT BROADCAST ONLINE</span>
           <strong>${escapeHtml(caitIntent.name)}</strong>
           <p>${escapeHtml(caitIntent.description)}</p>
+          ${currentEnrichmentCaption ? `
+            <div class="cait-codec-enrichment" style="margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(255, 204, 0, 0.15); color: var(--neon-gold); font-size: 0.7rem; font-style: italic;">
+              "${escapeHtml(currentEnrichmentCaption)}"
+            </div>
+          ` : ''}
           <div class="cait-codec-health" aria-label="Cait health">
             <b>Cait HP</b>
             <i><em style="width:${cait ? pct(cait.hp, cait.maxHp) : 0}%"></em></i>
@@ -2106,6 +2119,7 @@ function renderCombat() {
 
   root.appendChild(section);
   appendSystemMenuOverlay(section, true);
+  appendEnrichmentKeyOverlay(section);
   if (typeof caitCodecWindow !== 'undefined' && caitCodecWindow) {
     wireCaitCodecDrag(caitCodecWindow);
     const caitCodecCenter = caitCodecWindow.querySelector('.cait-codec-center');
@@ -2477,6 +2491,8 @@ function renderDraft() {
   appendSystemMenuButton(section, true);
   root.appendChild(section);
   appendSystemMenuOverlay(section, true);
+  appendEnrichmentKeyOverlay(section);
+  appendCaitEnrichmentWidget(section);
 }
 
 // ──────────────────────────────────────────────────────────
@@ -2563,6 +2579,182 @@ function appendSystemMenuButton(section, canSave = true) {
   button.innerHTML = '<span>MENU</span><strong>Save</strong>';
   button.onclick = () => openSystemMenu(canSave);
   section.appendChild(button);
+
+  appendEnrichmentKeyButton(section);
+}
+
+function appendEnrichmentKeyButton(section) {
+  const button = el('button', 'enrichment-key-button');
+  button.type = 'button';
+  button.innerHTML = '<span>ENRICH</span><strong>🔑 KEY</strong>';
+  button.onclick = () => {
+    enrichmentKeyModalOpen = true;
+    render();
+  };
+  section.appendChild(button);
+}
+
+function appendEnrichmentKeyOverlay(section) {
+  if (!enrichmentKeyModalOpen) return;
+  const currentKey = localStorage.getItem('openai-api-key') ?? '';
+  section.insertAdjacentHTML('beforeend', `
+    <div class="system-menu-overlay" role="dialog" aria-modal="true" aria-label="Enrichment Key Config">
+      <div class="system-menu-backdrop" data-close-enrichment-modal></div>
+      <div class="system-menu-panel" style="max-width: 440px;">
+        <div class="system-menu-header">
+          <span>// ENRICHMENT MODULE</span>
+          <button class="system-menu-close" data-close-enrichment-modal aria-label="Close modal">x</button>
+        </div>
+        <div style="padding: 20px; color: var(--text-primary); font-family: var(--font-display); font-size: 0.8rem;">
+          <p style="margin-bottom: 15px; color: var(--neon-gold); font-size: 0.72rem; line-height: 1.4;">Provide an OpenAI API Key to enable context-aware sarcastic comments from Cait every minute.</p>
+          <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px;">
+            <label for="openai-key-input" style="font-size: 0.65rem; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 0.05em;">OpenAI API Key</label>
+            <input type="password" id="openai-key-input" class="enrichment-key-input" value="${currentKey}" placeholder="sk-..." />
+          </div>
+          <div style="display: flex; gap: 10px;">
+            <button class="btn btn-primary" id="save-enrichment-key-btn" style="flex: 1;">Save Key</button>
+            <button class="btn" id="clear-enrichment-key-btn" style="border-color: var(--neon-red); color: var(--neon-red);">Clear</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `);
+
+  section.querySelectorAll('[data-close-enrichment-modal]').forEach(el => {
+    el.onclick = () => {
+      enrichmentKeyModalOpen = false;
+      render();
+    };
+  });
+
+  const saveBtn = section.querySelector('#save-enrichment-key-btn');
+  if (saveBtn) {
+    saveBtn.onclick = () => {
+      const val = section.querySelector('#openai-key-input').value.trim();
+      if (val) {
+        localStorage.setItem('openai-api-key', val);
+        triggerEnrichmentCaption();
+      } else {
+        localStorage.removeItem('openai-api-key');
+        currentEnrichmentCaption = '';
+      }
+      enrichmentKeyModalOpen = false;
+      render();
+    };
+  }
+
+  const clearBtn = section.querySelector('#clear-enrichment-key-btn');
+  if (clearBtn) {
+    clearBtn.onclick = () => {
+      localStorage.removeItem('openai-api-key');
+      currentEnrichmentCaption = '';
+      enrichmentKeyModalOpen = false;
+      render();
+    };
+  }
+}
+
+function getEnrichmentContext() {
+  const snap = game.getSnapshot();
+  const state = game.state;
+  const phase = snap.phase;
+  
+  let contextStr = `Current game state:
+- Phase: ${phase}
+- Floor: ${snap.floor}
+- Player HP: ${snap.hp}/${snap.maxHp}
+- Cait HP: ${state.cait ? `${state.cait.hp}/${state.cait.maxHp}` : 'Not spawned'}
+- Gold: ${snap.gold}
+- Deck Size: ${state.deck ? state.deck.length : 0} cards`;
+
+  if (phase === 'combat' && state.enemies && state.enemies.length > 0) {
+    const enemyNames = state.enemies.map(e => `${e.name} (HP: ${e.hp}/${e.maxHp})`).join(', ');
+    contextStr += `\n- Current combat enemies: ${enemyNames}`;
+  } else if (phase === 'draft') {
+    contextStr += `\n- Current state: In draft/refactoring screen choosing cards.`;
+  } else if (phase === 'map') {
+    contextStr += `\n- Current state: Looking at the floor map choosing the next path.`;
+  }
+  
+  return contextStr;
+}
+
+async function triggerEnrichmentCaption() {
+  const apiKey = localStorage.getItem('openai-api-key');
+  if (!apiKey) return;
+  
+  const context = getEnrichmentContext();
+  const prompt = `You are Cait, a sarcastic android girl character in a roguelike deckbuilder game. 
+You are "Cait, Kinetic Regent" and your duo-locked assistant is "Asiphyx". Asiphyx is a gravity pilot who programs modules for you but doesn't fight directly. You are sarcastic, witty, slightly condescending, and extra sarcastic. 
+Given the current game state, write a 1 to 2 sentence commentary. Keep it short, sharp, and highly sarcastic. Do not use quotes around your response.
+
+${context}`;
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: 'You are Cait, an extra sarcastic android girl.' },
+          { role: 'user', content: prompt }
+        ],
+        max_tokens: 60,
+        temperature: 0.9
+      })
+    });
+    
+    if (!response.ok) {
+      console.error('OpenAI enrichment error:', response.statusText);
+      return;
+    }
+    
+    const data = await response.json();
+    const comment = data.choices?.[0]?.message?.content?.trim();
+    if (comment) {
+      currentEnrichmentCaption = comment.replace(/^"|"$/g, '');
+      render();
+    }
+  } catch (err) {
+    console.error('OpenAI enrichment network error:', err);
+  }
+}
+
+function startEnrichmentTimer() {
+  if (enrichmentTimer) return;
+  
+  // Trigger immediately on start if key exists and no caption is loaded yet
+  const apiKey = localStorage.getItem('openai-api-key');
+  if (apiKey && !currentEnrichmentCaption) {
+    triggerEnrichmentCaption();
+  }
+
+  enrichmentTimer = setInterval(() => {
+    const phase = game.getSnapshot().phase;
+    if (['map', 'combat', 'draft'].includes(phase)) {
+      triggerEnrichmentCaption();
+    }
+  }, 60000);
+}
+
+function appendCaitEnrichmentWidget(section) {
+  if (!currentEnrichmentCaption) return;
+  const phase = game.getSnapshot().phase;
+  if (phase === 'combat') return; // Combat shows it inside the Cait Codec window
+  
+  const widget = el('div', 'cait-enrichment-widget');
+  widget.innerHTML = `
+    <img src="${CAIT_IDOL.battlePortrait}" alt="Cait" class="cait-enrichment-avatar" />
+    <div class="cait-enrichment-copy">
+      <span>CAIT // ENRICHMENT</span>
+      <p>"${escapeHtml(currentEnrichmentCaption)}"</p>
+    </div>
+  `;
+  section.appendChild(widget);
 }
 
 function appendSystemMenuOverlay(section, canSave = true) {
