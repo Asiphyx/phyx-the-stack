@@ -162,7 +162,7 @@ the same crop of the source PNG.
 
 ## 9. Asset + state docs
 
-- `TODO.md` (repo root) — current project state, breadcrumbs, next steps.
-- `asset-guide/index.html` — prompt bricks for generating new art.
-- `asset-guide/checklist.html` — agent-editable `ASSET_STATUS` JSON.
-- `docs/asset-pipeline.md`, `docs/character-direction.md` — art direction.
+- `README.md` — public-facing project entry, play link, GitHub link, and setup.
+- `docs/roadmap.md` — planned combat-fun and Budder Cat genre-breach direction.
+- `docs/asset-pipeline.md` — current asset layout and replacement rules.
+- `docs/character-direction.md` — character identity and assistant route notes.

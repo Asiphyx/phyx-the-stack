@@ -36,6 +36,16 @@ A browser lies to you about localhost. Click it. Fullscreen if you're not a cowa
 
 READY.
 
+## Links
+
+- Play: https://phyx-the-stack.vercel.app
+- GitHub: https://github.com/Asiphyx/phyx-the-stack
+- Roadmap: [docs/roadmap.md](docs/roadmap.md)
+
+The optional OpenAI API key in the launcher only enables context-aware Cait
+comments during a run. It is not required to play, and the core game loop works
+without it.
+
 ## The actual loop (my words)
 
 Stage the modules.  
