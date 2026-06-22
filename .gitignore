@@ -17,3 +17,6 @@ progress.md
 asset-guide/
 comfy/
 scripts/*.mjs
+
+# Local temp Vite override
+vite.dev-local.config.js
